@@ -574,6 +574,8 @@ async function regionFeedback(browser, url) {
       && n.targets.length === 2 && n.targets[0].selector === '#t1' && /p$/.test(n.targets[1].selector) && n.targets[1].text.startsWith('Tom & Jerry'),
     JSON.stringify(n));
   check('region note: HTML unchanged, not dirty', (await s.content()) === original && !(await s.dirty()));
+  // The sidecar is written before the response reaches the editor: wait for the card it renders.
+  await s.page.waitForFunction(() => /region/.test(document.querySelector('#note-list')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
   check('region: the feedback card says "region"', /region/.test(await s.page.textContent('#note-list')));
 
   // Duplicating the title makes #t1 ambiguous: after the save the region's elements are
