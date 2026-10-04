@@ -10,7 +10,7 @@
 // `env` = { isOriginal(node), isAmbiguous(node), modelOf(node) }.
 
 // Attributes the editor itself puts on live nodes; they never count as a difference.
-export const EDITOR_ATTRS = new Set(['contenteditable', 'spellcheck', 'data-ed-edit', 'data-ed-overflow', 'data-ed-slide', 'data-ed-slide-anc', 'data-ed-display']);
+export const EDITOR_ATTRS = new Set(['contenteditable', 'spellcheck', 'data-ed-edit', 'data-ed-svgtext', 'data-ed-overflow', 'data-ed-slide', 'data-ed-slide-anc', 'data-ed-display']);
 
 // A comparable form of a node's children. Both trees come out of the same HTML parser, so
 // entities, NBSP and whitespace already agree; nothing is normalised (it would hide edits).

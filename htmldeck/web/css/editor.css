@@ -191,6 +191,11 @@ button:disabled { cursor: default; opacity: .38; }
 .hd.w, .hd.e { width: 8px; height: 22px; border-radius: 4px; top: calc(50% - 11px); cursor: ew-resize; }
 .hd.w { left: -5px; } .hd.e { right: -5px; }
 .sel-box.small .hd.w, .sel-box.small .hd.e { display: none; }
+/* Shapes and text inside a diagram are positioned by SVG attributes, not by a CSS box. */
+.sel-box.svg .hd { display: none; }
+/* Typing into a diagram's text (contenteditable does nothing on SVG). */
+.svg-text { position: absolute; left: 0; top: 0; z-index: 2; margin: 0; padding: 0 6px; border: 0; border-radius: 4px; background: #fff; color: var(--ink); outline: 2px solid var(--accent); box-shadow: 0 0 0 5px rgba(255,90,31,.16); pointer-events: auto; line-height: 1; min-width: 0; }
+.svg-text[hidden] { display: none; }
 .size-tip { position: absolute; left: 50%; bottom: -34px; transform: translateX(-50%); padding: 3px 8px; border-radius: 6px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 600; white-space: nowrap; display: none; }
 .sel-box.dragging .size-tip { display: block; }
 /* Two separate boxes: the block's tools, then AI Feedback on its own a gap away, so it is never

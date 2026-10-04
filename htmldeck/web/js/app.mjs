@@ -155,6 +155,8 @@ html.ed-deck [data-ed-slide-anc] { transform: none !important; translate: none !
 [data-ed-edit] { cursor: text; }
 [data-ed-edit]:not([contenteditable]):hover { outline: 1.5px solid rgba(255,90,31,.6) !important; outline-offset: 2px; }
 [data-ed-edit][contenteditable] { outline: none !important; caret-color: #ff5a1f; }
+[data-ed-svgtext] { cursor: text; }
+[data-ed-svgtext]:hover { outline: 1.5px solid rgba(255,90,31,.6) !important; outline-offset: 2px; }
 ::selection { background: rgba(255,90,31,.24); }
 ::highlight(ed-find) { background-color: rgba(255,196,0,.45); }
 ::highlight(ed-find-cur) { background-color: #ff9a1f; color: #000; }
@@ -283,8 +285,10 @@ function hasDirectText(node) {
   return false;
 }
 // Mark the outermost original elements that carry their own text as editable roots.
+// Text inside an SVG diagram is marked apart (see openSvgText).
 function markRoots(scope, includeSelf) {
   const walk = (node, isScope) => {
+    if (node.localName === 'svg' || node.ownerSVGElement) { if (isOriginal(node)) markSvgText(node); return; }
     if (SKIP_TAGS.has(node.localName) || !isOriginal(node) || node.classList.contains('notes')) return;
     if ((!isScope || includeSelf) && !node.hasAttribute('data-ed-slide') && hasDirectText(node)) {
       node.setAttribute('data-ed-edit', '');
@@ -296,6 +300,23 @@ function markRoots(scope, includeSelf) {
   walk(scope, true);
 }
 const isRoot = node => !!node && node.hasAttribute('data-ed-edit');
+// <text>, <tspan> and <textPath> that hold plain text only: editing one replaces its text and
+// nothing else, so its position, styling and the rest of the diagram stay as authored.
+const SVG_TEXT = new Set(['text', 'tspan', 'textPath']);
+function markSvgText(scope) {
+  for (const n of [scope, ...scope.querySelectorAll('*')]) {
+    if (!SVG_TEXT.has(n.localName) || n.children.length || !/\S/.test(n.textContent) || !isOriginal(n)) continue;
+    n.setAttribute('data-ed-svgtext', '');
+    S.liveById.set(n.dataset.edId, n);
+  }
+}
+const isSvgText = node => !!node && node.hasAttribute?.('data-ed-svgtext');
+// The diagram itself: the outermost <svg> around a node.
+function outerSvg(node) {
+  let svg = node.closest('svg');
+  while (svg?.ownerSVGElement) svg = svg.ownerSVGElement;
+  return svg;
+}
 
 // ================================================================ open / load
 const LAST_FILE_KEY = 'gs9_editor_last_file';
@@ -361,6 +382,7 @@ function resetState() {
   endEditSession();
   S.touchedInFlight = null;
   S.sel = null; S.editing = false; S.textDirty = false; S.savedRange = null; S.lastWrap = null;
+  S.svgEdit = null; $('#svg-text').hidden = true;
   clearTimeout(S.commitTimer);
   S.undo = []; S.redo = []; S.seq = 0; S.savedSeq = 0; S.saveError = '';
   if (S.crop) { S.crop.cancelDrag?.(); S.crop = null; el.ctx.classList.remove('crop-mode'); el.box.classList.remove('crop'); }
@@ -630,7 +652,11 @@ function bindFrameEvents(doc, win) {
     }
     const img = t && t.closest('img');
     const root = t && t.closest('[data-ed-edit]');
-    const hit = img && isOriginal(img) ? img : root && isOriginal(root) ? root : null;
+    // A diagram is picked as one block (AI Feedback, delete, move); its text is edited in place.
+    const svgText = !root && t?.closest('[data-ed-svgtext]');
+    const svg = !root && t && outerSvg(t);
+    const hit = img && isOriginal(img) ? img : root && isOriginal(root) ? root
+      : svgText && isOriginal(svgText) ? svgText : svg && isOriginal(svg) ? svg : null;
     if (hit && e.shiftKey && (S.sel || S.multi)) {
       e.preventDefault();
       toggleMulti(hit);
@@ -644,6 +670,17 @@ function bindFrameEvents(doc, win) {
     }
     if (root && isOriginal(root)) {
       if (root !== S.sel || !S.editing) select(root, { edit: true });
+      return;
+    }
+    if (svgText && isOriginal(svgText)) {
+      e.preventDefault();
+      select(svgText, { edit: false });
+      openSvgText(svgText);
+      return;
+    }
+    if (svg && isOriginal(svg)) {
+      e.preventDefault();
+      select(svg, { edit: false });
       return;
     }
     if (S.sel) deselect();
@@ -730,6 +767,7 @@ function select(node, { edit = true } = {}) {
   el.pill.classList.add('show');
   el.box.classList.add('show');
   el.box.classList.toggle('block', !isRoot(node));
+  el.box.classList.toggle('svg', !!node.ownerSVGElement);
   const slideIdx = S.slides.indexOf(node.closest('[data-ed-slide]'));
   if (slideIdx >= 0 && slideIdx !== S.cur) showSlide(slideIdx, { keepSel: true });
   refreshToolbar();
@@ -763,6 +801,7 @@ function setEditing(on) {
 function deselect() {
   stopFxPreview();
   exitCrop();
+  closeSvgText(true);
   if (!S.sel) return;
   setEditing(false);
   S.sel = null;
@@ -812,6 +851,7 @@ function scheduleCommit() {
   S.commitTimer = setTimeout(commitText, 700);
 }
 function flushPending() {
+  closeSvgText(true);
   if (S.notesTimer) { clearTimeout(S.notesTimer); S.notesTimer = 0; saveNotes(); }
   commitText();
 }
@@ -912,6 +952,92 @@ function commitText() {
   pushOp({ type: 'html', id, before, after, label: 'Edit text' });
   queueThumb(node);
 }
+// ---------------------------------------------------------------- SVG text
+// contenteditable does nothing on SVG, so a marked <text>/<tspan> is typed into an input laid
+// over it. The diagram follows each keystroke; the model is written once, on commit (Enter,
+// leaving the field, selecting something else), as one 'html' op like any text edit.
+function openSvgText(node) {
+  closeSvgText(true);
+  if (!isSvgText(node) || node.children.length) return;
+  const block = S.readOnly || textEditBlock(provenanceOf(node)) || formatBlock('text', formatFlags(node));
+  if (block) { lockedHint(block, node); return; }
+  const input = $('#svg-text'), cs = S.win.getComputedStyle(node);
+  const ctm = node.getScreenCTM(), k = (ctm ? Math.hypot(ctm.a, ctm.b) : 1) * S.scale;
+  // SVG collapses white space when it draws text, and a one-line field would drop line breaks
+  // (gluing the words): show the words with single spaces and keep the outer white space.
+  const original = node.textContent, [, lead, words, trail] = original.match(/^(\s*)([\s\S]*?)(\s*)$/);
+  input.value = words.replace(/\s+/g, ' ');
+  // `last` is what the editor itself put in the diagram: anything else got there by a script.
+  S.svgEdit = { node, original, shown: input.value, lead, trail, last: original, rect: null };
+  input.style.fontFamily = cs.fontFamily;
+  input.style.fontWeight = cs.fontWeight;
+  input.style.fontStyle = cs.fontStyle;
+  input.style.fontSize = parseFloat(cs.fontSize) * k + 'px';
+  input.style.letterSpacing = cs.letterSpacing === 'normal' ? 'normal' : parseFloat(cs.letterSpacing) * k + 'px';
+  input.style.textTransform = cs.textTransform;
+  const anchor = cs.textAnchor;
+  input.style.textAlign = anchor === 'middle' ? 'center' : anchor === 'end' ? 'right' : 'left';
+  input.hidden = false;
+  el.box.classList.add('editing');
+  placeSvgText();
+  // After the press that opened it: the frame would take the focus back on mousedown.
+  setTimeout(() => { if (S.svgEdit?.node === node) { input.focus(); input.select(); } });
+}
+function placeSvgText() {
+  const ed = S.svgEdit;
+  if (!ed) return;
+  const input = $('#svg-text');
+  const live = ed.node.getBoundingClientRect();
+  // An emptied text has no box: keep the field where the text was.
+  const r = ed.rect = live.width || !ed.rect ? live : ed.rect;
+  const fr = el.frame.getBoundingClientRect(), st = el.stage.getBoundingClientRect(), s = S.scale;
+  const x = fr.left - st.left + r.left * s, y = fr.top - st.top + r.top * s, w = r.width * s, h = r.height * s;
+  const W = Math.max(w + 16, 60), H = Math.max(h + 6, 22);
+  const align = input.style.textAlign;
+  const left = align === 'center' ? x + w / 2 - W / 2 : align === 'right' ? x + w + 8 - W : x - 8;
+  input.style.transform = `translate(${left}px, ${y + h / 2 - H / 2}px)`;
+  input.style.width = W + 'px';
+  input.style.height = H + 'px';
+}
+function closeSvgText(commit) {
+  const ed = S.svgEdit;
+  if (!ed) return;
+  S.svgEdit = null;
+  const input = $('#svg-text'), value = input.value, { node } = ed;
+  input.hidden = true;
+  el.box.classList.remove('editing');
+  // The page rewrote the text while it was being typed: its text is not the authored one any
+  // more, so neither it nor the typed value may reach the model (as for HTML text, commitText).
+  if (node.isConnected && node.textContent !== ed.last) { lockedHint('lock_runtime_changed', node); return; }
+  const restore = () => { if (node.isConnected && node.textContent !== ed.original) node.textContent = ed.last = ed.original; };
+  // An empty text could no longer be clicked: deleting it is the block's Delete.
+  if (!commit || value === ed.shown || !value.trim() || !node.isConnected) { restore(); if (S.sel) positionOverlay(true); return; }
+  const id = node.dataset.edId, m = modelEl(id);
+  if (!m) { restore(); return; }
+  node.textContent = ed.lead + value + ed.trail;
+  const before = m.innerHTML, after = cleanFragment(node.innerHTML);
+  if (before === after) return;
+  m.innerHTML = after;
+  pushOp({ type: 'html', id, before, after, label: 'Edit text' });
+  queueThumb(node);
+}
+function bindSvgText() {
+  const input = $('#svg-text');
+  input.addEventListener('input', () => {
+    const ed = S.svgEdit;
+    if (!ed) return;
+    ed.node.textContent = ed.last = ed.lead + input.value + ed.trail;
+    placeSvgText();
+    if (S.sel === ed.node) positionOverlay(true);
+  });
+  input.addEventListener('keydown', e => {
+    // Enter that ends an IME composition (Vietnamese, Chinese…) only accepts the composed text.
+    if (e.isComposing || e.keyCode === 229) return;
+    if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeSvgText(e.key === 'Enter'); }
+  });
+  input.addEventListener('blur', () => closeSvgText(true));
+}
+
 // Does an inline declaration lose to a stylesheet `!important` rule (Tailwind `important: true`,
 // `!` utilities, hand-written overrides)? Measured, not guessed: read the computed values with
 // the declaration at normal priority, then at !important; a difference means normal loses.
@@ -1999,7 +2125,7 @@ function survivesReparse(el) {
 function refreshRoots(node) {
   if (node.parentElement?.closest('[data-ed-edit]')) {
     node.removeAttribute('data-ed-edit');
-    for (const n of node.querySelectorAll('[data-ed-edit]')) n.removeAttribute('data-ed-edit');
+    for (const n of node.querySelectorAll('[data-ed-edit],[data-ed-svgtext]')) { n.removeAttribute('data-ed-edit'); n.removeAttribute('data-ed-svgtext'); }
   } else markRoots(node, true);
 }
 // drop = { mode: 'before' | 'after' | 'inside', target }
@@ -2519,6 +2645,7 @@ function positionOverlay(force) {
   el.box.style.width = w + 4 + 'px';
   el.box.style.height = h + 4 + 'px';
   el.box.classList.toggle('small', h < 26);
+  if (S.svgEdit) placeSvgText();
   const pw = el.pill.offsetWidth || 170, ph = el.pill.offsetHeight || 40;
   let py = y - ph - 14;
   if (py < 64) py = y + h + 14;
@@ -4194,6 +4321,7 @@ function onKey(e, fromFrame) {
   if (S.sel) {
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSel(); }
     else if (e.key === 'Enter' && isRoot(S.sel)) { e.preventDefault(); setEditing(true); placeCaretEnd(S.sel); }
+    else if (e.key === 'Enter' && isSvgText(S.sel)) { e.preventDefault(); openSvgText(S.sel); }
     else if (e.altKey && (k === 'arrowup' || k === 'arrowdown')) { e.preventDefault(); nudgeOrder(k === 'arrowup' ? -1 : 1); }
     else if (k.startsWith('arrow')) {
       e.preventDefault();
@@ -4223,6 +4351,7 @@ window.__edWheel = e => zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1);
 function bindUI() {
   document.addEventListener('keydown', e => onKey(e, false));
   bindFind();
+  bindSvgText();
   $('#sb-overflow').addEventListener('click', nextOverflow);
   // Ctrl/Cmd+S must work from any field, including ones that stop key propagation; blur first
   // so a value typed but not yet committed (change event) is part of the save.

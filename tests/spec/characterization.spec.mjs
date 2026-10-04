@@ -436,6 +436,85 @@ async function structural(browser, url) {
   await s.close();
 }
 
+async function svgDiagram(browser, url) {
+  section('SVG diagram: edit its text in place, select it as one block for AI Feedback');
+  const original = disk('svg.html');
+  const s = await new Session(browser, url).start();
+  await s.open(wpath('svg.html'));
+  const input = s.page.locator('#svg-text');
+  const field = async sel => {
+    await s.frame.locator(sel).click();
+    await s.page.waitForFunction(() => document.activeElement?.id === 'svg-text');
+  };
+
+  await field('#t1');
+  check('click a diagram text: the field opens with its text', (await input.inputValue()) === 'Source data');
+  await s.page.keyboard.type('Nguồn & <data>');
+  check('typing updates the diagram as you go', (await s.frame.locator('#t1').textContent()) === 'Nguồn & <data>');
+  await s.page.keyboard.press('Enter');
+  let c = await s.content();
+  const want = original.replace('>Source data<', '>Nguồn &amp; &lt;data&gt;<');
+  check('Enter: only that text changes in the file, escaped', c === want && (await input.isHidden()), firstDiff(c, want));
+  await s.undo();
+  c = await s.content();
+  check('undo: back to the original file', c === original && (await s.frame.locator('#t1').textContent()) === 'Source data', firstDiff(c, original));
+
+  await field('#t3');
+  await s.page.keyboard.type('Nope');
+  await s.page.keyboard.press('Escape');
+  check('Escape: nothing saved, the diagram shows the old text',
+    (await s.content()) === original && (await s.frame.locator('#t3').textContent()) === 'Sync' && !(await s.dirty()));
+
+  await field('#s2');
+  await s.page.keyboard.press('Control+a');
+  await s.page.keyboard.type('Plans');
+  await s.select('#title');   // clicking elsewhere commits it
+  c = await s.content();
+  check('a <tspan> is edited on its own; the text around it is kept',
+    c === original.replace('<tspan id="s2">Projects</tspan>', '<tspan id="s2">Plans</tspan>'), firstDiff(c, original));
+  await s.undo();
+
+  await field('#t3');
+  await s.page.keyboard.press('Control+a');
+  await s.page.keyboard.press('Backspace');
+  await s.page.keyboard.press('Enter');
+  check('emptying a text is refused: it would no longer be clickable',
+    (await s.frame.locator('#t3').textContent()) === 'Sync' && (await s.content()) === original);
+
+  await field('#t4');
+  check('text over several lines: shown as one line, words kept apart', (await input.inputValue()) === 'First Second');
+  await s.page.keyboard.press('End');
+  await s.page.keyboard.type(' line');
+  await s.page.keyboard.press('Enter');
+  c = await s.content();
+  const multi = original.replace(/First\n\s*Second/, 'First Second line');
+  check('…saved with single spaces, the white space around it kept', c === multi, firstDiff(c, multi));
+  await s.undo();
+
+  await field('#t3');
+  await s.page.keyboard.type('X');
+  await s.frame.locator('#t3').evaluate(e => { e.textContent = 'Live 42'; });
+  await s.page.keyboard.press('Enter');
+  check('a page script rewrites the text while typing: nothing saved, the script\'s text stays',
+    (await s.content()) === original && (await s.frame.locator('#t3').textContent()) === 'Live 42' && !(await s.dirty()));
+
+  check('diagram text never gets contenteditable or editor markers in the file',
+    !(await s.frame.locator('svg [data-ed-edit]').count()) && !/data-ed-/.test(await s.content()));
+
+  await s.frame.locator('#box').click({ position: { x: 10, y: 10 } });
+  await s.page.waitForSelector('#pill.show');
+  check('click a shape: the whole diagram is selected, as one block', await s.page.isVisible('#pill-note') && (await input.isHidden()));
+  await s.page.click('#pill-note');
+  await s.page.fill('#note-input', 'Redraw this');
+  await s.page.click('#note-save');
+  const side = path.join(WORK, '.htmldeck_notes', 'svg.html.json');
+  for (let i = 0; i < 50 && !fs.existsSync(side); i++) await s.page.waitForTimeout(100);
+  const notes = fs.existsSync(side) ? JSON.parse(fs.readFileSync(side, 'utf8')).notes : [];
+  check('AI Feedback on the diagram: one note pointing at the <svg>', notes.length === 1 && /#dia$/.test(notes[0].selector), JSON.stringify(notes));
+  check('…and the file is unchanged', (await s.content()) === original && !(await s.dirty()));
+  await s.close();
+}
+
 async function regionFeedback(browser, url) {
   section('marquee selection: sweep, Shift+click, group delete, region feedback');
   const f = 'deck.html';
@@ -1401,7 +1480,7 @@ try {
   server = await startServer(['--test-hooks']);
   browser = await chromium.launch();
   if (!args.has('--real-only')) {
-    for (const scenario of [detection, textColourHistory, modeSwitch, structural, regionFeedback, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, motion, scenesSpec, remoteScriptsSpec, malformed]) {
+    for (const scenario of [detection, textColourHistory, modeSwitch, structural, svgDiagram, regionFeedback, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, motion, scenesSpec, remoteScriptsSpec, malformed]) {
       try { await scenario(browser, server.url); }
       catch (e) { failures.push(`${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); console.log(`  ✖ ${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); }
     }

@@ -39,8 +39,8 @@ export function modelEl(st, id) { return id ? st.model.querySelector(`[data-ed-i
 export function cleanFragment(st, html) {
   const t = st.model.createElement('template');
   t.innerHTML = html;
-  for (const n of t.content.querySelectorAll('[contenteditable],[data-ed-edit],[spellcheck],[data-ed-overflow]')) {
-    n.removeAttribute('contenteditable'); n.removeAttribute('data-ed-edit'); n.removeAttribute('spellcheck'); n.removeAttribute('data-ed-overflow');
+  for (const n of t.content.querySelectorAll('[contenteditable],[data-ed-edit],[data-ed-svgtext],[spellcheck],[data-ed-overflow]')) {
+    n.removeAttribute('contenteditable'); n.removeAttribute('data-ed-edit'); n.removeAttribute('data-ed-svgtext'); n.removeAttribute('spellcheck'); n.removeAttribute('data-ed-overflow');
   }
   return t.innerHTML;
 }
