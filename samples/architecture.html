@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How HTML Deck works</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-accent:  #eb6c36;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 0.5rem;
+    }
+    .sub { color: var(--color-muted); font-size: 0.95rem; max-width: 46rem; margin-bottom: 1.5rem; line-height: 1.5; }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · HTML Deck</p>
+    <h1>Your agent writes the HTML. You polish it.</h1>
+    <p class="sub">Everything runs on your machine. The editor patches the file only where you changed it, and your notes go back to the agent as a request it can act on.</p>
+
+    <svg viewBox="0 0 1200 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="htmldeck-arch-title htmldeck-arch-desc">
+      <title id="htmldeck-arch-title">How HTML Deck works</title>
+      <desc id="htmldeck-arch-desc">An AI agent writes an HTML file in your workspace; HTML Deck serves it to an editor in your browser, saves only the edited parts back, and stores your AI Feedback notes for the agent to read.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+        <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+        <marker id="arrow-link-start" markerWidth="8" markerHeight="6" refX="1" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="#2e5aa8"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+      <!-- zone: workspace -->
+      <rect x="356" y="88" width="248" height="376" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <rect x="440" y="92" width="80" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="480" y="101" fill="rgba(45,49,66,0.40)" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">WORKSPACE</text>
+
+      <!-- arrows -->
+      <line x1="240" y1="160" x2="378" y2="160" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="284" y="140" width="52" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="310" y="149" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">WRITES</text>
+
+      <line x1="580" y1="148" x2="698" y2="148" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="620" y="128" width="40" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="640" y="137" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">LOAD</text>
+
+      <line x1="700" y1="172" x2="582" y2="172" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="600" y="180" width="80" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="640" y="189" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PATCH EDITS</text>
+
+      <line x1="902" y1="160" x2="978" y2="160" stroke="#2e5aa8" stroke-width="1.2" marker-start="url(#arrow-link-start)" marker-end="url(#arrow-link)"/>
+      <rect x="916" y="140" width="48" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="940" y="149" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">HTTP</text>
+
+      <line x1="1072" y1="360" x2="1072" y2="202" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="1080" y="276" width="76" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="1084" y="285" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">CLICK · TYPE</text>
+
+      <path d="M800,200 V392 Q800,400 792,400 H582" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="808" y="292" width="64" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="812" y="301" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">PIN NOTES</text>
+
+      <path d="M380,400 H148 Q140,400 140,392 V202" fill="none" stroke="#eb6c36" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow-accent)"/>
+      <rect x="196" y="376" width="104" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="248" y="385" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">HTMLDECK-NOTES</text>
+
+      <!-- node: AI agent -->
+      <rect x="40" y="120" width="200" height="80" rx="6" fill="#f5f5f5"/>
+      <rect x="40" y="120" width="200" height="80" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+      <rect x="48" y="128" width="40" height="12" rx="2" fill="transparent" stroke="rgba(122,131,153,0.40)" stroke-width="0.8"/>
+      <text x="68" y="137" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AGENT</text>
+      <text x="140" y="164" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">AI agent</text>
+      <text x="140" y="180" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Claude Code · Codex</text>
+
+      <!-- node: HTML file -->
+      <rect x="380" y="120" width="200" height="80" rx="6" fill="#f5f5f5"/>
+      <rect x="380" y="120" width="200" height="80" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+      <rect x="388" y="128" width="32" height="12" rx="2" fill="transparent" stroke="rgba(79,93,117,0.40)" stroke-width="0.8"/>
+      <text x="404" y="137" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">FILE</text>
+      <text x="480" y="164" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">report.html</text>
+      <text x="480" y="180" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">slides, pages, reports</text>
+
+      <!-- node: notes sidecar -->
+      <rect x="380" y="360" width="200" height="80" rx="6" fill="#f5f5f5"/>
+      <rect x="380" y="360" width="200" height="80" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+      <rect x="388" y="368" width="32" height="12" rx="2" fill="transparent" stroke="rgba(79,93,117,0.40)" stroke-width="0.8"/>
+      <text x="404" y="377" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">JSON</text>
+      <text x="480" y="404" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">AI Feedback notes</text>
+      <text x="480" y="420" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">.htmldeck_notes/</text>
+
+      <!-- node: HTML Deck server -->
+      <rect x="700" y="120" width="200" height="80" rx="6" fill="#f5f5f5"/>
+      <rect x="700" y="120" width="200" height="80" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="708" y="128" width="40" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="728" y="137" fill="rgba(45,49,66,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">LOCAL</text>
+      <text x="800" y="164" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">HTML Deck</text>
+      <text x="800" y="180" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">python · 127.0.0.1</text>
+
+      <!-- node: editor (focal) -->
+      <rect x="980" y="120" width="180" height="80" rx="6" fill="#f5f5f5"/>
+      <rect x="980" y="120" width="180" height="80" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+      <rect x="988" y="128" width="24" height="12" rx="2" fill="transparent" stroke="rgba(235,108,54,0.40)" stroke-width="0.8"/>
+      <text x="1000" y="137" fill="#eb6c36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">UI</text>
+      <text x="1070" y="164" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Editor in your browser</text>
+      <text x="1070" y="180" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">edit · notes · present</text>
+
+      <!-- node: you -->
+      <rect x="980" y="360" width="180" height="80" rx="6" fill="#f5f5f5"/>
+      <rect x="980" y="360" width="180" height="80" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+      <rect x="988" y="368" width="28" height="12" rx="2" fill="transparent" stroke="rgba(122,131,153,0.40)" stroke-width="0.8"/>
+      <text x="1002" y="377" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">YOU</text>
+      <text x="1070" y="404" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">You</text>
+      <text x="1070" y="420" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">review, fix, present</text>
+
+      <!-- legend -->
+      <line x1="40" y1="488" x2="1160" y2="488" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <text x="40" y="516" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+      <rect x="120" y="504" width="20" height="16" rx="4" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+      <text x="148" y="516" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Where you work</text>
+      <rect x="280" y="504" width="20" height="16" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="308" y="516" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Local server</text>
+      <rect x="420" y="504" width="20" height="16" rx="4" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+      <text x="448" y="516" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">File on disk</text>
+      <rect x="560" y="504" width="20" height="16" rx="4" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+      <text x="588" y="516" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Person or agent</text>
+      <line x1="720" y1="512" x2="752" y2="512" stroke="#eb6c36" stroke-width="1.2" stroke-dasharray="5,4"/>
+      <text x="760" y="516" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Notes back to the agent</text>
+    </svg>
+  </div>
+</body>
+</html>

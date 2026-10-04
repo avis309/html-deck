@@ -40,6 +40,12 @@ Click text to edit it, restyle it, move blocks, add effects and present. The fil
     <td align="center"><b>AI Feedback</b>: pin notes for your agent</td>
     <td align="center"><b>Present</b> with the deck's own animations</td>
   </tr>
+  <tr>
+    <td colspan="2"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/svg.png" alt="Retyping a label inside an SVG architecture diagram"></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><b>Diagrams</b>: retype a label inside an inline SVG, the rest of the drawing stays as it was</td>
+  </tr>
 </table>
 
 ## Install
@@ -75,13 +81,14 @@ htmldeck --root <folder> --port 6789 --no-browser
 `<file>.html` is any HTML document in your workspace: a deck, a report, a page.
 
 To try it on the sample deck (a 17-slide quarterly marketing report with anime.js charts) in a
-clone of this repo, run `htmldeck --root samples --file marketing-report.html`.
+clone of this repo, run `htmldeck --root samples --file marketing-report.html`. The same folder
+has `architecture.html`, a page with an SVG diagram whose labels you can edit.
 
 The workspace is the folder HTML Deck runs in, or the folder given with `--root`. Every path is
 relative to it, and nothing outside it is served or written, except the file passed with `--file`.
 Each save keeps a timestamped backup in `.htmldeck_bak/` next to the document.
 
-**Save ▾** downloads the document to share it:
+**Save ▾** also saves a copy of the document to share:
 
 - **HTML**: a single file that includes all its images, styles, scripts and fonts, so it opens
   anywhere, even offline. Resources loaded from the web (a CDN script, web fonts) are included
@@ -108,6 +115,9 @@ note on the whole slide, and drop the region if they rewrite the notes file.
 - **Formats:** plain HTML pages and reports; decks of `.slide` blocks; hand-written Reveal.js
   decks, including vertical stacks, fragments, notes and backgrounds. Reveal's Markdown slides
   are read-only.
+- **SVG diagrams:** click a label in an inline `<svg>` (a `<text>` or `<tspan>`) and type over
+  it; only that text changes in the file. Click a shape to select the whole diagram, for example
+  to pin AI Feedback on it.
 - **Safe editing:** content that the page's own scripts create or change is locked, and the editor
   shows why. Animations are frozen while editing. You also get undo/redo and draft recovery.
 - **Effects:** set `data-fx` entrance effects (fade, zoom, slide, count-up) from the toolbar.
