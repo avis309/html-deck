@@ -90,6 +90,9 @@ export function alignTokens(tokens, pristine) {
   return j === tokens.length ? map : null;
 }
 const XHTML_NS = 'http://www.w3.org/1999/xhtml';
+export function escText(v) { return v.replace(/&/g, '&amp;').replace(/\u00a0/g, '&nbsp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+// Raw-text parents: their text is not markup, so it cannot be patched as escaped text.
+const RAWTEXT_PARENTS = new Set(['script', 'style', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript', 'plaintext']);
 export function escAttr(v) { return v.replace(/&/g, '&amp;').replace(/\u00a0/g, '&nbsp;').replace(/"/g, '&quot;'); }
 export function startTag(node) {
   let out = '<' + (node.namespaceURI === XHTML_NS ? node.localName : node.tagName);
@@ -160,6 +163,16 @@ function childSplices(st, p, m, map, ptok) {
     } else if (a && b && a.nodeType !== 1 && a.nodeType === b.nodeType && a.nodeValue === b.nodeValue) {
       const next = afterText(i);
       if (next == null) return null;
+      pos = next; i++; j++;
+    } else if (a && b && a.nodeType === 3 && b.nodeType === 3 && !RAWTEXT_PARENTS.has(p.localName) &&
+        (i === 0 || pc[i - 1].nodeType === 1) && (i + 1 >= pc.length || pc[i + 1].nodeType === 1)) {
+      // Edited text: only this text node's range is rewritten, its element siblings keep their
+      // exact bytes. Its range runs from the previous element's end to the next one's start, so
+      // a comment beside it (whose own range is not tracked) leaves it to the fallback.
+      const next = afterText(i);
+      // Markup the parser dropped (a stray end tag) would go with the old text: leave it whole.
+      if (next == null || st.sourceText.slice(pos, next).includes('<')) return null;
+      patches.push({ s: pos, e: next, text: escText(b.nodeValue) });
       pos = next; i++; j++;
     } else return null;
   }
