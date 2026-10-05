@@ -17,7 +17,7 @@ import { editFreeze } from './runtime/freeze.mjs';
 import { renderPresentHTML } from './present/render.mjs';
 import { renderPrintHTML } from './present/print.mjs';
 import { NS as PRESENT_NS, VERSION as PRESENT_V, newSessionId, createPresentSession } from './present/session.mjs';
-import { setStyleAttr, setAttrs, nodeRefs, doRemove } from './core/operations.mjs';
+import { setStyleAttr, setAttrs, nodeRefs, positionOf, doRemove } from './core/operations.mjs';
 
 // Language-bound wrappers over the pure i18n module (call sites stay unchanged).
 const curLang = () => (typeof S !== 'undefined' && S && S.lang) || storedLang();
@@ -1122,7 +1122,7 @@ const LIVE = {
   refresh: l => refreshRoots(l),
 };
 function applyOp(op, redo) { return Ops.applyOp(S, op, redo, LIVE); }
-function applyMove(op, redo) { return Ops.applyMove(op, redo, LIVE); }
+function applyMove(op, redo) { return Ops.applyMove(op, redo, LIVE, S); }
 // Restore the model from before the failed step and rebuild the preview from it. History has
 // to go: its ops point at live nodes of the preview being replaced.
 async function recoverFailedStep(modelBefore, wasDirty, err) {
@@ -2148,10 +2148,11 @@ function moveNode(node, drop) {
   if (lParent === node.parentNode && (lRef === node.nextSibling || (lRef === null && !node.nextSibling))) return false;
   const op = {
     type: 'move', label: 'Move block', m, l: node,
-    from: { mP: m.parentNode, mN: m.nextSibling, lP: node.parentNode, lN: node.nextSibling },
+    from: { mP: m.parentNode, mN: m.nextSibling, lP: node.parentNode, lN: node.nextSibling, ...positionOf(m, node) },
     to: { mP: mParent, mN: mRef, lP: lParent, lN: lRef },
   };
   applyMove(op, true);
+  Object.assign(op.to, positionOf(m, node));
   if (!survivesReparse(mParent)) {
     applyMove(op, false);
     toast('Browser will re-parent this position on reload — cannot place here', { err: true, ms: 4000 });
