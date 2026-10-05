@@ -46,10 +46,11 @@ def test_codex_manifest_points_at_the_skills():
     assert data["interface"]["displayName"] == "HTML Deck"
 
 
-def test_skill_and_command_have_frontmatter():
+def test_skill_has_frontmatter_and_no_command_shadows_it():
     skill = _frontmatter("skills/htmldeck/SKILL.md")
-    assert skill["name"] == "htmldeck" and len(skill["description"]) > 80
-    assert _frontmatter("commands/htmldeck.md")["description"]
+    assert skill["name"] == "htmldeck" and len(skill["description"]) > 80 and skill["argument-hint"]
+    # A command of the same name would list /htmldeck:htmldeck twice in Claude Code.
+    assert not (REPO / "commands" / "htmldeck.md").exists()
 
 
 def test_skill_names_files_that_exist():

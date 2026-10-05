@@ -1,6 +1,7 @@
 ---
 name: htmldeck
 description: Open the HTML documents of the user's workspace (slide decks, Reveal.js decks, reports, pages) in the HTML Deck visual editor to edit text, restyle, move blocks, add effects and present, saving in place; and act on the review notes ("AI Feedback") the user pinned there. Use when the user wants to edit, tweak, present or review an HTML deck/report/page visually, mentions HTML Deck, or asks to apply the feedback or notes left on an HTML document.
+argument-hint: "[file.html]"
 ---
 
 # HTML Deck
@@ -23,7 +24,8 @@ it prints.
 ## Open the editor
 
 1. The workspace is the project folder the user works in: `--root "<workspace>"`. Add
-   `--file <path>` (relative to the workspace) to open one document first.
+   `--file <path>` (relative to the workspace) to open one document first: the file the user
+   named, or the argument of `/htmldeck <file>`. With neither, start without `--file`.
 2. Start it in the background — the server runs until stopped:
    - Claude Code: Bash with `run_in_background: true`: `RUN --root "<workspace>" --file "<doc>"`
    - Other shells (macOS/Linux): `RUN --root "<workspace>" --file "<doc>" > "${TMPDIR:-/tmp}/htmldeck.log" 2>&1 &`

@@ -147,7 +147,7 @@ npm run check        # eslint (editor modules) + pytest (server) + browser spec
   HTML files save as an in-place patch. The rest still save correctly, through a full rewrite that
   the editor asks you to confirm.
 - Plugin: `.claude-plugin/`, `.codex-plugin/`, `.agents/plugins/` (marketplaces),
-  `skills/htmldeck/`, `commands/`, and `scripts/htmldeck-run[.cmd]`, which runs this copy with any
+  `skills/htmldeck/` (also the `/htmldeck [file]` command), and `scripts/htmldeck-run[.cmd]`, which runs this copy with any
   Python 3.11+.
 - npm wrapper: `packaging/npm/` bundles `htmldeck/` at pack time and runs it with the user's
   Python.
