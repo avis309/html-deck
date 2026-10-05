@@ -153,12 +153,12 @@ function revealRuntime(cfg) {
   })();
 }
 
-// opts: { untrusted, mode: 'deck'|'page', provider: 'legacy'|'reveal'|'page', slideIds, displays, start,
+// opts: { untrusted, nonce (set with untrusted: the runtime's scripts carry it), mode: 'deck'|'page', provider: 'legacy'|'reveal'|'page', slideIds, displays, start,
 //         deckW, deckH, extraCSS, bodyClass, session: {ns, v, sessionId, docRevision, origin} }
 // displays[i]: the display slide i renders with when shown (an authored display:none would
 // otherwise leave the current slide blank).
 export function renderPresentHTML(model, doctype, opts) {
-  const { untrusted, mode, provider = mode === 'deck' ? 'legacy' : 'page', slideIds = [], displays = [], start = 0, deckW, deckH, extraCSS = '', bodyClass = '', session } = opts;
+  const { untrusted, nonce, mode, provider = mode === 'deck' ? 'legacy' : 'page', slideIds = [], displays = [], start = 0, deckW, deckH, extraCSS = '', bodyClass = '', session } = opts;
   const legacy = provider === 'legacy';
   const root = model.documentElement.cloneNode(true);
   // Author scripts go first, so the trusted runtime added below is never removed with them.
@@ -188,6 +188,7 @@ export function renderPresentHTML(model, doctype, opts) {
     root.querySelectorAll('script[data-htmldeck-fx]').forEach(n => n.remove());
     const fx = model.createElement('script');
     fx.textContent = `(${fxRuntime.toString()})(window, ${JSON.stringify({ controlled: provider !== 'page' })});`;
+    if (nonce) fx.setAttribute('nonce', nonce);
     root.querySelector('body').appendChild(fx);
   }
   if (bodyClass) root.querySelector('body').classList.add(...bodyClass.split(/\s+/).filter(Boolean));
@@ -195,6 +196,7 @@ export function renderPresentHTML(model, doctype, opts) {
   const script = model.createElement('script');
   const runtime = provider === 'reveal' ? revealRuntime : presentRuntime;
   script.textContent = `(${runtime.toString()})(${JSON.stringify(cfg).replace(/</g, '\\u003c')});`;
+  if (nonce) script.setAttribute('nonce', nonce);
   root.querySelector('body').appendChild(script);
   return (doctype || '<!DOCTYPE html>') + '\n' + root.outerHTML;
 }

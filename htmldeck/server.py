@@ -36,6 +36,7 @@ import http.server
 import json
 import math
 import os
+import re
 import secrets
 import shutil
 import socketserver
@@ -82,6 +83,11 @@ EDIT_CSP = "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:; connect
 EDIT_CSP_TRUSTED = "script-src * 'unsafe-inline' 'unsafe-eval' blob: data:; worker-src 'none'; object-src 'none'"
 RAW_HTML_CSP = "sandbox allow-scripts allow-popups allow-forms allow-modals allow-downloads; worker-src 'none'; object-src 'none'"
 PREVIEW_ORIGIN_CSP = "worker-src 'none'; object-src 'none'"
+# A document from outside the workspace (no path) runs none of its own code anywhere: only the
+# editor's scripts, which carry the nonce the editor sends, or no script at all (a print copy).
+# Inline event handlers and javascript: URLs are then blocked by the browser, whatever route
+# (render, duplicate, undo) brought them into the page.
+NONCE_RE = re.compile(r"[A-Za-z0-9]{16,64}")
 PREVIEWS_KEPT = 4
 
 
@@ -406,6 +412,20 @@ def preview_url(source: Path | None, root: Path) -> str:
     return "/" + "/".join(parts)
 
 
+def _script_policy(payload: dict, source_path: Path | None) -> str | None:
+    """The script-src a staged preview gets, or None for a workspace document's usual policy."""
+    if payload.get("no_scripts") is True:
+        return "script-src 'none'"
+    nonce = payload.get("nonce")
+    if isinstance(nonce, str) and NONCE_RE.fullmatch(nonce):
+        return f"script-src 'nonce-{nonce}'"
+    if nonce is not None:
+        raise EditorError(400, "Invalid script nonce")
+    if source_path is None:
+        raise EditorError(400, "A document from outside the workspace needs a script nonce")
+    return None
+
+
 class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
     root: Path = Path.cwd()
     target_file: Path | None = None   # --file: opened first, allowed even outside the workspace
@@ -413,7 +433,7 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
     test_hooks: bool = False  # --test-hooks: the UI honours fault-injection URL params (spec only)
     editor_html: Path = EDITOR_HTML
     previews: OrderedDict[str, tuple[bytes, str]] = OrderedDict()   # edit previews: (body, CSP)
-    present_previews: OrderedDict[str, bytes] = OrderedDict()       # served by the preview origin
+    present_previews: OrderedDict[str, tuple[bytes, str]] = OrderedDict()   # preview origin: (body, CSP)
     previews_lock = threading.Lock()
     preview_origin: str = ""
     # Pinned, not left to the host's mime.types: a module served with any other type is
@@ -588,16 +608,21 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
         source = payload.get("path")
         source_path = resolve_html_path(source, self.root, self._allowed_extra()) if source else None
         url = preview_url(source_path, self.root)
+        scripts = _script_policy(payload, source_path)
         # Presenting runs the document on the preview origin, away from this API.
         if payload.get("target") == "present":
             if not self.preview_origin:
                 raise EditorError(503, "The presentation origin is not running")
+            csp = f"{scripts}; {PREVIEW_ORIGIN_CSP}" if scripts else PREVIEW_ORIGIN_CSP   # end_headers adds the base one too
             with self.previews_lock:
-                self.present_previews[url] = content.encode("utf-8")
+                self.present_previews[url] = (content.encode("utf-8"), csp)
                 while len(self.present_previews) > PREVIEWS_KEPT:
                     self.present_previews.popitem(last=False)
             return {"url": self.preview_origin + url}
-        csp = EDIT_CSP_TRUSTED if payload.get("trust_remote") is True else EDIT_CSP
+        if scripts:
+            csp = f"{scripts}; connect-src 'none'; worker-src 'none'; object-src 'none'"
+        else:
+            csp = EDIT_CSP_TRUSTED if payload.get("trust_remote") is True else EDIT_CSP
         with self.previews_lock:
             self.previews[url] = (content.encode("utf-8"), csp)
             while len(self.previews) > PREVIEWS_KEPT:
@@ -668,13 +693,14 @@ class PreviewOriginHandler(http.server.SimpleHTTPRequestHandler):
         with HTMLEditorHandler.previews_lock:
             staged = HTMLEditorHandler.present_previews.get(parsed.path)
         if staged is not None:
+            body, csp = staged
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(staged)))
-            self.send_header("Content-Security-Policy", PREVIEW_ORIGIN_CSP)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Security-Policy", csp)
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
-            self.wfile.write(staged)
+            self.wfile.write(body)
             return
         rel = urllib.parse.unquote(parsed.path).lstrip("/")
         if parsed.path.startswith(EDITOR_PREFIX) or rel.startswith("api/") or any(p.startswith(".") for p in Path(rel).parts):

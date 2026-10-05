@@ -12,7 +12,7 @@ import { textEditBlock, structureBlock, formatBlock } from './policy/edit-policy
 import { inspect as inspectFormat } from './formats/registry.mjs';
 import * as Reveal from './formats/reveal.mjs';
 import { fxRuntime, fxScriptSource, FX_VERSION } from './fx/runtime.mjs';
-import { neuterScripts } from './core/sanitize.mjs';
+import { neuterScripts, newNonce } from './core/sanitize.mjs';
 import { editFreeze } from './runtime/freeze.mjs';
 import { renderPresentHTML } from './present/render.mjs';
 import { renderPrintHTML } from './present/print.mjs';
@@ -253,7 +253,8 @@ function liveEl(id) {
   if (node) S.liveById.set(id, node);
   return node;
 }
-function renderHTML() {
+// nonce: set for a document from outside the workspace; only the editor's scripts carry it.
+function renderHTML(nonce) {
   const root = S.model.documentElement.cloneNode(true);
   if (S.source && S.source.kind !== 'server') neuterScripts(root);
   const head = root.querySelector('head');
@@ -270,6 +271,7 @@ function renderHTML() {
     boot.textContent = Reveal.EDIT_BOOTSTRAP;
     head.insertBefore(boot, freeze.nextSibling);
   }
+  if (nonce) for (const n of head.querySelectorAll('script')) n.setAttribute('nonce', nonce);
   const style = S.model.createElement('style');
   style.textContent = FRAME_CSS;
   head.appendChild(style);
@@ -467,7 +469,8 @@ function renderTrustChip() {
 }
 async function mountModel(token) {
   const trust = S.trustOverride ?? trustRemote();
-  const { url } = await postJSON('/api/preview', { path: S.source.kind === 'server' ? S.source.path : null, content: renderHTML(), target: 'edit', trust_remote: trust });
+  const nonce = S.source.kind === 'server' ? undefined : newNonce();
+  const { url } = await postJSON('/api/preview', { path: S.source.kind === 'server' ? S.source.path : null, content: renderHTML(nonce), target: 'edit', trust_remote: trust, nonce });
   S.mountedTrust = trust;
   if (token !== S.loadToken) return;
   el.frame.onload = () => { if (token === S.loadToken) onFrameReady(); };
@@ -3625,10 +3628,11 @@ function startPresent() {
   const provider = mode !== 'deck' ? 'page' : reveal && !untrusted && S.format.present === 'reveal' ? 'reveal' : 'legacy';
   const p = { sessionId: newSessionId(), docRevision: topSeq(), mode, provider, count: slideIds.length, start: mode === 'deck' ? S.cur : 0, session: null, fullscreen: false };
   const staticReveal = reveal && provider === 'legacy';
+  const nonce = untrusted ? newNonce() : undefined;
   let html;
   try {
     html = renderPresentHTML(S.model, S.doctype, {
-      untrusted, mode, provider, slideIds, displays, start: p.start, deckW: S.deckW, deckH: S.deckH,
+      untrusted, nonce, mode, provider, slideIds, displays, start: p.start, deckW: S.deckW, deckH: S.deckH,
       extraCSS: staticReveal ? Reveal.editCSS() + Reveal.backgroundCSS(Reveal.leaves(S.model), '[data-ed-cur]') : '',
       bodyClass: staticReveal ? 'reveal-viewport' : '',
       session: { ns: PRESENT_NS, v: PRESENT_V, sessionId: p.sessionId, docRevision: p.docRevision, origin: location.origin },
@@ -3645,7 +3649,7 @@ function startPresent() {
   const fail = msg => { if (S.present !== p) return; endPresent(); toast('Cannot start presenting' + (msg ? ': ' + msg : ''), { err: true }); };
   // One deadline from the click to the frame's ready, staging included.
   p.deadline = setTimeout(() => { if (p.session?.state !== 'active') fail('timed out'); }, 10000);
-  postJSON('/api/preview', { path: S.source.kind === 'server' ? S.source.path : null, content: html, target: 'present' }).then(({ url }) => {
+  postJSON('/api/preview', { path: S.source.kind === 'server' ? S.source.path : null, content: html, target: 'present', nonce }).then(({ url }) => {
     if (S.present !== p) return;
     p.session = createPresentSession({
       host: $('#present-host'), url, title: S.source.name, sessionId: p.sessionId, docRevision: p.docRevision,
@@ -3840,7 +3844,8 @@ async function exportPDF() {
   if (!w) return toast('The browser blocked the print tab. Allow pop-ups for this page and try again.', { err: true, ms: 6000 });
   w.document.write('<!doctype html><meta charset="utf-8"><title>PDF</title><p style="font:15px system-ui;padding:32px;color:#555">Preparing the PDF…</p>');
   try {
-    const res = await postJSON('/api/preview', { path: S.source.kind === 'server' ? S.source.path : null, content: html });
+    // The print copy has no scripts at all (renderPrintHTML removes them): none may run.
+    const res = await postJSON('/api/preview', { path: S.source.kind === 'server' ? S.source.path : null, content: html, no_scripts: true });
     w.location.replace(res.url);
     const t0 = Date.now();
     await new Promise(done => (function wait() {

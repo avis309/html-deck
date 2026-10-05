@@ -231,6 +231,22 @@ def test_http_edit_preview_csp_blocks_remote_scripts_unless_trusted(server):
         assert ("connect-src 'self'" in csp) == (not remote)
 
 
+def test_http_preview_of_untrusted_document_runs_only_the_editors_scripts(server):
+    json_hdr = {"Content-Type": "application/json"}
+    nonce = "a1" * 16
+    for extra, want in (({"nonce": nonce}, f"script-src 'nonce-{nonce}'"), ({"no_scripts": True}, "script-src 'none'")):
+        # trust_remote cannot loosen it: the nonce policy wins.
+        body = json.dumps({"path": None, "content": "<p>x</p>", "trust_remote": True, **extra})
+        url = json.loads(_request(server, "POST", "/api/preview", body, json_hdr)[1])["url"]
+        status, csp = _head(server, url)
+        assert status == 200 and csp.startswith(want) and "unsafe-inline" not in csp and "connect-src 'none'" in csp
+    # No path (a file from the computer) and no nonce: refused, never staged with the open policy.
+    assert _request(server, "POST", "/api/preview", json.dumps({"path": None, "content": "<p>x</p>"}), json_hdr)[0] == 400
+    for bad in ("short", "x' 'unsafe-inline", 7):
+        body = json.dumps({"path": None, "content": "<p>x</p>", "nonce": bad})
+        assert _request(server, "POST", "/api/preview", body, json_hdr)[0] == 400, bad
+
+
 def test_http_workspace_html_is_sandboxed_on_editor_origin(server, root):
     status, csp = _head(server, "/output/deck/a.html")
     assert status == 200 and csp.startswith("sandbox")
@@ -263,6 +279,11 @@ def test_preview_origin_serves_presented_documents_without_api(root):
         assert _head(a.server_address[1], path)[0] == 404          # not on the editor origin
         assert _head(b.server_address[1], "/api/config")[0] == 404  # no API on the preview origin
         assert _head(b.server_address[1], "/output/deck/a.html")[0] == 200
+        # A file from the computer presents with only the runtime's nonce-carrying scripts.
+        body = json.dumps({"path": None, "content": "<p>show</p>", "target": "present", "nonce": "b2" * 16})
+        url = json.loads(_request(a.server_address[1], "POST", "/api/preview", body, {"Content-Type": "application/json"})[1])["url"]
+        status, csp = _head(b.server_address[1], url[len(handler.preview_origin):])
+        assert status == 200 and f"script-src 'nonce-{'b2' * 16}'" in csp and "worker-src 'none'" in csp
     finally:
         for srv in (a, b):
             srv.shutdown()
