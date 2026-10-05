@@ -2838,6 +2838,9 @@ function nudge(dx, dy) {
 function showSlide(i, { keepSel = false } = {}) {
   stopFxPreview();
   if (S.mode !== 'deck' || !S.slides.length) return;
+  // Notes typed within the debounce belong to the slide being left: save them before S.cur moves
+  // (a panel button keeps the focus, so the textarea's blur does not flush them).
+  if (S.notesTimer) { clearTimeout(S.notesTimer); S.notesTimer = 0; saveNotes(); }
   i = clamp(i, 0, S.slides.length - 1);
   if (!keepSel) deselect();
   S.cur = i;

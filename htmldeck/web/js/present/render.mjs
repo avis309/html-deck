@@ -36,8 +36,10 @@ function presentRuntime(cfg) {
   function show(i, requestId) {
     if (!deck) return;
     i = Math.max(0, Math.min(slides.length - 1, i));
-    if (i !== cur) { slides[cur].removeAttribute('data-ed-cur'); slides[i].setAttribute('data-ed-cur', ''); cur = i; }
-    if (window.__htmldeckFx) window.__htmldeckFx.show(slides[cur]);
+    // Past either end the slide stays: its scene keeps its state instead of playing again.
+    var moved = i !== cur;
+    if (moved) { slides[cur].removeAttribute('data-ed-cur'); slides[i].setAttribute('data-ed-cur', ''); cur = i; }
+    if (moved && window.__htmldeckFx) window.__htmldeckFx.show(slides[cur]);
     send('state', { index: cur, requestId: requestId });
   }
   if (deck) {
