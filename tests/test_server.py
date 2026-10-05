@@ -84,6 +84,19 @@ def test_save_writes_backup_and_new_mtime(root):
     assert not list(target.parent.glob(".a.html.tmp.*"))
 
 
+def test_save_keeps_a_utf8_bom(root):
+    target = root / "output/deck/a.html"
+    target.write_bytes(b"\xef\xbb\xbf<p>a</p>")
+    data = ed.load_html(target, root)
+    assert data["content"] == "<p>a</p>"
+    res = ed.save_html(target, "<p>b</p>", data["mtime_ns"], False, root)
+    assert target.read_bytes() == b"\xef\xbb\xbf<p>b</p>" and res["bytes_written"] == 11
+    # No BOM before: none after.
+    target.write_bytes(b"<p>a</p>")
+    ed.save_html(target, "<p>c</p>", None, False, root)
+    assert target.read_bytes() == b"<p>c</p>"
+
+
 def test_save_refuses_when_file_changed_since_load(root):
     target = root / "output/deck/a.html"
     stale = ed.load_html(target, root)["mtime_ns"]

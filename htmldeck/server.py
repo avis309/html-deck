@@ -189,9 +189,12 @@ def _save_locked(target: Path, content: str, expected_mtime_ns: str | None, forc
     stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{time.time_ns() % 1_000_000:06d}"
     backup = _backup(target, stamp)
     tmp = target.with_name(f".{target.name}.tmp.{os.getpid()}.{secrets.token_hex(4)}")
+    # load_html hands the text over without its BOM: a file that had one keeps it.
+    with open(target, "rb") as fh:
+        bom = fh.read(3) == b"\xef\xbb\xbf"
     try:
-        with open(tmp, "w", encoding="utf-8", newline="") as fh:
-            fh.write(content)
+        with open(tmp, "w", encoding="utf-8-sig" if bom else "utf-8", newline="") as fh:
+            fh.write(content.removeprefix("\ufeff") if bom else content)
         shutil.copymode(target, tmp)
         _replace(tmp, target)
     finally:
@@ -201,7 +204,7 @@ def _save_locked(target: Path, content: str, expected_mtime_ns: str | None, forc
         "success": True,
         "file": display_path(target, root),
         "backup": display_path(backup, root),
-        "bytes_written": len(content.encode("utf-8")),
+        "bytes_written": target.stat().st_size,
         "mtime_ns": str(target.stat().st_mtime_ns),
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
