@@ -330,16 +330,22 @@ function storedMode(src) {
 function storeMode(src, mode) {
   try { mode ? localStorage.setItem(modeKey(src), mode) : localStorage.removeItem(modeKey(src)); } catch {}
 }
+// Every open request takes a number: a slower response for an older request must not replace
+// the document opened since (and its edits) after the discard prompt has already been passed.
+let openSeq = 0;
 async function openServerFile(path) {
   if (!confirmDiscard()) return;
+  const seq = ++openSeq;
   setLoading(true);
   docState('loading', path);
   try {
     const data = await api(`/api/load?path=${encodeURIComponent(path)}`);
-    await openDocument(data.content, { kind: 'server', path: data.path, name: data.filename, mtime: data.mtime_ns, size: data.size });
+    if (seq !== openSeq) return false;
+    if (!await openDocument(data.content, { kind: 'server', path: data.path, name: data.filename, mtime: data.mtime_ns, size: data.size })) return false;
     try { localStorage.setItem(LAST_FILE_KEY, data.path); } catch {}
     return true;
   } catch (e) {
+    if (seq !== openSeq) return false;
     setLoading(false);
     docState('error');
     toast('Cannot open file: ' + e.message, { err: true, ms: 5000 });
@@ -347,8 +353,11 @@ async function openServerFile(path) {
   }
 }
 async function openFromHandle(handle) {
+  const seq = ++openSeq;
   const file = await handle.getFile();
-  await openDocument(await file.text(), { kind: 'handle', handle, name: file.name, size: file.size });
+  const text = await file.text();
+  if (seq !== openSeq) return;
+  await openDocument(text, { kind: 'handle', handle, name: file.name, size: file.size });
 }
 async function pickLocalFile() {
   if (!confirmDiscard()) return;
@@ -364,8 +373,9 @@ async function pickLocalFile() {
 }
 async function openUpload(file) {
   setLoading(true);
-  try { await openDocument(await file.text(), { kind: 'upload', name: file.name, size: file.size }); }
-  catch (e) { setLoading(false); toast('Cannot read file: ' + e.message, { err: true }); }
+  const seq = ++openSeq;
+  try { const text = await file.text(); if (seq !== openSeq) return; await openDocument(text, { kind: 'upload', name: file.name, size: file.size }); }
+  catch (e) { if (seq !== openSeq) return; setLoading(false); toast('Cannot read file: ' + e.message, { err: true }); }
 }
 function confirmDiscard() {
   flushPending();
@@ -416,9 +426,13 @@ async function openDocument(html, source) {
     const dir = source.kind === 'server' ? source.path.split('/').slice(0, -1).map(encodeURIComponent).join('/') : '';
     S.baseURL = location.origin + '/' + (dir ? dir + '/' : '');
     await mountModel(token);
+    if (token !== S.loadToken) return false;
     loadAgentNotes();
     if (!source.restored) offerDraft(html, source).catch(() => {});
+    return true;
   } catch (e) {
+    // A newer open took over meanwhile: its document is not this one's to clear.
+    if (token !== S.loadToken) return false;
     if (e.status === 404) e.message = 'the running server is an older version — stop it (Ctrl+C) and run htmldeck again';
     // Never leave the previous document on screen bound to a half-built model.
     S.model = null; S.source = null;
