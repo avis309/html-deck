@@ -1421,6 +1421,91 @@ async function malformed(browser, url) {
   await s.close();
 }
 
+async function untrustedSpec(browser, url) {
+  section('file from the computer: none of its handlers run, even after duplicate / undo');
+  const s = await new Session(browser, url).start();
+  await s.page.goto(url);
+  await s.page.waitForFunction(() => document.body.dataset.docState !== 'loading', null, { timeout: 30000 }).catch(() => {});
+  const seq = await s.seq();
+  await s.page.setInputFiles('#file-input', path.join(WORK, 'untrusted.html'));
+  await s.page.waitForFunction(([sq]) => document.body.dataset.docState === 'ready' && +document.body.dataset.docSeq > sq, [seq], { timeout: 30000 });
+  const pwned = () => s.page.evaluate(() => document.body.dataset.pwned || '');
+  await s.select('#x-b');
+  check('a handler on <html> does not run on the editor origin', (await pwned()) === '', await pwned());
+  await s.frame.locator('#x-a').click({ modifiers: ['Alt'] });
+  await s.page.keyboard.press(process.platform === 'darwin' ? 'Meta+d' : 'Control+d');
+  await s.page.waitForFunction(() => document.querySelector('#frame').contentDocument.querySelectorAll('p').length === 4, null, { timeout: 5000 }).catch(() => {});
+  const ps = s.frame.locator('section').first().locator('p');
+  check('duplicate still works on such a file', (await ps.count()) === 3);
+  for (let i = 0; i < 3; i++) { await s.frame.locator('#x-b').hover(); await ps.nth(i).hover(); }
+  check('a duplicated element\'s handler does not run', (await pwned()) === '', await pwned());
+  await s.page.keyboard.press('Escape');   // drop the block selection left by Alt+click
+  await s.select('#x-b');
+  await s.page.waitForTimeout(150);
+  await s.typeAtEnd('#x-b', '!');
+  await s.frame.locator('#x-b').press('Escape');
+  const typed = await s.frame.locator('#x-b').textContent();
+  check('the editor\'s own scripts still run in that frame (typing is recorded)', typed === 'Plain!', typed);
+  await s.close();
+}
+
+async function runtimeCssSpec(browser, url) {
+  section('Tailwind Play CDN: the open notice says the page looks unstyled until trusted');
+  const s = await new Session(browser, url).start();
+  await s.open(wpath('tailwind-cdn.html'));
+  const msg = await s.page.textContent('#toast');
+  check('runtime CSS framework from a CDN: the notice says why the page looks unstyled, with "Trust this file"', /looks unstyled/.test(msg) && /Trust this file/.test(msg), msg);
+  await s.close();
+}
+
+async function regressionsSpec(browser, url) {
+  section('undo after a text edit, and text edits next to untouched markup');
+  const f = 'regress.html';
+  const original = disk(f);
+  const s = await new Session(browser, url).start();
+  await s.open(wpath(f));
+  const html = sel => s.frame.locator(sel).evaluate(n => n.innerHTML.replace(/ data-ed-[a-z-]+(="[^"]*")?/g, ''));
+  const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
+  const typeAtStart = async (sel, text) => {
+    await s.frame.locator(sel).click({ position: { x: 3, y: 5 } });
+    await s.page.waitForTimeout(150);   // the edit session starts on the click
+    await s.page.keyboard.press('Home');
+    await s.page.keyboard.type(text);
+    await s.frame.locator(sel).press('Escape');
+  };
+  // Duplicate a child, edit its parent's text, undo both: the copy goes away.
+  await s.frame.locator('#r-sp').click({ modifiers: ['Alt'] });
+  await s.page.keyboard.press(`${mod}+d`);
+  await typeAtStart('#r-dup', 'Oh ');
+  await s.undo(); await s.undo();
+  check('duplicate → edit the parent\'s text → undo ×2: back to the loaded markup, not dirty',
+    (await html('#r-dup')) === 'Hello <span id="r-sp">world</span> end' && !(await s.canUndo()) && !(await s.dirty()), await html('#r-dup'));
+  await s.redo(); await s.redo();
+  check('… and redo ×2 brings both back', (await html('#r-dup')) === 'Oh Hello <span id="r-sp">world</span><span id="r-sp">world</span> end', await html('#r-dup'));
+  await s.undo(); await s.undo();
+  // Delete a child, edit the parent's text, undo both: the child is back in its place.
+  await s.frame.locator('#r-b').click({ modifiers: ['Alt'] });
+  await s.page.keyboard.press('Delete');
+  await typeAtStart('#r-del', 'X ');
+  await s.undo(); await s.undo();
+  check('delete → edit the parent\'s text → undo ×2: the element is back where it was', (await html('#r-del')) === 'Kept <b id="r-b">bold</b> tail', await html('#r-del'));
+  // Move a child, edit its old parent's text, undo both: the child is back between its texts.
+  await s.page.keyboard.press('Escape');
+  await s.frame.locator('#r-x').click({ modifiers: ['Alt'] });
+  await s.page.keyboard.press('Alt+ArrowDown');
+  await s.page.keyboard.press('Escape');
+  await typeAtStart('#r-mv', 'Z');
+  await s.undo(); await s.undo();
+  check('move → edit the old parent\'s text → undo ×2: the element is back between its texts', (await html('#r-mv')) === 'left<span id="r-x">X</span>right<b>B</b>', await html('#r-mv'));
+  // A text-only edit keeps the bytes of the untouched element beside it.
+  await s.page.keyboard.press('Escape');
+  await typeAtStart('#r-ent', 'Oh <');
+  const c = await s.content();
+  const want = original.replace(`<p id="r-ent">Hello <b class='x'>&#65;</b>`, `<p id="r-ent">Oh &lt;Hello <b class='x'>&#65;</b>`);
+  check('edit text beside <b class=\'x\'>&#65;</b>: only that text changes (quotes, entity kept)', c === want, firstDiff(c, want));
+  await s.close();
+}
+
 async function realFiles(browser) {
   section(`real files in workspace ${REAL_ROOT}: no-op serialization`);
   const real = await startServer([], REAL_ROOT);
@@ -1482,7 +1567,7 @@ try {
   server = await startServer(['--test-hooks']);
   browser = await chromium.launch();
   if (!args.has('--real-only')) {
-    for (const scenario of [detection, textColourHistory, modeSwitch, structural, svgDiagram, regionFeedback, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, motion, scenesSpec, remoteScriptsSpec, malformed]) {
+    for (const scenario of [detection, textColourHistory, modeSwitch, structural, svgDiagram, regionFeedback, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, motion, scenesSpec, remoteScriptsSpec, malformed, untrustedSpec, regressionsSpec, runtimeCssSpec]) {
       try { await scenario(browser, server.url); }
       catch (e) { failures.push(`${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); console.log(`  ✖ ${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); }
     }
