@@ -4,9 +4,10 @@
 export const I18N = {
   vi: {
     brand_title: 'HtmlDeck · tạo bởi Avis (hunganh.freeze@gmail.com)',
+    present_untrusted: 'File được mở từ máy tính nên script (animation…) không chạy khi trình chiếu — chọn file trong workspace để chạy',
     present_split: 'Có slide Markdown được tách thành nhiều trang — thoát trình chiếu ở các trang đó sẽ về slide gốc',
     trust_off: 'Script ngoài: tắt', trust_on: 'Script ngoài: đang bật', trust_off_title: 'Script tải từ nguồn ngoài (CDN…) không chạy khi sửa — bấm để tin file này', trust_on_title: 'File này được tin: script ngoài chạy cùng quyền với editor (đọc/ghi file workspace) — bấm để tắt',
-    trust_toast: 'Script từ nguồn ngoài đang tắt khi sửa (trình chiếu vẫn chạy đủ).', trust_action: 'Tin file này', trust_confirm: 'Tin file này: script từ nguồn ngoài sẽ chạy trong khung sửa với toàn quyền của editor (đọc/ghi file trong workspace). Chỉ bật với file và nguồn bạn tin. Tiếp tục?',
+    trust_toast: 'Script từ nguồn ngoài đang tắt khi sửa (trình chiếu vẫn chạy đủ).', trust_toast_css: 'Trang dựng style bằng script từ CDN (Tailwind…), mà script đó đang tắt khi sửa, nên trang trông như mất style — tin file này để hiện đúng (trình chiếu vẫn đúng).', trust_action: 'Tin file này', trust_confirm: 'Tin file này: script từ nguồn ngoài sẽ chạy trong khung sửa với toàn quyền của editor (đọc/ghi file trong workspace). Chỉ bật với file và nguồn bạn tin. Tiếp tục?',
     fx_scene_hint: 'Scene: animation do code của file điều khiển (không chỉnh trong panel) — xem bằng Trình chiếu. Vẫn gán thêm hiệu ứng cho từng khối bằng nút ▶.',
     rail_effects: 'Hiệu ứng', panel_effects: 'Hiệu ứng', fx_panel_hint: 'Hiệu ứng chạy khi trình chiếu. Chọn một khối rồi bấm nút ▶ trên thanh công cụ để gán.', fx_play_slide: 'Xem thử cả slide', fx_list_empty: 'Chưa có hiệu ứng nào ở đây.', fx_scene: 'scene', fx_remove: 'Gỡ hiệu ứng',
     fx_title: 'Hiệu ứng khi hiện (trình chiếu)', fx_label: 'Hiệu ứng khi hiện', fx_none: 'Không có', fx_delay: 'Trễ (ms)', fx_dur: 'Thời lượng (ms)', fx_stagger: 'Lần lượt từng con (ms)', fx_preview: 'Xem thử',
@@ -359,9 +360,10 @@ export const I18N = {
   
   zh: {
     brand_title: 'HtmlDeck · 由 Avis 创建 (hunganh.freeze@gmail.com)',
+    present_untrusted: '此文件是从电脑打开的，演示时不运行其脚本（动画等）— 请在工作区中选择该文件以运行',
     present_split: '部分 Markdown 幻灯片被拆分为多页 — 在这些页面退出演示会回到原幻灯片',
     trust_off: '外部脚本：关闭', trust_on: '外部脚本：已开启', trust_off_title: '编辑时不运行来自外部 (CDN…) 的脚本 — 点击以信任此文件', trust_on_title: '此文件受信任：外部脚本以编辑器权限运行（读写工作区文件）— 点击关闭',
-    trust_toast: '编辑时已关闭外部脚本（演示时仍完整运行）。', trust_action: '信任此文件', trust_confirm: '信任此文件：外部脚本将在编辑框中以编辑器的全部权限运行（读写工作区文件）。仅对您信任的文件和来源开启。继续？',
+    trust_toast: '编辑时已关闭外部脚本（演示时仍完整运行）。', trust_toast_css: '此页面的样式由 CDN 脚本（Tailwind 等）生成，编辑时该脚本已关闭，因此页面看起来没有样式 — 信任此文件即可正常显示（演示时不受影响）。', trust_action: '信任此文件', trust_confirm: '信任此文件：外部脚本将在编辑框中以编辑器的全部权限运行（读写工作区文件）。仅对您信任的文件和来源开启。继续？',
     fx_scene_hint: 'Scene：由文件代码控制的动画（不能在面板中编辑）— 请用演示查看。仍可用 ▶ 为单个块添加动画。',
     rail_effects: '动画', panel_effects: '动画', fx_panel_hint: '动画在演示时运行。选择一个块，然后点击工具栏上的 ▶ 进行设置。', fx_play_slide: '预览整张幻灯片', fx_list_empty: '这里还没有动画。', fx_scene: 'scene', fx_remove: '移除动画',
     fx_title: '出现动画（演示）', fx_label: '出现动画', fx_none: '无', fx_delay: '延迟 (ms)', fx_dur: '时长 (ms)', fx_stagger: '子元素依次 (ms)', fx_preview: '预览',
@@ -714,9 +716,10 @@ export const I18N = {
 
   en: {
     brand_title: 'HtmlDeck · created by Avis (hunganh.freeze@gmail.com)',
+    present_untrusted: 'This file was opened from your computer, so its scripts (animations…) do not run while presenting — select it from the workspace to run them',
     present_split: 'Some Markdown slides are split into several pages — leaving the presentation on those pages returns to the source slide',
     trust_off: 'Remote scripts: off', trust_on: 'Remote scripts: on', trust_off_title: 'Scripts loaded from outside (CDN…) do not run while editing — click to trust this file', trust_on_title: 'This file is trusted: remote scripts run with the editor\'s rights (read/write workspace files) — click to turn off',
-    trust_toast: 'Remote scripts are off while editing (presenting still runs everything).', trust_action: 'Trust this file', trust_confirm: 'Trust this file: remote scripts will run in the edit view with the editor\'s full rights (read/write files in the workspace). Only for files and sources you trust. Continue?',
+    trust_toast: 'Remote scripts are off while editing (presenting still runs everything).', trust_toast_css: 'This page builds its styles with a CDN script (Tailwind…), which is off while editing, so it looks unstyled — trust this file to see it right (presenting is not affected).', trust_action: 'Trust this file', trust_confirm: 'Trust this file: remote scripts will run in the edit view with the editor\'s full rights (read/write files in the workspace). Only for files and sources you trust. Continue?',
     fx_scene_hint: 'Scene: animation driven by the file\'s own code (not editable here) — watch it by presenting. You can still add effects to blocks with ▶.',
     rail_effects: 'Effects', panel_effects: 'Effects', fx_panel_hint: 'Effects run when presenting. Select a block, then press ▶ in the toolbar to set one.', fx_play_slide: 'Preview the whole slide', fx_list_empty: 'No effects here yet.', fx_scene: 'scene', fx_remove: 'Remove effect',
     fx_title: 'Entrance effect (presenting)', fx_label: 'Entrance effect', fx_none: 'None', fx_delay: 'Delay (ms)', fx_dur: 'Duration (ms)', fx_stagger: 'Children one by one (ms)', fx_preview: 'Preview',

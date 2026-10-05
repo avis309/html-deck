@@ -195,8 +195,14 @@ const el = {
 // ================================================================ utilities
 function translateToast(msg) { return translateToastFor(curLang(), msg); }
 
+// In full screen only the full-screen element is painted: the toast must live inside it.
+function placeToast() {
+  const tEl = $('#toast'), host = document.fullscreenElement || document.body;
+  if (tEl.parentElement !== host) host.appendChild(tEl);
+  return tEl;
+}
 function toast(msg, { err = false, ms = 2600, action = null } = {}) {
-  const tEl = $('#toast');
+  const tEl = placeToast();
   tEl.textContent = translateToast(msg);
   tEl.classList.toggle('has-action', !!action);
   if (action) {
@@ -455,6 +461,8 @@ function remoteScripts() {
   }
   return [...new Set(out)].sort();
 }
+// Remote scripts that generate the page's CSS in the browser.
+const RUNTIME_CSS = /\/\/cdn\.tailwindcss\.com|@tailwindcss\/browser|\/twind|@unocss\/runtime|unocss\/runtime/i;
 const trustKey = () => S.source?.kind === 'server' ? 'htmldeck_trust:' + S.source.path : null;
 function trustRemote() {
   const k = trustKey(), sig = remoteScripts().join('\n');
@@ -566,7 +574,12 @@ function onFrameReady() {
   const n = S.liveById.size;
   renderTrustChip();
   if (S.readOnly) toast(t(S.readOnly), { ms: 6000 });
-  else if (!$('#sb-trust').hidden && !S.mountedTrust) toast(t('trust_toast'), { ms: 8000, action: { label: t('trust_action'), fn: () => setTrust(true) } });
+  else if (!$('#sb-trust').hidden && !S.mountedTrust) {
+    // A runtime CSS framework (Tailwind Play CDN, Twind, UnoCSS runtime) styles the whole page:
+    // blocked, the page looks broken rather than merely static, so say so and keep it up longer.
+    const css = remoteScripts().some(u => RUNTIME_CSS.test(u));
+    toast(t(css ? 'trust_toast_css' : 'trust_toast'), { ms: css ? 15000 : 8000, action: { label: t('trust_action'), fn: () => setTrust(true) } });
+  }
   else toast(`Opened ${S.source.name} · ${S.mode === 'deck' ? S.slides.length + ' slides' : 'web page'} · ${n} editable text blocks`);
   if (S.afterReady) { const f = S.afterReady; S.afterReady = null; f(); }
 }
@@ -3631,6 +3644,13 @@ function zoomBy(f) { setZoom(S.scale * 100 * f); }
 function fitZoom() { S.fit = true; layout(); }
 // Present runs in its own iframe built from the model (js/present/): the edit iframe, its
 // selection mapping and the undo history stay untouched underneath, and the deck gets its keys.
+// Scripts neuterScripts strips that would have run: data blocks (JSON, import maps…) do not count.
+function hasAuthorCode(model) {
+  return [...model.querySelectorAll('script:not([data-htmldeck-fx])')].some(n => {
+    const ty = (n.getAttribute('type') || '').trim().toLowerCase();
+    return !ty || ty === 'module' || /^(text|application)\/(x-)?(java|ecma)script$/.test(ty);
+  });
+}
 function togglePresent() { if (S.present) endPresent(); else startPresent(); }
 function startPresent() {
   if (!S.doc || S.present) return;
@@ -3673,7 +3693,7 @@ function startPresent() {
       host: $('#present-host'), url, title: S.source.name, sessionId: p.sessionId, docRevision: p.docRevision,
       count: p.count, start: p.start, origin: S.previewOrigin,
       on: {
-        ready: m => { clearTimeout(p.deadline); layoutPresent(); p.session.frame.focus(); p.session.frame.contentWindow?.focus(); document.body.dataset.presentIndex = String(m.index); document.body.dataset.presentState = 'active'; if (m.split) toast(t('present_split'), { ms: 5000 }); },
+        ready: m => { clearTimeout(p.deadline); layoutPresent(); p.session.frame.focus(); p.session.frame.contentWindow?.focus(); document.body.dataset.presentIndex = String(m.index); document.body.dataset.presentState = 'active'; if (untrusted && hasAuthorCode(S.model)) toast(t('present_untrusted'), { ms: 6000 }); if (m.split) toast(t('present_split'), { ms: 5000 }); },
         state: i => { document.body.dataset.presentIndex = String(i); },
         exit: () => endPresent(),
         save: () => save(),
@@ -3725,6 +3745,7 @@ document.addEventListener('fullscreenchange', () => {
   // Only the session's own full screen ending closes it; a refused request never opened one.
   if (p && document.fullscreenElement === el.stage) p.fullscreen = true;
   else if (p && p.fullscreen) endPresent();
+  placeToast();
   requestAnimationFrame(layoutPresent);
   setTimeout(layoutPresent, 120);
 });
