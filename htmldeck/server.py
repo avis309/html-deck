@@ -426,7 +426,8 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
 
     def guess_type(self, path):
         ext = os.path.splitext(str(path))[1].lower()
-        return self.extensions_map.get(ext) or super().guess_type(path)
+        # Explicit base: PreviewOriginHandler borrows this method, so a bare super() would fail there.
+        return self.extensions_map.get(ext) or http.server.SimpleHTTPRequestHandler.guess_type(self, path)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(self.root), **kwargs)
