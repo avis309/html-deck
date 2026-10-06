@@ -70,11 +70,21 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the whole history and tags: notes cover the commits since the previous tag
+      # Notes from the Conventional Commits since the previous tag (feat/fix/perf/docs; see cliff.toml).
+      - uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: RELEASE_NOTES.md
       - uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
-      - run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes
+      - run: gh release create "$GITHUB_REF_NAME" dist/* --notes-file RELEASE_NOTES.md
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

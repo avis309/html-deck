@@ -1,0 +1,36 @@
+# Release notes from Conventional Commits (git-cliff, https://git-cliff.org).
+# The release workflow renders the commits between the previous tag and the pushed one;
+# preview locally with: npx git-cliff --unreleased --tag vX.Y.Z --strip header
+
+[changelog]
+header = ""
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | upper_first }}\
+{% if commit.body %}
+{{ commit.body | indent(prefix="  ", first=true) }}
+{% endif %}\
+{% endfor %}
+{% endfor %}
+{% if previous.version %}
+**Full Changelog**: https://github.com/avis309/html-deck/compare/{{ previous.version }}...{{ version }}
+{% endif %}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+tag_pattern = "v[0-9].*"
+sort_commits = "oldest"
+# Only what a user of the editor notices; tests, CI, refactors and version bumps stay out.
+commit_parsers = [
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Bug Fixes" },
+  { message = "^perf", group = "<!-- 2 -->Performance" },
+  { message = "^docs", group = "<!-- 3 -->Documentation" },
+  { message = ".*", skip = true },
+]
