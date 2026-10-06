@@ -88,6 +88,7 @@ function applyLanguage(lang) {
     else if (view === 'files' && typeof renderFileList === 'function') renderFileList();
   }
   if (typeof applyModeUI === 'function') applyModeUI();
+  if (typeof S !== 'undefined' && S) renderAgentCmds();
 }
 
 function openLangMenu() {
@@ -429,6 +430,9 @@ async function openDocument(html, source) {
     buildModel(html);
     S.format = inspectFormat(S.model);
     S.source = source;
+    // Nothing of the previous document's feedback stays usable while this one is mounted:
+    // the preview may be slow or fail, and loadAgentNotes only runs after it.
+    clearFeedback();
     S.diskHash = source.diskHash || textHash(html);
     const dir = source.kind === 'server' ? source.path.split('/').slice(0, -1).map(encodeURIComponent).join('/') : '';
     S.baseURL = location.origin + '/' + (dir ? dir + '/' : '');
@@ -443,6 +447,7 @@ async function openDocument(html, source) {
     if (e.status === 404) e.message = 'the running server is an older version — stop it (Ctrl+C) and run htmldeck again';
     // Never leave the previous document on screen bound to a half-built model.
     S.model = null; S.source = null;
+    clearFeedback();
     el.frame.onload = null;
     el.frame.src = 'about:blank';
     el.stage.classList.add('empty');
@@ -555,8 +560,9 @@ function onFrameReady() {
   else if (isOriginal(doc.body)) markRoots(doc.body, false);
 
   bindFrameEvents(doc, win);
-  // Feedback lives in a sidecar next to a workspace file; nothing to pin for other files.
-  $('#pill-note').disabled = S.source.kind !== 'server';
+  // Feedback lives in a sidecar next to a workspace file; for other files the button stays
+  // clickable and explains why (see needWorkspaceFile).
+  $('#pill-note').classList.toggle('unavailable', S.source.kind !== 'server');
   S.fit = true;
   applyModeUI();
   if (S.mode === 'deck') { showSlide(0); centerAllSlides(); buildFilmstrip(); }
@@ -3085,33 +3091,61 @@ function noteTarget(note) {
   const id = noteTargetId(note);
   return id && modelEl(id) ? liveEl(id) : null;
 }
-async function loadAgentNotes() {
+// The notes, their pins and the agent command all belong to one document: drop them together.
+function clearFeedback() {
   flushRemoval();
   S.agentNotes = [];
+  S.notesCmds = [];
+  renderAgentCmds();
+  renderNoteList();
+  renderPins();
+}
+async function loadAgentNotes() {
+  clearFeedback();   // never the previous document's notes or command, even if this load fails
   const token = S.loadToken, src = S.source;
   if (src?.kind === 'server') {
     try {
       const res = await api(`/api/notes?path=${encodeURIComponent(src.path)}`);
       if (token !== S.loadToken) return;
       S.agentNotes = res.notes || [];
+      S.notesCmds = res.commands || [];
     } catch (e) { if (token === S.loadToken) toast('Cannot read feedback: ' + e.message, { err: true }); }
   }
-  $('#agent-cmd').textContent = S.source?.kind === 'server' ? agentCmd() : t('note_workspace_only');
+  renderAgentCmds();
   renderNoteList();
   renderPins();
 }
 // Send operations, not the whole list: the server merges them into the sidecar as it is on
 // disk, so an agent's `--done` made meanwhile is never overwritten by this stale copy.
+// Resolves true once the server has written the sidecar, false when it has not, and null when
+// another document was opened meanwhile (the result is then about a document no longer shown).
 async function noteOps(ops) {
   const src = S.source, token = S.loadToken;
-  if (src?.kind !== 'server') return toast('Feedback can only be saved for workspace files', { err: true });
+  if (src?.kind !== 'server') { needWorkspaceFile(); return false; }
+  let ok = false;
   try {
     const res = await postJSON('/api/notes', { path: src.path, ops });
-    if (token !== S.loadToken) return;
+    if (token !== S.loadToken) return null;
     S.agentNotes = res.notes || [];
-  } catch (e) { toast('Cannot save feedback: ' + e.message, { err: true, ms: 5000 }); }
+    if (res.commands) { S.notesCmds = res.commands; renderAgentCmds(); }
+    ok = true;
+  } catch (e) {
+    if (token !== S.loadToken) return null;
+    toast('Cannot save feedback: ' + e.message, { err: true, ms: 5000 });
+  }
   renderNoteList();
   renderPins();
+  return ok;
+}
+// Feedback is kept beside the file on disk, which only a document opened from the workspace
+// has: one opened from the computer or dropped in is text without a place. Say so, and lead
+// to the workspace list (filtered to this file's name) instead of a button that does nothing.
+function needWorkspaceFile() {
+  toast(t('note_workspace_only'), { err: true, ms: 7000, action: { label: t('fb_show_files'), fn: () => {
+    openPanel('files', true);
+    $('#file-search').value = S.source?.name || '';
+    renderFileList();
+  } } });
 }
 // Before a save: which element each note (and each element of a region note) points at, keyed
 // by note id, since the list may be reloaded while the request is in flight.
@@ -3140,14 +3174,41 @@ function reanchorNotes(before) {
   }
   if (ops.length) noteOps(ops);
 }
-// Single-quoted for the shell: paths may hold spaces or glob characters like [PTGSEA].
-const shq = v => `'${String(v).replace(/'/g, `'\\''`)}'`;
-const agentCmd = () => `htmldeck-notes --file ${shq(S.source.path)}`;   // run in the workspace
+// Built by the server (notes_commands): this Python and this copy of htmldeck by absolute path,
+// with the workspace, quoted per shell — on Windows one for PowerShell and one for Git Bash.
+const agentCmdLines = (suffix = '') => (S.notesCmds || []).map(c => (c.shell ? c.shell + ': ' : '') + c.command + suffix);
+function renderAgentCmds() {
+  const box = $('#agent-cmds');
+  if (!box) return;
+  box.textContent = '';
+  const row = text => {
+    const r = document.createElement('div');
+    r.className = 'agent-cmd';
+    const span = document.createElement('span');
+    span.textContent = text;
+    r.appendChild(span);
+    return box.appendChild(r);
+  };
+  if (S.source?.kind !== 'server') return void row(t('note_workspace_only'));
+  if (!S.notesCmds?.length) return void row('—');
+  for (const c of S.notesCmds) {
+    const r = row(c.command);
+    if (c.shell) r.insertAdjacentHTML('afterbegin', '<b class="ac-shell"></b>'), r.firstChild.textContent = c.shell;
+    const b = document.createElement('button');
+    b.textContent = t('copy_btn');
+    b.addEventListener('click', () => navigator.clipboard?.writeText(c.command).then(() => toast('Command copied')));
+    r.appendChild(b);
+  }
+}
 // target: the selected block, or a whole slide / report section pinned from the panel.
 // region: { region, canvas, targets } of an area on `target` (see feedbackMulti).
 function openNotePop(target = S.sel, region = null) {
+  if (!S.model) return toast('Please open a document first');
+  if (S.source?.kind !== 'server') return needWorkspaceFile();
   if (!target) return toast('Select a block before writing feedback');
-  if (S.source?.kind !== 'server') return toast(t('note_workspace_only'), { err: true });
+  if (noteSaving?.token === S.loadToken) return;   // the open popup is still sending its note
+  $('#note-save').disabled = false;
+  $('#note-input').readOnly = false;
   if (S.editing) setEditing(false);
   const pop = $('#pop-note');
   closePopups();
@@ -3182,20 +3243,33 @@ function regionLabel(owner, targets) {
   const what = targets.length ? t('fb_region_items').replace('{n}', targets.length) + ': ' + targets.slice(0, 3).map(x => x.text ? `“${x.text.slice(0, 24)}”` : `<${x.tag}>`).join(', ') : t('fb_region_empty');
   return [stripLabel(owner), t('fb_region_tag'), what].filter(Boolean).join(' · ');
 }
-function addNoteFromPop() {
+// The note being sent, tied to the document it belongs to: a slow request for a document
+// already closed never blocks feedback on the one opened since.
+let noteSaving = null;
+async function addNoteFromPop() {
   const text = $('#note-input').value.trim(), target = S.noteTarget;
-  if (!text || !target || !target.isConnected) return;
+  if (noteSaving?.token === S.loadToken || !text || !target || !target.isConnected) return;
   const id = target.dataset.edId, p = S.pristine.querySelector(`[data-ed-id="${id}"]`);
   if (!p) return toast('This block is not in the file yet — save first, then write feedback', { err: true, ms: 4000 });
   const slide = S.slides.indexOf(target.closest('[data-ed-slide]'));
   const reg = S.noteRegion?.owner === target ? S.noteRegion : null;
-  $('#pop-note').hidden = true;
-  S.noteRegion = null;
-  noteOps([{ op: 'add', note: {
+  // The popup and its text stay until the server has the note: a failed save loses nothing.
+  // Read-only meanwhile, so what is saved is what the popup shows.
+  const mine = noteSaving = { token: S.loadToken };
+  $('#note-save').disabled = true;
+  $('#note-input').readOnly = true;
+  const ok = await noteOps([{ op: 'add', note: {
     id: Math.random().toString(36).slice(2, 10), note: text, status: 'open', created: new Date().toISOString(),
     selector: cssPath(p), tag: p.localName, text: snippetOf(p), line: sourceLine(id), slide: slide >= 0 ? slide : null,
     ...(reg && { kind: 'region', region: reg.region, canvas: reg.canvas, targets: reg.targets }),
-  } }]);
+  } }]).finally(() => {
+    if (noteSaving !== mine) return;   // another document took over the popup meanwhile
+    noteSaving = null;
+    $('#note-save').disabled = false;
+    $('#note-input').readOnly = false;
+  });
+  if (!ok) return;
+  if (S.noteTarget === target) { $('#pop-note').hidden = true; S.noteRegion = null; }
   toast('Feedback saved');
 }
 // ---------------------------------------------------------------- marquee selection
@@ -3327,6 +3401,7 @@ function clearMulti() {
 function feedbackMulti() {
   const g = S.multi;
   if (!g) return;
+  if (S.source?.kind !== 'server') return needWorkspaceFile();   // keep the selection
   let hit = g.hit;
   if (!hit) {
     const rs = g.nodes.map(n => n.getBoundingClientRect());
@@ -3528,6 +3603,7 @@ const REMOVE_DELAY = 3000;
 const liveNotes = () => (S.agentNotes || []).filter(n => !isRemoving(n));
 const isRemoving = n => S.removing?.id === n.id;
 function removeNote(n) {
+  if (S.source?.kind !== 'server') return;
   flushRemoval();
   const pending = { id: n.id, path: S.source.path };
   pending.timer = setTimeout(() => flushRemoval(), REMOVE_DELAY);
@@ -3613,7 +3689,7 @@ function copyFeedbackRequest() {
       : n.text && !whole ? '“' + n.text.slice(0, 80) + '” → ' : '';
     lines.push(`${i + 1}. ${where ? '[' + where + '] ' : ''}${quote}${n.note}`);
   }
-  lines.push('', t('fb_prompt_read'), agentCmd(), '', t('fb_prompt_done'), agentCmd() + ' --done <id>');
+  if (S.notesCmds?.length) lines.push('', t('fb_prompt_read'), ...agentCmdLines(), '', t('fb_prompt_done'), ...agentCmdLines(' --done ID'));
   const text = lines.join('\n');
   (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
     .then(() => toast(t('fb_copied')), () => { S.lastRequest = text; toast(text.slice(0, 120) + '…', { ms: 6000 }); });
@@ -4599,7 +4675,6 @@ function bindUI() {
   });
   $('#note-cancel').addEventListener('click', () => { $('#pop-note').hidden = true; });
   $('#note-input').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addNoteFromPop(); if (e.key === 'Escape') $('#pop-note').hidden = true; });
-  $('#agent-cmd-copy').addEventListener('click', () => navigator.clipboard?.writeText($('#agent-cmd').textContent).then(() => toast('Command copied')));
   $('#sb-width').addEventListener('change', e => {
     try { localStorage.setItem(PAGE_W_KEY, e.target.value); } catch {}
     applyPageWidth(e.target.value);

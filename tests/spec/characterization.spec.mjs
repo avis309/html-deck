@@ -436,6 +436,69 @@ async function structural(browser, url) {
   await s.close();
 }
 
+// AI Feedback needs a workspace file: a file opened from the computer says so instead of a dead
+// button; a save only reports success once the server has the note; the copied command runs anywhere.
+async function feedbackAccess(browser, url) {
+  section('AI Feedback: workspace vs local file, save errors, copied command');
+  const name = '10月改版 台灣推廣提案.html';
+  fs.writeFileSync(path.join(WORK, name), '<!doctype html><html><body><h1 id="t1">10 月改版<br>台灣推廣提案</h1><p id="p1">目標：提升留存</p></body></html>');
+  const side = path.join(WORK, '.htmldeck_notes', name + '.json');
+  const notes = () => fs.existsSync(side) ? JSON.parse(fs.readFileSync(side, 'utf8')).notes : [];
+  const s = await new Session(browser, url).start();
+  await s.open(wpath(name));
+  await s.page.waitForSelector('#agent-cmds .agent-cmd button', { state: 'attached' });   // notes load after the document
+  const cmd = await s.page.textContent('#agent-cmds .agent-cmd span');
+  check('copied command: this Python + notes.py by path, with --root and the quoted file', /notes\.py'? --root .+ --file '10月改版 台灣推廣提案\.html'$/.test(cmd), cmd);
+
+  // The first save fails: the popup and its text stay, no success message.
+  let fail = true;
+  await s.page.route('**/api/notes', async route => {
+    if (route.request().method() !== 'POST') return route.continue();
+    if (fail) { fail = false; return route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"disk full"}' }); }
+    await new Promise(r => setTimeout(r, 400));   // slow: a second click must not send it twice
+    return route.continue();
+  });
+  await s.page.click('.rail-item[data-panel="review"]');   // the panel stays open: it must follow document switches
+  await s.select('#t1');
+  await s.page.click('#pill-note');
+  await s.page.fill('#note-input', '標題字級加大');
+  await s.page.click('#note-save');
+  await s.page.waitForFunction(() => /disk full/.test(document.querySelector('#toast').textContent));
+  check('failed save: popup still open with the text, nothing written',
+    await s.page.isVisible('#pop-note') && (await s.page.inputValue('#note-input')) === '標題字級加大' && notes().length === 0);
+  await s.page.click('#note-save');
+  check('while sending: the text is read-only, so what is saved is what is shown', await s.page.evaluate(() => document.querySelector('#note-input').readOnly));
+  await s.page.click('#note-save', { force: true, timeout: 1000 }).catch(() => {});
+  await s.page.waitForFunction(() => document.querySelector('#pop-note').hidden, null, { timeout: 5000 });
+  await s.page.waitForTimeout(300);
+  check('retry: saved once (a double click sends one note), popup closed', notes().length === 1 && notes()[0].note === '標題字級加大', JSON.stringify(notes()));
+  await s.page.unroute('**/api/notes');
+
+  // The same file opened from the computer: the button explains and leads to the workspace list.
+  const seq = await s.seq();
+  // A slow preview for the next document: the previous one's command must not stay copyable meanwhile.
+  await s.page.route('**/api/preview', async route => { await new Promise(r => setTimeout(r, 1500)); return route.continue(); });
+  await s.page.setInputFiles('#file-input', path.join(WORK, name));
+  await s.page.waitForTimeout(300);
+  check('switching documents: the previous notes and command are cleared before the new one is mounted',
+    (await s.page.locator('#agent-cmds button').count()) === 0 && (await s.page.locator('#note-list .note-card').count()) === 0 && await s.page.isDisabled('#fb-copy'));
+  await s.waitReady(name, seq);
+  await s.page.unroute('**/api/preview');
+  await s.select('#t1');
+  const pill = await s.page.evaluate(() => { const b = document.querySelector('#pill-note'); return { disabled: b.disabled, unavailable: b.classList.contains('unavailable') }; });
+  check('local file: AI button stays clickable, shown as unavailable', !pill.disabled && pill.unavailable, JSON.stringify(pill));
+  check('local file: no agent command left over from the workspace file', (await s.page.locator('#agent-cmds button').count()) === 0);
+  await s.page.click('#pill-note');
+  check('local file: clicking explains instead of opening the popup', await s.page.isHidden('#pop-note') && await s.page.isVisible('#toast .t-act'));
+  await s.page.keyboard.press(process.platform === 'darwin' ? 'Meta+Shift+M' : 'Control+Shift+M');
+  check('local file: the shortcut says the same', await s.page.isHidden('#pop-note') && await s.page.isVisible('#toast .t-act'));
+  await s.page.click('#toast .t-act');
+  await s.page.waitForSelector('#file-list .file-item');
+  check('the action opens the workspace list filtered to this file',
+    (await s.page.inputValue('#file-search')) === name && (await s.page.locator('#file-list .file-item').count()) === 1);
+  await s.close();
+}
+
 async function svgDiagram(browser, url) {
   section('SVG diagram: edit its text in place, select it as one block for AI Feedback');
   const original = disk('svg.html');
@@ -1567,7 +1630,7 @@ try {
   server = await startServer(['--test-hooks']);
   browser = await chromium.launch();
   if (!args.has('--real-only')) {
-    for (const scenario of [detection, textColourHistory, modeSwitch, structural, svgDiagram, regionFeedback, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, motion, scenesSpec, remoteScriptsSpec, malformed, untrustedSpec, regressionsSpec, runtimeCssSpec]) {
+    for (const scenario of [detection, textColourHistory, modeSwitch, structural, svgDiagram, regionFeedback, feedbackAccess, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, motion, scenesSpec, remoteScriptsSpec, malformed, untrustedSpec, regressionsSpec, runtimeCssSpec]) {
       try { await scenario(browser, server.url); }
       catch (e) { failures.push(`${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); console.log(`  ✖ ${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); }
     }

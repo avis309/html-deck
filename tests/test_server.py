@@ -443,7 +443,48 @@ def test_notes_prompt_is_ready_to_paste(root):
     out = ln.format_prompt(target, [_note(), _region(), _note(id="n9", status="done")], root)
     assert out.startswith("Edit output/deck/a b.html as asked in the 2 note(s)")
     assert "n9" not in out and "id=r1" in out and "#h2" in out
-    assert "htmldeck-notes --file 'output/deck/a b.html' --done <id>" in out
+    assert out.rstrip().endswith(ed.notes_commands(target, root)[-1]["command"] + " --done ID")
+
+
+def test_notes_command_quotes_for_the_shell_of_the_machine(root):
+    import shlex
+    target = root / "output/deck/10月改版 台灣's 提案.html"
+    posix = ed.notes_command(target, root, "posix")
+    assert shlex.split(posix)[2:] == ["--root", str(root), "--file", "output/deck/10月改版 台灣's 提案.html"]
+    ps = ed.notes_command(target, root, "powershell")
+    assert ps.startswith("& '") and "--file 'output/deck/10月改版 台灣''s 提案.html'" in ps
+    curly = ed.notes_command(root / "Bob’s ‘deck’.html", root, "powershell")
+    assert curly.endswith("--file 'Bob’’s ‘‘deck’’.html'")
+    # A name that looks like an option is still read as the file.
+    assert "--file ./-x.html" in ed.notes_command(root / "-x.html", root)
+    # Windows: one command per shell an agent may use there, each labelled.
+    assert [c["shell"] for c in ed.notes_commands(target, root, windows=True)] == ["PowerShell", "Git Bash"]
+    assert [c["shell"] for c in ed.notes_commands(target, root, windows=False)] == [""]
+
+
+def test_notes_api_hands_the_editor_the_agent_command(server, root):
+    status, data = _request(server, "GET", "/api/notes?path=output/deck/a.html")
+    assert status == 200 and json.loads(data)["commands"] == ed.notes_commands(root / "output/deck/a.html", root)
+    body = json.dumps({"path": "output/deck/a.html", "ops": [{"op": "add", "note": _note()}]})
+    ok = {"Content-Type": "application/json", "Origin": f"http://127.0.0.1:{server}"}
+    status, data = _request(server, "POST", "/api/notes", body, ok)
+    data = json.loads(data)
+    assert status == 200 and data["commands"] and data["notes"][0]["id"] == "n1"
+
+
+@pytest.mark.parametrize("args", [[], ["--prompt"], ["--done", "n1"]])
+def test_notes_cli_rejects_a_missing_or_folder_target(root, capsys, args):
+    from htmldeck import notes as ln
+    for name in ("output/deck/nope.html", "output/deck"):
+        with pytest.raises(SystemExit) as exc:
+            ln.main(["--root", str(root), "--file", name, *args])
+        assert exc.value.code == 1 and "not a file" in capsys.readouterr().err
+
+
+def test_notes_cli_existing_file_without_notes_is_fine(root, capsys):
+    from htmldeck import notes as ln
+    ln.main(["--root", str(root), "--file", "output/deck/a.html"])
+    assert "No open notes" in capsys.readouterr().out
 
 
 def test_http_symlink_into_hidden_dir_is_blocked(server, root):

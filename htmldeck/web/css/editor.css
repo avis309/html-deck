@@ -115,6 +115,9 @@ button:disabled { cursor: default; opacity: .38; }
 .btn-primary:hover { background: var(--accent-600); }
 .btn-soft { height: 36px; padding: 0 12px; border-radius: 8px; background: var(--hover); font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .btn-soft:hover { background: #e7e8ec; }
+.pick-local { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.pick-local .btn-soft { width: 100%; }
+.pick-local .hint { margin: 8px 2px 0; }
 .sec-label { margin: 18px 0 8px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
 .file-group { margin-bottom: 10px; }
 .file-group-name { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 12px 0 4px; }
@@ -211,6 +214,8 @@ button:disabled { cursor: default; opacity: .38; }
 /* Its own box with a thin accent outline, so it reads as the AI action. */
 .pill-group.pill-ai { box-shadow: var(--shadow-md), inset 0 0 0 1.5px var(--accent); }
 .pill-ai button:hover { background: var(--accent-50); }
+/* Feedback needs a workspace file: dimmed, still clickable so it can say why. */
+.pill-ai button.unavailable { opacity: .45; }
 .pill.show { display: flex; }
 .pill button { width: 32px; height: 32px; border-radius: 7px; display: grid; place-items: center; color: var(--ink-2); }
 .pill button:hover { background: var(--hover); color: var(--ink); }
@@ -439,6 +444,8 @@ details.more[open] summary::before { content: '▾ '; }
 .note-card .nc-edit .btn-soft { height: 30px; font-size: 12px; }
 .thumb .note-dot { position: absolute; left: 6px; top: 5px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px 9px 9px 3px; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 800; display: grid; place-items: center; border: 1.5px solid #fff; }
 .agent-cmd { display: flex; gap: 6px; align-items: center; margin: 4px 0 14px; padding: 8px 10px; border-radius: 8px; background: var(--hover); font: 500 11px/1.4 'JetBrains Mono', monospace; color: var(--ink-2); word-break: break-all; }
+.agent-cmd span { flex: 1; min-width: 0; }
+.agent-cmd .ac-shell { flex: none; font: 700 10px var(--ui); color: var(--ink-2); }
 .agent-cmd button { flex: none; height: 26px; padding: 0 8px; border-radius: 6px; background: #fff; font: 600 11px var(--ui); box-shadow: var(--shadow-sm); }
 .rail-item .badge-count { position: absolute; margin: -4px 0 0 26px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 800; display: grid; place-items: center; }
 .rail-item { position: relative; }

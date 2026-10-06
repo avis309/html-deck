@@ -99,8 +99,11 @@ Each save keeps a timestamped backup in `.htmldeck_bak/` next to the document.
   `python -m htmldeck.export --file <file>.html --remote`.
 - **PDF**: the document as a PDF file: a deck, a report or any page.
 
-Review notes live beside each document in `.htmldeck_notes/<name>.json`. Scripts and agents read
-and resolve them with:
+Review notes live beside each document in `.htmldeck_notes/<name>.json`, so **AI Feedback** works
+on documents opened from the workspace's **Files** list (not on a file opened from the computer or
+dropped in). The request copied from the editor carries the exact command for the agent to run,
+on macOS, Linux and Windows (PowerShell) alike. With HtmlDeck installed, scripts and agents can
+also read and resolve notes with:
 
 ```bash
 htmldeck-notes --file <file>.html             # list open notes

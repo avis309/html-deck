@@ -103,10 +103,13 @@
       <div class="panel-inner">
         <div class="panel-head"><h2 id="panel-title">Files</h2><button class="icon-btn" id="panel-close" data-i18n-title="close" title="Close"><svg class="icon"><use href="#i-x"/></svg></button></div>
         <div class="panel-body" data-view="files">
-          <button class="btn-primary" id="btn-pick" data-i18n="pick_file"><svg class="icon sm"><use href="#i-laptop"/></svg>Open file from computer</button>
-          <div class="hint" style="margin:8px 2px 14px" data-i18n="drag_hint">Or drag &amp; drop .html files into this window.</div>
           <label class="search"><svg class="icon sm"><use href="#i-search"/></svg><input id="file-search" data-i18n-placeholder="search_files" placeholder="Search files in workspace"></label>
           <div id="file-list"><div class="hint" data-i18n="loading_list">Loading list…</div></div>
+          <!-- Secondary: a file opened from the computer can be edited, not given AI Feedback. -->
+          <div class="pick-local">
+            <button class="btn-soft" id="btn-pick" data-i18n="pick_file"><svg class="icon sm"><use href="#i-laptop"/></svg>Open file from computer</button>
+            <div class="hint" data-i18n="drag_hint">Or drag &amp; drop .html files into this window. Files opened this way can be edited, but AI Feedback needs a file from the list above.</div>
+          </div>
         </div>
         <div class="panel-body" data-view="text" hidden>
           <div class="hint" style="margin-bottom:12px" id="text-hint" data-i18n-html="text_hint">Click to add a text box to the current page. Drag the <b>move</b> handle on the floating toolbar to reposition.</div>
@@ -170,7 +173,7 @@
           <div class="seg fb-filter" id="fb-filter"><button data-f="open" class="on"></button><button data-f="done"></button></div>
           <div id="note-list"></div>
           <details class="agent-more"><summary data-i18n="fb_for_agent">For agents (command to read feedback)</summary>
-            <div class="agent-cmd"><span id="agent-cmd">—</span><button id="agent-cmd-copy" data-i18n="copy_btn">Copy</button></div>
+            <div id="agent-cmds"></div>
           </details>
         </div>
         <div class="panel-body" data-view="colors" hidden>

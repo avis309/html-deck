@@ -38,6 +38,7 @@ import math
 import os
 import re
 import secrets
+import shlex
 import shutil
 import socketserver
 import sys
@@ -221,6 +222,37 @@ def export_html(target: Path, content: object, root: Path, fetch_remote: bool) -
 
 def notes_path(target: Path) -> Path:
     return target.parent / NOTES_DIR_NAME / f"{target.name}.json"
+
+
+def _ps_quote(value: str) -> str:
+    """Single-quoted for PowerShell: only quote marks are special, and each doubles. PowerShell
+    reads the curly ones (‘ ’ ‚ ‛) as single quotes too, as in a name like Bob’s deck.html."""
+    return "'" + re.sub("(['\u2018\u2019\u201a\u201b])", r"\1\1", value) + "'"
+
+
+def notes_command(target: Path, root: Path, shell: str = "posix") -> str:
+    """The command an agent runs to read this document's notes (append ``--done ID`` to resolve one).
+
+    It names this interpreter and this copy of notes.py by absolute path, with the workspace,
+    so it works from any folder whether HtmlDeck came from pip, npm, uvx or a plugin, none of
+    which is sure to put ``htmldeck-notes`` on PATH. ``shell`` is "posix" (sh, bash, Git Bash:
+    backslashes are literal inside its single quotes) or "powershell".
+    """
+    quote = _ps_quote if shell == "powershell" else shlex.quote
+    py, script = quote(sys.executable), quote(str(Path(__file__).resolve().with_name("notes.py")))
+    doc = display_path(target, root)
+    doc = "./" + doc if doc.startswith("-") else doc   # never read as an option
+    cmd = f"{py} {script} --root {quote(str(root))} --file {quote(doc)}"
+    return "& " + cmd if shell == "powershell" else cmd
+
+
+def notes_commands(target: Path, root: Path, windows: bool = _WINDOWS) -> list[dict]:
+    """``notes_command`` for each shell an agent may run on this machine: on Windows, PowerShell
+    (Codex, a terminal) and Git Bash (Claude Code's Bash tool) cannot share one syntax."""
+    if not windows:
+        return [{"shell": "", "command": notes_command(target, root)}]
+    return [{"shell": "PowerShell", "command": notes_command(target, root, "powershell")},
+            {"shell": "Git Bash", "command": notes_command(target, root, "posix")}]
 
 
 def read_notes(target: Path) -> list[dict]:
@@ -635,12 +667,13 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
     def _api_notes_get(self, parsed):
         req_path = urllib.parse.parse_qs(parsed.query).get("path", [None])[0]
         target = resolve_html_path(req_path, self.root, self._allowed_extra())
-        return {"notes": read_notes(target), "notes_file": display_path(notes_path(target), self.root)}
+        return {"notes": read_notes(target), "notes_file": display_path(notes_path(target), self.root),
+                "commands": notes_commands(target, self.root)}
 
     def _api_notes_post(self, parsed):
         payload = self._read_json()
         target = resolve_html_path(payload.get("path"), self.root, self._allowed_extra())
-        return apply_note_ops(target, payload.get("ops"), self.root)
+        return {**apply_note_ops(target, payload.get("ops"), self.root), "commands": notes_commands(target, self.root)}
 
     def _api_save(self, parsed):
         payload = self._read_json()

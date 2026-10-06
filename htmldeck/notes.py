@@ -8,7 +8,7 @@ Run (in the workspace, or with --root):
   htmldeck-notes --file output/deck.html
   htmldeck-notes --file output/deck.html --done <id>
   htmldeck-notes --file output/deck.html --prompt   (a request ready to paste to an agent)
-  (or python -m htmldeck.notes ...)
+  (or python -m htmldeck.notes ..., or python <path to>/htmldeck/notes.py ...)
 """
 
 from __future__ import annotations
@@ -17,7 +17,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from htmldeck.server import EditorError, apply_note_ops, display_path, notes_path, read_notes, utf8_stdio
+if not __package__:
+    # Run by its path (the command the editor copies): import this copy's package, not the
+    # package's own folder as top-level modules.
+    sys.path[0] = str(Path(__file__).resolve().parent.parent)
+
+from htmldeck.server import EditorError, apply_note_ops, display_path, notes_commands, notes_path, read_notes, utf8_stdio  # noqa: E402
 
 
 def current_line(source: str, note: dict) -> int | None:
@@ -78,11 +83,6 @@ def format_notes(target: Path, notes: list[dict], show_all: bool, root: Path | N
     return "\n".join(lines).rstrip()
 
 
-def _shq(value: str) -> str:
-    """Single-quoted for a POSIX shell, like the editor's copy button."""
-    return "'" + value.replace("'", "'\\''") + "'"
-
-
 def format_prompt(target: Path, notes: list[dict], root: Path | None = None) -> str:
     """The open notes as one request an agent can act on directly."""
     root = root or Path.cwd()
@@ -100,7 +100,8 @@ def format_prompt(target: Path, notes: list[dict], root: Path | None = None) -> 
     ]
     for i, n in enumerate(shown, 1):
         lines += _note_lines(source, n, i)
-    lines += ["Mark each note done once addressed:", f"htmldeck-notes --file {_shq(name)} --done <id>"]
+    lines.append("Mark each note done once addressed (ID is the note's id):")
+    lines += [(f"{c['shell']}: " if c["shell"] else "") + c["command"] + " --done ID" for c in notes_commands(target, root)]
     return "\n".join(lines)
 
 
@@ -117,6 +118,10 @@ def main(argv: list[str] | None = None):
     root = Path(args.root).expanduser().resolve()
     target = Path(args.file).expanduser()
     target = (target if target.is_absolute() else root / target).resolve()
+    if not target.is_file():
+        # A missing document has no sidecar either: "No open notes" would hide the typo.
+        print(f"Error: not a file: {target}", file=sys.stderr)
+        sys.exit(1)
     notes = read_notes(target)
     if args.done:
         known = {n["id"] for n in notes}
