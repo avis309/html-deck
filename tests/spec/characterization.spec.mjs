@@ -808,7 +808,7 @@ async function draftRestore(browser, url) {
 }
 
 async function language(browser, url) {
-  section('language EN / VI / ZH');
+  section('language EN / VI / ZH / ZH-HANT');
   const s = await new Session(browser, url).start();
   await s.open(wpath('deck.html'));
   const label = () => s.page.evaluate(() => document.querySelector('#btn-save').textContent.trim());
@@ -816,7 +816,7 @@ async function language(browser, url) {
   const attrs = () => s.page.evaluate(() => ({ title: document.querySelector('#btn-save').title, ph: document.querySelector('#find-q').placeholder, badge: document.querySelector('#mode-badge').textContent }));
   const en = await attrs();
   check('EN: title/placeholder/badge in English', /Save/.test(en.title) && /find|search/i.test(en.ph) && /Slide deck/.test(en.badge), JSON.stringify(en));
-  for (const [lang, want, ph] of [['vi', 'Lưu', /Tìm/], ['zh', '保存', /[\u4e00-\u9fff]/]]) {
+  for (const [lang, want, ph] of [['vi', 'Lưu', /Tìm/], ['zh', '保存', /[\u4e00-\u9fff]/], ['zh-Hant', '儲存', /[\u4e00-\u9fff]/]]) {
     await s.page.click('#btn-lang');
     await s.page.click(`#pop-lang .lang-opt[data-lang="${lang}"]`);
     const a = await attrs();
@@ -824,7 +824,7 @@ async function language(browser, url) {
   }
   await s.page.reload();
   await s.waitReady(wpath('deck.html'));
-  check('reload keeps the chosen language (ZH)', (await label()) === '保存', await label());
+  check('reload keeps Traditional Chinese', (await label()) === '儲存' && await s.page.getAttribute('html', 'lang') === 'zh-Hant', await label());
   await s.close();
   // First visit from a Vietnamese browser: the editor starts in Vietnamese.
   const ctx = await browser.newContext({ locale: 'vi-VN' });

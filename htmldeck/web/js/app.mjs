@@ -27,9 +27,9 @@ function t(key, fallback = '') { return translate(curLang(), key, fallback); }
 function applyLanguage(lang) {
   if (typeof S !== 'undefined' && S) S.lang = lang;
   try { localStorage.setItem('gs9_editor_lang', lang); } catch {}
-  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang === 'zh-Hant' ? 'zh-Hant' : lang;
   const ind = $('#lang-indicator');
-  if (ind) ind.textContent = lang === 'zh' ? 'ZH' : lang.toUpperCase();
+  if (ind) ind.textContent = lang === 'zh' ? 'ZH' : lang === 'zh-Hant' ? '繁' : lang.toUpperCase();
   
   // Update elements with data-i18n
   document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -117,7 +117,8 @@ function selectLanguage(lang) {
   const msgs = {
     vi: 'Đã chuyển sang Tiếng Việt',
     en: 'Switched language to English',
-    zh: '已切换为简体中文'
+    zh: '已切换为简体中文',
+    'zh-Hant': '已切換為繁體中文'
   };
   toast(msgs[lang] || lang);
 }
@@ -386,7 +387,7 @@ async function openUpload(file) {
 function confirmDiscard() {
   flushPending();
   if (!isDirty()) return true;
-  const ok = confirm(S.lang === 'zh' ? '文档有未保存的更改。是否放弃这些更改？' : S.lang === 'vi' ? 'Tài liệu có thay đổi chưa lưu. Bỏ các thay đổi đó?' : 'Document has unsaved changes. Discard changes?');
+  const ok = confirm(S.lang === 'zh-Hant' ? '文件有尚未儲存的變更。是否捨棄這些變更？' : S.lang === 'zh' ? '文档有未保存的更改。是否放弃这些更改？' : S.lang === 'vi' ? 'Tài liệu có thay đổi chưa lưu. Bỏ các thay đổi đó?' : 'Document has unsaved changes. Discard changes?');
   if (ok) clearDraft();
   return ok;
 }
@@ -504,7 +505,7 @@ async function rerender({ force = false, dirty: knownDirty } = {}) {
   if (!S.model) return false;
   if (S.saving) { toast('Saving — please wait before switching display mode'); return false; }
   if (!force) flushPending();
-  if (!force && (S.undo.length || S.redo.length) && !confirm(S.lang === 'zh' ? '切换显示模式将清空撤销历史（更改仍将保留）。是否继续？' : S.lang === 'vi' ? 'Đổi cách hiển thị sẽ xoá lịch sử hoàn tác (các thay đổi vẫn giữ nguyên). Tiếp tục?' : 'Switching display mode will clear undo history (changes will remain). Continue?')) return false;
+  if (!force && (S.undo.length || S.redo.length) && !confirm(S.lang === 'zh-Hant' ? '切換顯示模式將清空復原記錄（變更仍會保留）。是否繼續？' : S.lang === 'zh' ? '切换显示模式将清空撤销历史（更改仍将保留）。是否继续？' : S.lang === 'vi' ? 'Đổi cách hiển thị sẽ xoá lịch sử hoàn tác (các thay đổi vẫn giữ nguyên). Tiếp tục?' : 'Switching display mode will clear undo history (changes will remain). Continue?')) return false;
   const dirty = knownDirty ?? isDirty(), token = ++S.loadToken;
   resetState();
   S.savedSeq = dirty ? -1 : 0;
@@ -3986,7 +3987,7 @@ async function offerDraft(html, source) {
   // Restoring reopens the document; never do that over edits made while IndexedDB was read.
   // The draft stays, and the next autosave of the new edits replaces it.
   if (token !== S.loadToken || S.undo.length || isDirty()) return false;
-  const time = new Date(rec.savedAt).toLocaleString(S.lang === 'vi' ? 'vi-VN' : S.lang === 'zh' ? 'zh-CN' : 'en-GB');
+  const time = new Date(rec.savedAt).toLocaleString(S.lang === 'vi' ? 'vi-VN' : S.lang === 'zh-Hant' ? 'zh-TW' : S.lang === 'zh' ? 'zh-CN' : 'en-GB');
   let msg = t('draft_restore').replace('{name}', source.name).replace('{time}', time);
   if (rec.base && rec.base !== textHash(html)) msg += t('draft_changed');
   if (!confirm(msg)) { clearDraft(rec.key); return false; }
@@ -4229,8 +4230,8 @@ function applyModeUI() {
   if (!deck) { el.notes.hidden = true; $('#sb-notes').classList.remove('on'); }
   $('#sb-notes').disabled = deck && !S.slides.some(s => $$('.notes', s).some(isOriginal));
   $('#text-hint').innerHTML = deck
-    ? (S.lang === 'zh' ? '点击向当前幻灯片添加文本框。拖动悬浮栏上的<b>移动</b>手柄调整位置。' : S.lang === 'vi' ? 'Nhấp để thêm hộp chữ vào slide hiện tại. Kéo nút <b>di chuyển</b> trên thanh nổi để đặt lại vị trí.' : 'Click to add text box to current slide. Drag <b>move</b> handle on floating toolbar to reposition.')
-    : (S.lang === 'zh' ? '新文字插入在当前选定区块后（或屏幕中央的区块后）。' : S.lang === 'vi' ? 'Chữ mới được chèn ngay sau khối đang chọn (hoặc khối ở giữa màn hình).' : 'New text is inserted after the selected block (or block in center of screen).');
+    ? (S.lang === 'zh-Hant' ? '點擊以在目前投影片新增文字方塊。拖曳浮動工具列上的<b>移動</b>控制柄來調整位置。' : S.lang === 'zh' ? '点击向当前幻灯片添加文本框。拖动悬浮栏上的<b>移动</b>手柄调整位置。' : S.lang === 'vi' ? 'Nhấp để thêm hộp chữ vào slide hiện tại. Kéo nút <b>di chuyển</b> trên thanh nổi để đặt lại vị trí.' : 'Click to add text box to current slide. Drag <b>move</b> handle on floating toolbar to reposition.')
+    : (S.lang === 'zh-Hant' ? '新文字會插入目前選取的區塊後（或畫面中央的區塊後）。' : S.lang === 'zh' ? '新文字插入在当前选定区块后（或屏幕中央的区块后）。' : S.lang === 'vi' ? 'Chữ mới được chèn ngay sau khối đang chọn (hoặc khối ở giữa màn hình).' : 'New text is inserted after the selected block (or block in center of screen).');
 }
 function updateChrome() {
   const dirty = S.model ? isDirty() : false;
@@ -4322,7 +4323,7 @@ function renderFileList() {
       b.innerHTML = `<span class="fi-icon"><svg class="icon sm"><use href="#i-file"/></svg></span><span class="fi-text"><div class="fi-name"></div><div class="fi-meta"></div></span>`;
       b.querySelector('.fi-name').textContent = f.path.split('/').pop();
       const meta = b.querySelector('.fi-meta');
-      const loc = S.lang === 'zh' ? 'zh-CN' : S.lang === 'vi' ? 'vi-VN' : 'en-US';
+      const loc = S.lang === 'zh-Hant' ? 'zh-TW' : S.lang === 'zh' ? 'zh-CN' : S.lang === 'vi' ? 'vi-VN' : 'en-US';
       meta.textContent = fmtSize(f.size) + ' · ' + new Date(f.mtime * 1000).toLocaleDateString(loc);
       if (f.size > 3 * 1048576) meta.insertAdjacentHTML('beforeend', ' · <span class="fi-heavy">' + t('file_heavy') + '</span>');
       b.title = f.path;

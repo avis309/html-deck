@@ -1,4 +1,4 @@
-// HtmlDeck UI strings (VI / ZH / EN) and pure lookups. No DOM, no editor state:
+// HtmlDeck UI strings (VI / ZH / ZH-HANT / EN) and pure lookups. No DOM, no editor state:
 // callers pass the language (see the wrappers in app.mjs).
 
 export const I18N = {
@@ -713,6 +713,361 @@ export const I18N = {
     k_nav_kbd: '← → 未选中文本时',
     k_zoom_kbd: 'Ctrl + / − / 0 · Ctrl + 滚轮',
   },
+  'zh-Hant': {
+    brand_title: 'HtmlDeck · 由 Avis 建立 (hunganh.freeze@gmail.com)',
+    present_untrusted: '此檔案是從電腦開啟的，簡報時不執行其指令碼（動畫等）— 請在工作區中選擇該檔案以執行',
+    present_split: '部分 Markdown 投影片被拆分為多頁 — 在這些頁面退出簡報會回到原投影片',
+    trust_off: '外部指令碼：關閉', trust_on: '外部指令碼：已開啟', trust_off_title: '編輯時不執行來自外部 (CDN…) 的指令碼 — 點選以信任此檔案', trust_on_title: '此檔案受信任：外部指令碼以編輯器許可權執行（讀寫工作區檔案）— 點選關閉',
+    trust_toast: '編輯時已關閉外部指令碼（簡報時仍完整執行）。', trust_toast_css: '此頁面的樣式由 CDN 指令碼（Tailwind 等）生成，編輯時該指令碼已關閉，因此頁面看起來沒有樣式 — 信任此檔案即可正常顯示（簡報時不受影響）。', trust_action: '信任此檔案', trust_confirm: '信任此檔案：外部指令碼將在編輯框中以編輯器的全部許可權執行（讀寫工作區檔案）。僅對您信任的檔案和來源開啟。繼續？',
+    fx_scene_hint: 'Scene：由檔案程式碼控制的動畫（不能在面板中編輯）— 請用簡報檢視。仍可用 ▶ 為單個區塊新增動畫。',
+    rail_effects: '動畫', panel_effects: '動畫', fx_panel_hint: '動畫在簡報時執行。選擇一個區塊，然後點選工具列上的 ▶ 進行設定。', fx_play_slide: '預覽整張投影片', fx_list_empty: '這裡還沒有動畫。', fx_scene: 'scene', fx_remove: '移除動畫',
+    fx_title: '出現動畫（簡報）', fx_label: '出現動畫', fx_none: '無', fx_delay: '延遲 (ms)', fx_dur: '時長 (ms)', fx_stagger: '子元素依次 (ms)', fx_preview: '預覽',
+    fx_doc_off: '檔案未啟用 FX：動畫僅在 HtmlDeck 簡報時執行。', fx_doc_on: '檔案已啟用 FX（單獨開啟檔案也會執行）。', fx_doc_old: '檔案使用舊版 FX。',
+    fx_enable: '為檔案啟用 FX…', fx_disable: '關閉 FX', fx_update: '更新 FX', fx_enable_h: '為檔案啟用 FX', fx_enable_b: '在 <body> 末尾插入一個小指令碼區塊，使動畫在 HtmlDeck 之外開啟檔案時也能執行。僅新增此區塊；關閉 FX 會移除。', fx_update_h: '更新 FX', fx_enable_ok: '插入指令碼', fx_update_ok: '更新',
+    fx_count_bad: 'Count up 需要恰好一個格式明確的數字（如 1.250 可能是千位或小數 — 寫作 1.250,0 或 1250）', lock_fx_fragment: 'Reveal 控制 fragment 的顯示 — 不能對 fragment 或包含 fragment 的區塊設定動畫',
+    lock_markdown: 'Markdown 投影片：內容由 Reveal 外掛執行時生成 — 請在原始檔的 Markdown 區塊中修改',
+    lock_auto_animate: '無法複製：該區塊在 auto-animate 投影片中帶有 data-id（重複的 data-id 會破壞過渡）',
+    lock_r_stack: 'r-stack 內無法複製/移動：圖層順序即顯示順序',
+    lock_reveal_runtime: 'Reveal 已在編輯框中自行執行（無法攔截）— 文件唯讀；仍可簡報和儲存',
+    reveal_size_warn: '編輯時暫不支援百分比的 Reveal 尺寸 — 以 960×700 顯示',
+    lock_generated: '此部分由頁面指令碼生成，檔案中不存在 — 請在原始碼 (JS/資料) 中修改或向 Agent 回饋',
+    lock_generated_child: '此區塊包含指令碼插入的內容 — 在此編輯會一併儲存，已鎖定',
+    lock_ambiguous: '頁面指令碼複製了此區塊 — 無法確定哪個是檔案中的原件，已鎖定',
+    lock_runtime_changed: '頁面指令碼已修改此區塊的內容 — 編輯文字會儲存執行時的值，已鎖定。仍可調整樣式/框',
+    lock_conflict: '輸入時頁面指令碼修改了此區塊 — 未儲存，已恢復為檔案中的內容',
+    lock_copy_typed: '複製已輸入的文字',
+    history_wait_save: '正在儲存 — 請等待儲存完成後再復原/重做',
+    history_step_failed: '復原/重做中途出錯 — 文件已恢復到該步驟之前；復原記錄已重置',
+    lock_find_skipped: '已跳過被指令碼修改的區塊 — 無法在那裡替換',
+    open_file: '開啟檔案',
+    undo: '復原 (Ctrl+Z)',
+    redo: '重做 (Ctrl+Shift+Z)',
+    save_no_doc: '未開啟文件',
+    save_saving: '正在儲存…',
+    save_saved: '所有更改已儲存',
+    save_dirty: '有未儲存的更改',
+    draft_restore: '發現 {name} 的未儲存草稿（{time}）。是否恢復草稿？\n\n取消 = 丟棄草稿，按磁碟上的檔案開啟。',
+    draft_changed: '\n\n注意：草稿建立後磁碟上的檔案已被修改。恢復並儲存將覆蓋這些修改。',
+    draft_restored: '已恢復草稿 — 請點選儲存寫入檔案',
+    color_kids: '內部有 {n} 段文字有自己的顏色，尚未改變',
+    color_kids_apply: '應用到內部',
+    fb_section: '部分',
+    fb_copy: '複製給 AI 的請求',
+    fb_for_agent: '供 Agent 使用（讀取回饋的命令）',
+    fb_slide: '為整張投影片新增回饋',
+    fb_page: '為整個部分新增回饋',
+    fb_open: '待處理 ({n})',
+    fb_done: '已處理 ({n})',
+    fb_none_open: '沒有待處理的回饋',
+    fb_none_done: '暫無已處理的回饋',
+    fb_edit: '編輯',
+    fb_edit_hint: '點選編輯 · Enter 儲存 · Shift+Enter 換行 · Esc 取消',
+    fb_save: '儲存',
+    fb_lost: '⚠ 找不到原位置 — 該區塊已被修改或刪除',
+    fb_copied: '已複製請求 — 貼上到 Claude / Codex',
+    fb_nothing: '沒有待處理的回饋可傳送',
+    fb_whole_slide: '整張投影片',
+    multi_count: '已選 {n} 個',
+    export_title: '儲存為 HTML 或 PDF',
+    export_menu_title: '儲存',
+    export_single: 'HTML',
+    export_single_sub: '單個檔案，已包含所有圖片、樣式和指令碼。可直接分享，在任何地方開啟。',
+    export_remote: '包含線上資源（從網路載入的指令碼和字型）。需要連線網際網路。',
+    export_pdf: 'PDF',
+    export_pdf_sub: '匯出為 PDF 檔案。',
+    multi_note_title: '為這些區塊寫 AI 回饋 (Ctrl+Shift+M)',
+    multi_del_title: '刪除這些區塊 (Delete)',
+    fb_region_tag: '框選區域',
+    fb_region_items: '{n} 個元素',
+    fb_region_empty: '沒有元素（空白區域）',
+    fb_prompt_head: '請處理檔案 {path} 中 {n} 條待處理回饋。',
+    fb_prompt_read: '使用以下命令讀取詳細位置（selector、行號）：',
+    fb_prompt_done: '每修復一條後標記為已處理：',
+    find_ph: '在文件中查詢',
+    replace_ph: '替換為',
+    find_case: '區分大小寫',
+    find_prev: '上一個 (Shift+Enter)',
+    find_next: '下一個 (Enter)',
+    replace_one: '替換',
+    replace_all: '全部替換',
+    find_none: '無結果',
+    find_title: '查詢和替換 (Ctrl+F)',
+    find_btn: '查詢和替換',
+    replaced_n: '已替換 {n} 處',
+    overflow_title: '文字超出邊框 — 點選逐個檢視',
+    overflow_n: '{n} 處文字溢位',
+    overflow_new: '剛編輯的文字超出了邊框 — 請縮短或減小字號',
+    reformat_h: '本次儲存將重寫整個檔案',
+    reformat_b: '無法僅修補您編輯的部分，因此將重寫整個檔案。內容不變，但未編輯處的換行、引號等格式可能改變。透過伺服器開啟的檔案仍保留舊版本備份。',
+    reformat_dl: '下載副本',
+    reformat_save: '仍然儲存',
+    save_error: '儲存出錯',
+    present: '簡報',
+    present_title: '全螢幕簡報 (F)',
+    download: '下載',
+    download_title: '下載當前檔案到本機',
+    save: '儲存',
+    save_title: '儲存 (Ctrl+S)',
+    lang_btn_title: '切換語言 (VI / EN / 簡體 / 繁體中文)',
+    lang_select_title: '選擇語言',
+
+    // Rail
+    rail_files: '檔案',
+    rail_text: '文字',
+    rail_box: '區塊',
+    rail_layers: '圖層',
+    rail_outline: '大綱',
+    rail_colors: '顏色',
+    rail_review: 'AI 回饋',
+    rail_keys: '快捷鍵',
+
+    // Panels
+    panel_files: '檔案',
+    panel_text: '文字',
+    panel_box: '區塊樣式',
+    panel_layers: '圖層與區塊',
+    panel_outline: '文件大綱',
+    panel_colors: '顏色',
+    panel_review: 'AI Agent 回饋',
+    close: '關閉',
+    pick_file: '從電腦開啟檔案',
+    drag_hint: '或將 .html 檔案拖放到此視窗。',
+    search_files: '在工作區搜尋檔案',
+    loading_list: '正在載入清單…',
+    no_match_files: '沒有匹配的檔案。',
+    empty_workspace: 'output/ 或 docs/ 下沒有 HTML 檔案。',
+    error_list_files: '無法載入檔案清單。',
+
+    // Text panel
+    text_hint: '點選向當前頁面新增文字框。拖曳浮動工具列上的<b>移動</b>手柄可調整位置。',
+    preset_heading: '新增大標題',
+    preset_subheading: '新增副標題',
+    preset_body: '新增正文段落',
+
+    // Box panel
+    box_size: '尺寸',
+    reset_orig: '恢復原始尺寸',
+    size_hint: '拖曳畫布上邊角或邊緣的控制點即可縮放大小。',
+    padding_label: '內邊距 (Padding)',
+    reset_btn: '重置',
+    sides_padding_sum: '單獨調整各邊',
+    margin_label: '外邊距 (上下)',
+    sides_margin_sum: '單獨調整上下',
+    bg_label: '背景顏色',
+    border_label: '邊框',
+    radius_label: '圓角',
+    shadow_label: '投影',
+    shadow_none: '無',
+    shadow_soft: '輕柔',
+    shadow_medium: '適中',
+    shadow_strong: '明顯',
+
+    // Layers panel
+    layers_hint_top: '頁面上的區塊清單（按層級排列）。點選選中，懸停可在畫布上預覽位置。',
+    layers_hint_bottom: '拖曳單行可調整層級：拖至<b>橙色線</b>可置於上/下方，拖至行中可<b>巢狀至內部</b>。Esc 取消。',
+
+    // Review panel
+    review_hint: '選中一個區塊，點選浮動工具列上的 <b>AI 回饋</b> 寫下需要 AI 修改的地方；也可以從投影片背景拖曳框選多個區塊，為整個區域寫一條回饋。完成後點選下方按鈕並貼上到 Claude / Codex。',
+    copy_btn: '複製',
+    cmd_copied: '已複製命令',
+    no_notes_yet: '暫無回饋記錄',
+
+    // Colors panel
+    color_text: '文字顏色',
+    color_bg: '區塊背景色',
+    doc_colors: '文件內建顏色',
+    default_colors: '預設顏色',
+    color_hint: '選中文字的一部分可僅對選區著色；未選中則應用於整個區塊。',
+
+    // Toolbar (ctx)
+    idle_hint: '點選文字進行編輯 · 從背景拖曳可框選多個區塊 · 按住 Alt 點選可選擇外層容器（卡片、列…）',
+    font_title: '字型',
+    size_dn: '縮小字號',
+    font_size: '字號',
+    size_up: '加大字號',
+    replace_img: '替換圖片',
+    replace_img_title: '替換圖片',
+    crop_img: '裁剪與對齊',
+    crop_img_title: '裁剪與對齊圖片（或雙擊圖片）',
+    crop_hint: '拖曳圖片調整容器內的顯示區域',
+    crop_cover: '填充容器',
+    crop_cover_title: '圖片填滿容器，超出部分被裁剪',
+    crop_contain: '完整顯示',
+    crop_contain_title: '顯示整張圖片，可能留有空隙',
+    crop_done: '完成',
+    text_color: '文字顏色',
+    bold_title: '加粗 (Ctrl+B)',
+    italic_title: '斜體 (Ctrl+I)',
+    underline_title: '底線 (Ctrl+U)',
+    strike_title: '刪除線',
+    case_title: '大寫轉換',
+    link_title: '插入 / 編輯連結 (Ctrl+K)',
+    align_title: '對齊方式',
+    spacing_title: '間距',
+    opacity_title: '不透明度',
+    box_btn: '區塊',
+    box_btn_title: '調整區塊：間距、背景、邊框、圓角、陰影',
+    clear_title: '清除格式',
+
+    // Popovers
+    letter_spacing: '字間距',
+    line_height: '行高',
+    upload_img: '從本機上傳圖片',
+    img_drop_hint: '或直接將圖片檔案拖放到頁面圖片上。',
+    doc_img_label: '使用文件已有圖片',
+    paste_img_link: '貼上圖片連結',
+    apply_btn: '應用',
+    use_btn: '使用',
+    alt_label: '圖片描述 (Alt)',
+    alt_hint: '當圖片無法載入時顯示的文字，也供螢幕閱讀器朗讀。',
+    alt_placeholder: '例如：公司 Logo、Q3 營收圖表…',
+    cancel_btn: '取消',
+    link_label: '連結地址',
+    link_blank: '在新標籤頁開啟',
+    link_url_ph: 'https://…, mailto:…, #page-section',
+    link_remove: '移除連結',
+    note_label: '給 AI Agent 的修改回饋',
+    note_placeholder: '例如：修改資料為 Q3、縮減為一行、更換圖示…',
+    note_save_btn: '儲存回饋',
+    opacity_label: '不透明度',
+
+    // Pill & Menu
+    drag_move: '拖曳以平移',
+    select_parent: '選擇外層容器',
+    feedback_pill_title: 'AI Agent 回饋 (Ctrl+Shift+M)',
+    dup_title: '複製副本 (Ctrl+D)',
+    del_title: '刪除 (Delete)',
+    more_title: '更多選項',
+    m_alt: '圖片描述文字',
+    m_flip: '水平翻轉',
+    m_img_reset: '重置為原圖',
+    m_up: '上移一層',
+    m_down: '下移一層',
+    m_copy_style: '複製樣式',
+    m_paste_style: '貼上樣式',
+    m_clear: '清除格式',
+
+    // Empty state
+    empty_h3: '開啟 HTML 文件',
+    empty_p: '從工作區選擇檔案，從電腦開啟，或將檔案拖放到此處。',
+    empty_btn: '選擇文件',
+    drop_veil: '鬆開以開啟 .html 檔案',
+
+    // Statusbar
+    speaker_notes: '演講者備註',
+    sb_mode_title: '文件顯示模式',
+    sb_auto: '自動識別',
+    sb_deck: '投影片模式',
+    sb_page: '網頁模式',
+    sb_width_title: '頁面視口寬度',
+    zoom_title: '縮放比例',
+    zoom_pct_title: '符合視窗大小 (Ctrl+0)',
+    sb_fit_title: '符合視窗大小',
+    sb_prev_title: '上一頁',
+    sb_next_title: '下一頁',
+    sb_full_title: '全螢幕模式',
+    sb_help_title: '快捷鍵',
+    notes_drawer_title: '演講者備註',
+    notes_drawer_placeholder: '當前投影片無備註',
+
+    // Modals
+    conflict_h: '磁碟上的檔案已被修改',
+    conflict_b: '在您開啟此檔案後，其他使用者或指令碼對其進行了修改。覆蓋將丟失最新更改（備份檔案儲存在 .htmldeck_bak 目錄）。',
+    conflict_dl: '下載我的版本',
+    conflict_force: '仍要覆蓋',
+    shortcuts_h: '鍵盤快捷鍵',
+
+    // Key descriptions
+    k_save: '儲存',
+    k_format: '加粗 / 斜體 / 底線',
+    k_find: '在文件中查詢',
+    k_replace: '查詢和替換',
+    k_find_step: '下一個 / 上一個結果',
+    k_undo_redo: '復原 / 重做',
+    k_esc: '退出編輯 → 選中區塊',
+    k_enter: '編輯所選區塊文字',
+    k_del_dup: '刪除 / 複製區塊',
+    k_nudge: '微調移動 (1px / 10px)',
+    k_alt_click: '選擇外層容器（卡片、列…）',
+    k_ai_note: '標記 AI 回饋',
+    k_link: '插入 / 編輯連結',
+    k_reorder: '區塊上移 / 下移',
+    k_nav: '翻頁 (未選中時)',
+    k_zoom: '縮放檢視',
+    k_copy_paste_style: '複製 / 貼上樣式',
+
+    // Chips & presets
+    chip_none: '無',
+    chip_tight: '窄',
+    chip_small: '小',
+    chip_medium: '適中',
+    chip_wide: '寬',
+    chip_large: '大',
+    chip_subtle: '微圓',
+    chip_round: '全圓',
+    chip_thin: '細',
+    chip_thick: '粗',
+
+    // Border styles
+    bstyle_none: '無邊框',
+    bstyle_solid: '實線',
+    bstyle_dashed: '虛線',
+    bstyle_dotted: '點線',
+
+    // Sides
+    side_top: '上',
+    side_right: '右',
+    side_bottom: '下',
+    side_left: '左',
+
+    // Box values
+    box_target_empty: '在畫布（或圖層面板）中選擇一個區塊以編輯樣式。',
+    val_mixed: '不一致',
+    val_round: '圓形',
+    box_bg_none: '無背景',
+    color_custom: '自訂顏色',
+
+    // Layers & outline & notes hints
+    layer_empty: '未開啟文件。',
+    layer_no_blocks: '未找到區塊。',
+    scope_whole_page: '整頁',
+    layer_limit_more: '… 更多內容 — 摺疊部分分支以檢視更多。',
+    outline_empty: '本頁未找到 H1–H3 標題。',
+    notes_slide_title: '演講者備註 · 投影片',
+
+    // Review / feedback
+    note_workspace_only: '回饋功能僅支援工作區內的檔案。',
+    note_reopen: '重新開啟',
+    note_resolve: '標記完成',
+    note_del: '移除回饋',
+    fb_removed: '已移除回饋',
+    fb_undo: '復原',
+    line_prefix: '第 ',
+
+    // Link pop
+    link_mode_new: '新增',
+    link_mode_existing: '已有',
+
+    // Img pop
+    no_other_imgs: '文件中沒有其他圖片。',
+    use_this_img: '使用此圖片',
+
+    // Canvas tips
+    tip_width: '寬',
+    tip_size: '字號',
+
+    // File list & general
+    file_heavy: '較大，開啟較慢',
+    frame_title: '文件編輯檢視',
+    rail_tools: '工具列',
+    local_file: '本機檔案',
+    download_only: '僅可下載',
+
+    // Shortcuts kbd
+    k_alt_click_kbd: 'Alt + 點選',
+    k_nav_kbd: '← → 未選中文字時',
+    k_zoom_kbd: 'Ctrl + / − / 0 · Ctrl + 滾輪',
+  },
 
   en: {
     brand_title: 'HtmlDeck · created by Avis (hunganh.freeze@gmail.com)',
@@ -1104,7 +1459,18 @@ export const LAYER_NAMES = {
     button: '按钮', blockquote: '引用', code: '代码', pre: '代码块', label: '标签', small: '小字',
     hr: '分割线', canvas: '画布', video: '视频', iframe: '内嵌框架', form: '表单',
     details: '折叠框', summary: '折叠标题'
-  }
+  },
+  'zh-Hant': {
+    h1: '標題 1', h2: '標題 2', h3: '標題 3', h4: '標題 4', h5: '標題 5', h6: '標題 6',
+    p: '段落', span: '文字', b: '粗體', strong: '粗體', em: '斜體', i: '斜體',
+    a: '超連結', div: '容器框', section: '區段', article: '文章', header: '頁首', footer: '頁尾',
+    nav: '導覽', main: '主要內容', aside: '側邊欄', ul: '無序清單', ol: '有序清單', li: '清單項',
+    table: '表格', thead: '表頭', tbody: '表體', tr: '行', td: '儲存格', th: '表頭儲存格',
+    img: '圖片', picture: '圖片組', svg: '向量圖', figure: '配圖', figcaption: '圖題',
+    button: '按鈕', blockquote: '引用', code: '程式碼', pre: '程式碼區塊', label: '標籤', small: '小字',
+    hr: '分割線', canvas: '畫布', video: '影片', iframe: '內嵌框架', form: '表單',
+    details: '摺疊框', summary: '摺疊標題'
+  },
 };
 
 
@@ -1248,15 +1614,90 @@ export const TOAST_ZH_PATTERNS = [
   [/^Cannot start presenting(.*)$/, '无法开始演示$1']
 ];
 
+export const TOAST_ZH_HANT_PATTERNS = [
+  // Simplified Chinese
+  [/^The browser blocked the print tab\. Allow pop-ups for this page and try again\.$/, '瀏覽器攔截了列印標籤頁。請允許此頁面彈出視窗後重試。'],
+  [/^Preparing the file \(downloading web files\)…$/, '正在準備檔案（正在下載網路檔案）…'],
+  [/^Preparing the file…$/, '正在準備檔案…'],
+  [/^Downloaded · (.*) · (\d+) files? embedded · (\d+) files? kept as links?$/, '已下載 · $1 · 已內嵌 $2 個檔案 · $3 個仍為連結'],
+  [/^Downloaded · (.*) · (\d+) files? embedded$/, '已下載 · $1 · 已內嵌 $2 個檔案'],
+  [/^Export failed: (.*)$/, '匯出失敗: $1'],
+  [/^Cannot open file: (.*)$/, '無法開啟檔案: $1'],
+  [/^Cannot read file: (.*)$/, '無法讀取檔案: $1'],
+  [/^Saving — please wait before switching display mode$/, '正在儲存 — 請儲存完成後再切換顯示模式'],
+  [/^Cannot rebuild: (.*)$/, '無法重新構建: $1'],
+  [/^Cannot render document$/, '無法渲染文件'],
+  [/^Document has no \.slide blocks — keeping web page mode$/, '文件中未檢測到 .slide 元素 — 保持網頁模式'],
+  [/^Opened (.*) · (.*) · (.*) editable text blocks$/, '已開啟 $1 · $2 · $3 個可編輯文字區塊'],
+  [/^Links are disabled while editing$/, '編輯狀態下已禁用超連結跳轉'],
+  [/^Deleted · Ctrl\+Z to undo$/, '已刪除 · 按 Ctrl+Z 復原'],
+  [/^Please open a document first$/, '請先開啟一個文件'],
+  [/^Select a text block to insert after$/, '請先選中一個文字區塊以在其後插入'],
+  [/^Already at the outermost block$/, '已處於最外層區塊'],
+  [/^Style copied$/, '樣式已複製'],
+  [/^No style copied yet$/, '尚未複製任何樣式'],
+  [/^This block has no inline formatting$/, '該區塊沒有內聯樣式'],
+  [/^Select a text block first$/, '請先選中一個文字區塊'],
+  [/^Select text first$/, '請先選中文字'],
+  [/^Highlight the text to link$/, '請先選定要新增連結的文字'],
+  [/^Click text and highlight the part to link$/, '點選文字並高亮選中需要關聯的區域'],
+  [/^javascript: and data: links are not allowed$/, '不允許使用 javascript: 和 data: 格式連結'],
+  [/^Please enter a link URL$/, '請輸入連結地址'],
+  [/^Link attached$/, '連結已新增'],
+  [/^Link removed$/, '連結已移除'],
+  [/^Select an image on the page first$/, '請先選擇頁面中的一張圖片'],
+  [/^This image is already in use$/, '此圖片已在使用中'],
+  [/^Image replaced (.*)$/, '圖片已替換 $1'],
+  [/^This image was newly added, no original exists$/, '此圖片為新新增，無原始版本'],
+  [/^Image already matches original$/, '圖片已與原圖一致'],
+  [/^Reset to original image$/, '已恢復原始圖片'],
+  [/^Browser will re-parent this position on reload — cannot place here$/, '該位置在重新載入時會被瀏覽器重排 — 無法放置此處'],
+  [/^Block is already at the top$/, '區塊已在最上方'],
+  [/^Block is already at the bottom$/, '區塊已在最下方'],
+  [/^Cannot place block at that position$/, '無法將區塊放置在目標位置'],
+  [/^Cannot read feedback: (.*)$/, '讀取回饋失敗: $1'],
+  [/^Feedback can only be saved for workspace files$/, '回饋功能僅支援工作區內的檔案'],
+  [/^Cannot save feedback: (.*)$/, '儲存回饋失敗: $1'],
+  [/^Select a block before writing feedback$/, '寫回饋前請先選中目標區塊'],
+  [/^Feedback is only available for workspace files$/, '回饋功能僅適用於從工作區開啟的檔案'],
+  [/^This block is not in the file yet — save first, then write feedback$/, '該區塊尚未寫入檔案 — 請先儲存後再寫回饋'],
+  [/^Feedback saved$/, '已儲存回饋'],
+  [/^Target element for this feedback no longer found$/, '未找到該回饋對應的目標元素'],
+  [/^Browser blocked fullscreen mode$/, '瀏覽器攔截了全螢幕請求'],
+  [/^No changes to save$/, '沒有需要儲存的更改'],
+  [/^Failed to load image$/, '無法載入圖片'],
+  [/^Only PNG, JPG, WebP, GIF, SVG, AVIF images are supported$/, '僅支援 PNG、JPG、WebP、GIF、SVG、AVIF 圖片格式'],
+  [/^Image is still too large after compression — please reduce image dimensions$/, '壓縮後圖片仍然過大 — 請減小圖片尺寸'],
+  [/^(GIF|SVG) size is (.*) — maximum (.*)$/, '$1 大小為 $2 — 最大允許 $3'],
+  [/^Saved (.*) · (.*) · backup: (.*)$/, '已儲存 $1 · $2 · 備份: $3'],
+  [/^Saved directly to (.*)$/, '已直接儲存至 $1'],
+  [/^Browser blocked direct write to dropped file — downloaded new copy instead$/, '瀏覽器限制直接寫入拖入的檔案 — 已下載最新版本'],
+  [/^Saved — full file re-formatted as local patch was not possible$/, '已儲存 — 因無法區域性增量合併，已全量重新格式化'],
+  [/^Save failed: (.*)$/, '儲存失敗: $1'],
+  [/^Invalid image link$/, '圖片連結無效'],
+  [/^Command copied$/, '命令已複製'],
+  [/^Select an image on the page then drop the new image on it$/, '請先選中頁面中的圖片，然後拖放新圖片到其上方'],
+  [/^Only \.html \/ \.htm files are supported$/, '僅支援 .html / .htm 格式檔案'],
+  [/^Server is running an older version — please restart htmldeck$/, '後臺服務版本過舊 — 請關閉 (Ctrl+C) 並重新執行 htmldeck'],
+  [/^File is (.*) after editing, over the 60 MB save limit — remove some embedded images$/, '修改後檔案體積為 $1，超出 60 MB 儲存上限 — 請刪除部分內嵌圖片'],
+  [/^Cannot remove feedback: (.*)$/, '移除回饋失敗: $1'],
+  [/^Cannot start presenting(.*)$/, '無法開始簡報$1']
+];
+
 export const LANG_KEY = 'gs9_editor_lang';
 export function storedLang() {
-  try { const v = localStorage.getItem(LANG_KEY); if (v) return v; } catch { /* storage blocked */ }
+  try { const v = localStorage.getItem(LANG_KEY); if (v && v in I18N) return v; } catch { /* storage blocked */ }
   return browserLang();
 }
 // First visit: follow the browser when it asks for a language the editor speaks.
 function browserLang() {
   const want = (typeof navigator !== 'undefined' && navigator.languages) || [];
-  for (const l of want) { const k = String(l).slice(0, 2).toLowerCase(); if (k in I18N) return k; }
+  for (const l of want) {
+    const locale = String(l).toLowerCase();
+    if (/^zh-(?:hant(?:-|$)|(?:tw|hk|mo)(?:-|$))/.test(locale)) return 'zh-Hant';
+    const k = locale.slice(0, 2);
+    if (k in I18N) return k;
+  }
   return 'en';
 }
 export function layerName(lang, tag) {
@@ -1268,12 +1709,12 @@ export function translate(lang, key, fallback = '') {
 // Messages that arrive inside another toast ("Save failed: …"), translated wherever they appear.
 export const TOAST_PHRASES = [
   ['HTML Deck is not running — start it again, then reload this page',
-    { vi: 'HTML Deck đã tắt — hãy mở lại HTML Deck rồi tải lại trang này', zh: 'HTML Deck 未在运行 — 请重新启动 HTML Deck，然后刷新此页面' }],
+    { vi: 'HTML Deck đã tắt — hãy mở lại HTML Deck rồi tải lại trang này', zh: 'HTML Deck 未在运行 — 请重新启动 HTML Deck，然后刷新此页面', 'zh-Hant': 'HTML Deck 未在執行 — 請重新啟動 HTML Deck，然後重新整理此頁面' }],
 ];
-// Toasts are written in English at the call site; VI/ZH are matched by pattern.
+// Toasts are written in English at the call site; VI/ZH/ZH-HANT are matched by pattern.
 export function translateToastFor(lang, msg) {
   if (typeof msg !== 'string') return String(msg);
-  const table = lang === 'vi' ? TOAST_VI_PATTERNS : lang === 'zh' ? TOAST_ZH_PATTERNS : null;
+  const table = lang === 'vi' ? TOAST_VI_PATTERNS : lang === 'zh' ? TOAST_ZH_PATTERNS : lang === 'zh-Hant' ? TOAST_ZH_HANT_PATTERNS : null;
   if (!table) return msg;
   for (const [en, tr] of TOAST_PHRASES) if (tr[lang]) msg = msg.split(en).join(tr[lang]);
   for (const [pattern, rep] of table) if (pattern.test(msg)) return msg.replace(pattern, rep);

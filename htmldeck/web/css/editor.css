@@ -20,6 +20,10 @@
   --shadow-lg: 0 24px 48px -12px rgba(22,20,17,.20), 0 4px 8px -4px rgba(22,20,17,.06);
   --ui: 'Inter Tight', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
 }
+/* Traditional Chinese: Traditional glyph forms, with local CJK fonts when offline. */
+:root:lang(zh-Hant) {
+  --ui: 'Inter Tight', 'Be Vietnam Pro', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Heiti TC', system-ui, -apple-system, sans-serif;
+}
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--canvas-bg); color: var(--ink); font: 13px/1.4 var(--ui); -webkit-font-smoothing: antialiased; }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -53,13 +57,15 @@ button:disabled { cursor: default; opacity: .38; }
 .brand-main { font-size: 15px; font-weight: 800; letter-spacing: -.02em; color: #fff; }
 .brand { padding-right: 14px; margin-right: 6px; border-right: 1px solid rgba(255,255,255,.3); }
 .tb-ghost { height: 36px; min-width: 36px; padding: 0 10px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; font-size: 13.5px; color: #fff; transition: background .15s; }
+/* Labels stay on one line in every language; the document name gives way instead. */
+.tb-ghost, .btn-download, .btn-save { white-space: nowrap; flex-shrink: 0; }
 .tb-ghost:hover:not(:disabled) { background: rgba(255,255,255,.18); }
 .tb-sep { width: 1px; height: 22px; background: rgba(255,255,255,.35); margin: 0 6px; }
 .save-state { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; height: 36px; font-size: 12.5px; font-weight: 500; color: rgba(255,255,255,.9); white-space: nowrap; }
 .save-state.dirty { color: #fff; font-weight: 600; }
 .save-state.error { color: #fff; background: rgba(94,27,9,.35); border-radius: 8px; }
 .spacer { flex: 1; }
-.doc-name { display: flex; align-items: center; gap: 8px; max-width: 38vw; padding: 0 10px; height: 36px; border-radius: 8px; font-weight: 700; font-size: 13.5px; }
+.doc-name { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; max-width: 38vw; padding: 0 10px; height: 36px; border-radius: 8px; font-weight: 700; font-size: 13.5px; }
 .doc-name span.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mode-badge { flex: none; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.22); color: #fff; font-size: 11px; font-weight: 700; }
 .btn-download { height: 38px; padding: 0 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,.7); color: #fff; font-weight: 700; display: inline-flex; align-items: center; gap: 7px; transition: background .15s; }
@@ -250,7 +256,7 @@ button:disabled { cursor: default; opacity: .38; }
 .sb-btn.warn { color: #c62828; font-weight: 700; }
 .thumb .num { position: absolute; left: 6px; bottom: 5px; min-width: 18px; padding: 1px 5px; border-radius: 5px; background: rgba(13,18,22,.72); color: #fff; font-size: 10.5px; font-weight: 700; text-align: center; }
 .statusbar { flex: none; height: 44px; display: flex; align-items: center; gap: 6px; padding: 0 14px; background: #fff; border-top: 1px solid var(--line); }
-.sb-btn { height: 32px; padding: 0 10px; border-radius: 7px; display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--ink-2); }
+.sb-btn { height: 32px; padding: 0 10px; border-radius: 7px; display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--ink-2); white-space: nowrap; flex-shrink: 0; }
 .sb-btn:hover:not(:disabled) { background: var(--hover); }
 .sb-btn.on { background: var(--accent-50); color: var(--accent); }
 .zoom { width: 150px; accent-color: var(--accent); }
