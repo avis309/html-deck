@@ -29,18 +29,71 @@ const FX_LABELS = {
 };
 // Runtime refusal → the i18n key that explains it.
 export const FX_WHY = { count: 'fx_count_bad', draw: 'fx_bad_draw', inline: 'fx_bad_inline', filter: 'fx_bad_filter', transform: 'fx_bad_transform', reveal: 'fx_bad_reveal' };
+// Each tile's little picture, animated on hover by its data-anim (editor.css).
+const FX_ICONS = {
+  'count-up': '<b>123</b>', 'grow-x': '<i class="bar-x"></i>', 'grow-y': '<i class="bar-y"></i>',
+  'draw': '<svg viewBox="0 0 32 20"><path d="M2 17 L10 8 L18 12 L30 3"/></svg>',
+};
 let fxCatalog = null;
+function fxTile(name, label) {
+  const b = document.createElement('button');
+  b.className = 'fx-tile';
+  b.dataset.preset = name;
+  b.innerHTML = `<span class="fx-ico" data-anim="${name || 'none'}">${name ? FX_ICONS[name] || '<i></i>' : '<i class="none"></i>'}</span><span class="n"></span>`;
+  b.querySelector('.n').textContent = label;
+  b.addEventListener('click', () => pickFx(name));
+  return b;
+}
+// The Effects side bar: tiles by category, from the runtime's own catalog (same code the file runs).
 export function renderFxPresets() {
-  const sel = $('#fx-preset'), keep = sel.value;
+  const box = $('#fx-tiles');
   fxCatalog ||= fxRuntime(window, { preview: true }).catalog();
-  sel.replaceChildren(new Option(t('fx_none'), ''));
+  box.replaceChildren();
+  const none = document.createElement('div');
+  none.className = 'fx-none-row';
+  none.appendChild(fxTile('', t('fx_none')));
+  box.appendChild(none);
   for (const cat of FX_CATS) {
-    const g = document.createElement('optgroup');
-    g.label = t('fx_cat_' + cat);
-    for (const p of fxCatalog.filter(p => p.category === cat)) g.appendChild(new Option(FX_LABELS[p.name] || p.name, p.name));
-    sel.appendChild(g);
+    const g = document.createElement('div');
+    g.className = 'fx-group';
+    g.innerHTML = `<div class="sec-label"></div><div class="fx-grid-tiles"></div>`;
+    g.querySelector('.sec-label').textContent = t('fx_cat_' + cat);
+    for (const p of fxCatalog.filter(p => p.category === cat)) g.lastChild.appendChild(fxTile(p.name, FX_LABELS[p.name] || p.name));
+    box.appendChild(g);
   }
-  sel.value = keep;
+  if (effectsVisible()) renderFxSel();
+}
+// A tile clicked: the block gets that effect (or none), and it plays once on the slide.
+export function pickFx(name) {
+  if (!S.sel) return;
+  $('#fx-preset').value = name;
+  applyFx();
+  if (name && modelEl(S.sel.dataset.edId)?.getAttribute('data-fx') === name) previewFx();
+  renderFxSel();
+}
+// The selected block's part of the side bar: its effect, timing and what the file can play.
+export function renderFxSel() {
+  const node = S.multi ? null : S.sel;
+  $('#fx-sel').hidden = !node;
+  $('#fx-nosel').hidden = !!node;
+  if (!node) return;
+  const m = modelEl(node.dataset.edId);
+  const snippet = (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 48);
+  $('#fx-target').textContent = node.localName + (snippet ? ': ' + snippet : '');
+  $('#fx-preset').value = m?.getAttribute('data-fx') || '';
+  for (const [sel, attr] of [['#fx-delay', 'data-fx-delay'], ['#fx-dur', 'data-fx-dur'], ['#fx-stagger', 'data-fx-stagger']]) {
+    if (document.activeElement !== $(sel)) $(sel).value = m?.getAttribute(attr) || '';
+  }
+  // Effects that cannot run on this block stay shown, disabled, with the reason as title.
+  const cur = $('#fx-preset').value, api = fxApi();
+  for (const b of $$('#fx-tiles .fx-tile')) {
+    const why = b.dataset.preset && api ? api.check(node, b.dataset.preset) : null;
+    b.classList.toggle('on', b.dataset.preset === cur);
+    b.disabled = !!why && b.dataset.preset !== cur;
+    b.title = why ? t(FX_WHY[why] || 'fx_bad_draw') : '';
+  }
+  syncFxDur();
+  renderFxDoc();
 }
 // The duration field shows the chosen preset's own default (a loop's is seconds, not 700 ms).
 export function syncFxDur() {
@@ -54,23 +107,10 @@ export function fxBlock(node, preset) {
   if (why) return FX_WHY[why] || 'fx_bad_draw';
   return null;
 }
-export function openFxPop(btn) {
-  hooks.togglePop('#pop-fx', btn);
-  if ($('#pop-fx').hidden || !S.sel) return;
-  const m = modelEl(S.sel.dataset.edId);
-  $('#fx-preset').value = m?.getAttribute('data-fx') || '';
-  $('#fx-delay').value = m?.getAttribute('data-fx-delay') || '';
-  $('#fx-dur').value = m?.getAttribute('data-fx-dur') || '';
-  $('#fx-stagger').value = m?.getAttribute('data-fx-stagger') || '';
-  // Presets that cannot run on this block stay listed, disabled, with the reason as title.
-  const cur = $('#fx-preset').value, api = fxApi();
-  for (const o of $$('#fx-preset option')) {
-    const why = o.value && api ? api.check(S.sel, o.value) : null;
-    o.disabled = !!why && o.value !== cur;
-    o.title = why ? t(FX_WHY[why] || 'fx_bad_draw') : '';
-  }
-  syncFxDur();
-  renderFxDoc();
+// ▶ on the toolbar: the Effects side bar, on the selected block.
+export function openFxPanel() {
+  hooks.openPanel('effects', true);
+  renderFxSel();
 }
 export function applyFx() {
   const node = S.sel;
@@ -89,6 +129,7 @@ export function applyFx() {
   pushOp({ type: 'attrs', id, before, after, key: 'fx:' + id, label: 'Effect' });
   syncFxDur();
   renderFxDoc();
+  if (effectsVisible()) renderFxList();
 }
 export function previewFx() {
   const node = S.sel;

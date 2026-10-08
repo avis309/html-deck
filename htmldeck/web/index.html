@@ -163,7 +163,22 @@
           <div class="hint" style="margin-top:10px" data-i18n-html="layers_hint_bottom">Drag a row to reorder: drop on <b>orange line</b> for above/below, drop into middle to place <b>inside</b>. Esc to cancel.</div>
         </div>
         <div class="panel-body" data-view="effects" hidden>
-          <div class="hint" style="margin-bottom:10px" data-i18n="fx_panel_hint">Effects run when presenting. Select a block, then press ▶ in the toolbar to set one.</div>
+          <div id="fx-sel" hidden>
+            <div class="box-target" id="fx-target"></div>
+            <input type="hidden" id="fx-preset">
+            <div id="fx-tiles"></div>
+            <div class="sec-label" data-i18n="fx_timing">Timing</div>
+            <div class="fx-grid">
+              <label><span data-i18n="fx_delay">Delay (ms)</span><input type="number" id="fx-delay" min="0" step="50" placeholder="0"></label>
+              <label><span data-i18n="fx_dur">Duration (ms)</span><input type="number" id="fx-dur" min="50" step="50" placeholder="700"></label>
+              <label><span data-i18n="fx_stagger">Children one by one (ms)</span><input type="number" id="fx-stagger" min="0" step="50" placeholder="0"></label>
+            </div>
+            <button class="btn-soft" id="fx-preview" data-i18n="fx_preview">Preview</button>
+            <div class="fx-doc" id="fx-doc" hidden><span id="fx-doc-state"></span><button class="btn-soft" id="fx-doc-btn"></button></div>
+          </div>
+          <div class="hint fx-nosel" id="fx-nosel" data-i18n="fx_pick_block">Select a block on the slide to give it an effect.</div>
+          <div class="sec-label fx-slide-h" data-i18n="fx_slide_h">Whole slide</div>
+          <div class="hint" style="margin-bottom:10px" data-i18n="fx_panel_hint">Effects run when presenting.</div>
           <button class="btn-primary" id="fx-auto" style="width:100%;margin-bottom:8px"><span id="fx-auto-label" data-i18n="fx_auto_deck">Animate this slide</span></button>
           <button class="btn-soft" id="fx-play-slide" style="width:100%;margin-bottom:12px"><svg class="icon sm"><use href="#i-play"/></svg><span data-i18n="fx_play_slide">Preview the whole slide</span></button>
           <div id="fx-list"></div>
@@ -244,17 +259,6 @@
           <input type="range" id="op-range" min="0" max="100" step="1">
         </div>
 
-        <div class="pop pop-fx" id="pop-fx" hidden>
-          <label><span data-i18n="fx_label">Effect</span></label>
-          <select id="fx-preset"></select>
-          <div class="fx-grid">
-            <label><span data-i18n="fx_delay">Delay (ms)</span><input type="number" id="fx-delay" min="0" step="50" placeholder="0"></label>
-            <label><span data-i18n="fx_dur">Duration (ms)</span><input type="number" id="fx-dur" min="50" step="50" placeholder="700"></label>
-            <label><span data-i18n="fx_stagger">Children one by one (ms)</span><input type="number" id="fx-stagger" min="0" step="50" placeholder="0"></label>
-          </div>
-          <button class="btn-soft" id="fx-preview" data-i18n="fx_preview">Preview</button>
-          <div class="fx-doc" id="fx-doc" hidden><span id="fx-doc-state"></span><button class="btn-soft" id="fx-doc-btn"></button></div>
-        </div>
 
         <div class="scroller" id="scroller">
           <div class="sizer" id="sizer"><div class="sheet" id="sheet"><iframe id="frame" title="Document editing view" data-i18n-title="frame_title"></iframe></div></div>

@@ -43,7 +43,7 @@ export function onKey(e, fromFrame) {
   if (S.multi && !S.editing && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); deleteMulti(); return; }
   if (e.key === 'Escape' && S.crop) { exitCrop(); return; }
   if (e.key === 'Escape') {
-    if (!el.menu.hidden || !$('#pop-spacing').hidden || !$('#pop-opacity').hidden || !$('#pop-fx').hidden || !$('#pop-note').hidden || !$('#pop-link').hidden || !$('#pop-alt').hidden || !$('#pop-img').hidden) { closePopups(); return; }
+    if (!el.menu.hidden || !$('#pop-spacing').hidden || !$('#pop-opacity').hidden || !$('#pop-note').hidden || !$('#pop-link').hidden || !$('#pop-alt').hidden || !$('#pop-img').hidden) { closePopups(); return; }
     if (S.editing) setEditing(false); else deselect();
     return;
   }

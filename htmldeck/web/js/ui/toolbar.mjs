@@ -2,6 +2,7 @@
 import { $, $$, clamp } from '../core/utils.mjs';
 import { S, el } from '../editor/state.mjs';
 import { boxVisible, renderBoxPanel } from './panels/box.mjs';
+import { effectsVisible, renderFxSel } from '../features/effects.mjs';
 import { computedFor } from '../features/formatting.mjs';
 import { isRoot } from '../editor/live-document.mjs';
 
@@ -11,6 +12,7 @@ export function refreshToolbar() {
   el.ctx.classList.toggle('idle', !node);
   el.ctx.classList.toggle('img-mode', !!node && node.localName === 'img');
   if (boxVisible()) renderBoxPanel();
+  if (effectsVisible()) renderFxSel();
   if (!node || !S.win) return;
   if (node.localName === 'img') {
     const op = Math.round(parseFloat(S.win.getComputedStyle(node).opacity) * 100);
@@ -51,7 +53,6 @@ export function refreshToolbar() {
   el.box.classList.toggle('block', textOnly);
 }
 export function closePopups() {
-  $('#pop-fx').hidden = true;
   $('#pop-spacing').hidden = true;
   $('#pop-opacity').hidden = true;
   $('#pop-note').hidden = true;

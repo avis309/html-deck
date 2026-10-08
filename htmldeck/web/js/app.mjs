@@ -28,7 +28,7 @@ import { drawSnapGuides, hideOverlay, positionOverlay, startTrack, stopTrack } f
 import { renderBoxPanel } from './ui/panels/box.mjs';
 import { buildLayers, drawOffsets, layersVisible, syncLayers } from './ui/panels/layers.mjs';
 import { loadWorkspaceList, openPanel, renderFileList } from './ui/panels/side-panel.mjs';
-import { closePopups, refreshToolbar, togglePop } from './ui/toolbar.mjs';
+import { closePopups, refreshToolbar } from './ui/toolbar.mjs';
 import { buildDocColors } from './ui/panels/colors.mjs';
 import { buildFilmstrip, queueThumb, trackSection } from './ui/slides.mjs';
 
@@ -96,7 +96,6 @@ installHooks({
   stopFxPreview,
   stopTrack,
   syncLayers,
-  togglePop,
   trackSection,
   updateChrome,
   watchSource,

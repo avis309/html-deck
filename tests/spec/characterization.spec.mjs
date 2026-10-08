@@ -1355,7 +1355,7 @@ async function reveal(browser, url) {
   await s.select('#frag');
   await s.frame.locator('#frag').press('Escape');
   await s.page.click('#tb-fx');
-  const fragOpt = await s.page.$eval('#fx-preset option[value="fade-in"]', o => ({ disabled: o.disabled, title: o.title }));
+  const fragOpt = await s.page.$eval('.fx-tile[data-preset="fade-in"]', o => ({ disabled: o.disabled, title: o.title }));
   check('FX on a Reveal fragment: not offered, with the reason', fragOpt.disabled && /fragment/.test(fragOpt.title) && (await s.content()) === original, JSON.stringify(fragOpt));
   await s.page.keyboard.press('Escape');
   check('edit view: fragments shown for editing', (await s.frame.locator('#frag').evaluate(e => getComputedStyle(e).opacity)) === '1');
@@ -1470,8 +1470,8 @@ async function effects(browser, url) {
   const frameAnims = () => s.frame.locator('html').evaluate(() => document.getAnimations().length);
   const setFx = async (sel, preset, extra = {}, position) => {
     await s.frame.locator(sel).click({ modifiers: ['Alt'], position });
-    if (await s.page.isHidden('#pop-fx')) await s.page.click('#tb-fx');
-    await s.page.selectOption('#fx-preset', preset);
+    if (await s.page.isHidden('#fx-tiles')) await s.page.click('#tb-fx');
+    await s.page.click(`.fx-tile[data-preset="${preset}"]`);
     for (const [k, v] of Object.entries(extra)) { await s.page.fill(k, v); await s.page.locator(k).dispatchEvent('change'); }
   };
   await s.page.click('#sb-next');
@@ -1492,8 +1492,8 @@ async function effects(browser, url) {
 
   await s.page.click('#filmstrip .thumb >> nth=2');
   await s.frame.locator('#f3').click({ modifiers: ['Alt'] });
-  if (await s.page.isHidden('#pop-fx')) await s.page.click('#tb-fx');
-  const f3 = await s.page.$eval('#fx-preset option[value="count-up"]', o => ({ disabled: o.disabled, title: o.title }));
+  if (await s.page.isHidden('#fx-tiles')) await s.page.click('#tb-fx');
+  const f3 = await s.page.$eval('.fx-tile[data-preset="count-up"]', o => ({ disabled: o.disabled, title: o.title }));
   check('count-up on text without a number: not offered, with the reason', f3.disabled && /Count up/.test(f3.title) && !(await s.content()).includes('id="f3" data-fx'), JSON.stringify(f3));
   await s.page.keyboard.press('Escape');
   await s.page.click('#filmstrip .thumb >> nth=1');
@@ -1505,10 +1505,8 @@ async function effects(browser, url) {
   c = await s.content();
   check('count-up + stagger: right attributes', c === want, firstDiff(c, want));
 
-  await s.page.click('.rail-item[data-panel="effects"]');
   const items = await s.page.locator('#fx-list .fx-item').count();
   check('effects panel: lists the slide\'s 3 effects', items === 3, String(items));
-  await s.page.click('.rail-item[data-panel="effects"]');
 
   // Enable FX in the file: one script block, inert in the edit frame.
   await s.page.click('#fx-doc-btn');
@@ -1609,33 +1607,35 @@ async function fxModules(browser, url) {
   await s.open(wpath(f));
   await s.frame.locator('#m-done').click({ modifiers: ['Alt'] });
   await s.page.click('#tb-fx');
+  check('▶ on the toolbar opens the Effects side bar (not a popover)', await s.page.evaluate(() => { const p = document.querySelector('#panel'); return p.classList.contains('open') && p.dataset.view === 'effects'; }) && await s.page.isVisible('#fx-tiles'));
+  check('the side bar marks the block\'s current effect', await s.page.$eval('.fx-tile[data-preset="pop"]', t => t.classList.contains('on')));
   const state = await s.page.textContent('#fx-doc-state');
   check('v2 runtime in the file, v3 preset used: the popover asks for Update FX', /Update FX/.test(state), state);
   await s.page.keyboard.press('Escape');
   section('FX modules: picker grouped by category, presets that cannot apply are disabled with the reason');
-  const groups = await s.page.$$eval('#fx-preset optgroup', gs => gs.map(g => [g.label, g.children.length]));
+  const groups = await s.page.$$eval('#fx-tiles .fx-group', gs => gs.map(g => [g.querySelector('.sec-label').textContent, g.querySelectorAll('.fx-tile').length]));
   check('picker: 4 groups (Entrance, Emphasis, Data & charts, Loop) holding 16 presets',
     groups.map(g => g[0]).join('|') === 'Entrance|Emphasis|Data & charts|Loop' && groups.reduce((n, g) => n + g[1], 0) === 16, JSON.stringify(groups));
   await s.page.click('#sb-next');
   await s.frame.locator('#m-plain').click({ modifiers: ['Alt'] });
-  if (await s.page.isHidden('#pop-fx')) await s.page.click('#tb-fx');
-  const opt = v => s.page.$eval(`#fx-preset option[value="${v}"]`, o => ({ disabled: o.disabled, title: o.title }));
+  if (await s.page.isHidden('#fx-tiles')) await s.page.click('#tb-fx');
+  const opt = v => s.page.$eval(`.fx-tile[data-preset="${v}"]`, o => ({ disabled: o.disabled, title: o.title }));
   const cu = await opt('count-up'), dr = await opt('draw'), fu = await opt('fade-up');
   check('words: count-up disabled, its title gives the reason', cu.disabled && /Count up/.test(cu.title), JSON.stringify(cu));
   check('words: draw disabled with the reason; fade-up enabled', dr.disabled && /stroke/i.test(dr.title) && !fu.disabled, JSON.stringify({ dr, fu }));
   await s.page.keyboard.press('Escape');
   await s.frame.locator('#m-bar').click({ modifiers: ['Alt'] });
-  if (await s.page.isHidden('#pop-fx')) await s.page.click('#tb-fx');
-  await s.page.selectOption('#fx-preset', 'grow-x');
+  if (await s.page.isHidden('#fx-tiles')) await s.page.click('#tb-fx');
+  await s.page.click('.fx-tile[data-preset="grow-x"]');
+  check('clicking a tile previews it on the slide', (await s.frame.locator('#m-bar').evaluate(n => n.getAnimations().length)) > 0);
   check('duration field: shows the preset\'s default (grow 900 ms)', (await s.page.getAttribute('#fx-dur', 'placeholder')) === '900', await s.page.getAttribute('#fx-dur', 'placeholder'));
-  check('popover label: not "Entrance" only any more', !/Entrance/.test(await s.page.textContent('#pop-fx [data-i18n="fx_label"]')), await s.page.textContent('#pop-fx [data-i18n="fx_label"]'));
   const c = await s.content();
   check('grow-x on a bar: only data-fx added', c === disk(f).replace('<span class="bar" id="m-bar">', '<span class="bar" id="m-bar" data-fx="grow-x">'), firstDiff(c, disk(f)));
   await s.undo();
   await s.page.keyboard.press('Escape');
   section('FX modules: Animate this slide');
   await s.page.click('#sb-prev');
-  await s.page.click('.rail-item[data-panel="effects"]');
+  if (await s.page.isHidden('#fx-auto')) await s.page.click('.rail-item[data-panel="effects"]');
   const orig = disk(f);
   await s.page.click('#fx-auto');
   const want = orig

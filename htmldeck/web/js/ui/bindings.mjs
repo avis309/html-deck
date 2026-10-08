@@ -6,7 +6,7 @@ import { addNoteFromPop, feedbackMulti, openNotePop } from '../features/feedback
 import { applyAlt, enterCrop, exitCrop, flipImage, normalizeImageURL, openAltPop, openImagePop, replaceImage, replaceWithFile, resetImage, selectedImg, setFit, startCropDrag } from '../features/images.mjs';
 import { applyFont, cycleAlign, setFontSize, toggleCase, toggleStyle } from '../features/formatting.mjs';
 import { animateScope } from '../features/auto-fx.mjs';
-import { applyFx, fxDocAction, openFxPop, previewFx, previewSlideFx, renderFxPresets } from '../features/effects.mjs';
+import { applyFx, fxDocAction, openFxPanel, previewFx, previewSlideFx, renderFxPresets } from '../features/effects.mjs';
 import { applyLink, openLinkPop, removeLink } from '../features/links.mjs';
 import { bindBoxPanel } from './panels/box.mjs';
 import { bindFind } from '../features/find.mjs';
@@ -69,7 +69,7 @@ export function bindUI() {
   window.addEventListener('pointerup', e => { if (S.marquee?.fromStage) { moveMarquee(framePoint(e)); endMarquee(); } });
 
   // Keep the iframe's text selection alive while toolbar buttons are pressed.
-  for (const zone of [el.ctx, el.pill, el.menu, $('#pop-spacing'), $('#pop-opacity'), $('#pop-fx'), $('#pop-note'), $('#pop-link'), $('#pop-alt'), $('#pop-img'), el.panel]) {
+  for (const zone of [el.ctx, el.pill, el.menu, $('#pop-spacing'), $('#pop-opacity'), $('#pop-note'), $('#pop-link'), $('#pop-alt'), $('#pop-img'), el.panel]) {
     zone.addEventListener('mousedown', e => { if (!e.target.closest('input, select, textarea')) e.preventDefault(); });
   }
 
@@ -138,9 +138,9 @@ export function bindUI() {
   $('#tb-clear').addEventListener('click', clearStyle);
   $('#tb-spacing').addEventListener('click', e => togglePop('#pop-spacing', e.currentTarget));
   $('#tb-opacity').addEventListener('click', e => togglePop('#pop-opacity', e.currentTarget));
-  $('#tb-fx').addEventListener('click', e => openFxPop(e.currentTarget));
+  $('#tb-fx').addEventListener('click', openFxPanel);
   renderFxPresets();
-  for (const id of ['#fx-preset', '#fx-delay', '#fx-dur', '#fx-stagger']) $(id).addEventListener('change', applyFx);
+  for (const id of ['#fx-delay', '#fx-dur', '#fx-stagger']) $(id).addEventListener('change', applyFx);
   for (const id of ['#fx-delay', '#fx-dur', '#fx-stagger']) $(id).addEventListener('keydown', e => e.stopPropagation());
   $('#fx-preview').addEventListener('click', previewFx);
   $('#fx-doc-btn').addEventListener('click', fxDocAction);

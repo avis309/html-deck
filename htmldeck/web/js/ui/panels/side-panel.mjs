@@ -6,7 +6,7 @@ import { buildLayers } from './layers.mjs';
 import { drawBoxPanel, renderBoxPanel } from './box.mjs';
 import { layout } from '../layout.mjs';
 import { openServerFile } from '../../editor/document.mjs';
-import { renderFxList } from '../../features/effects.mjs';
+import { renderFxList, renderFxSel } from '../../features/effects.mjs';
 import { renderNoteList } from '../feedback-view.mjs';
 import { curLang, t } from '../../shared/lang.mjs';
 
@@ -24,7 +24,7 @@ export function openPanel(name, keepOpen = false) {
   panel.classList.add('open');
   if (name === 'box') { drawBoxPanel(); renderBoxPanel(); }
   if (name === 'files') { loadWorkspaceList(); setTimeout(() => $('#file-search').focus(), 60); }
-  if (name === 'effects') renderFxList();
+  if (name === 'effects') { renderFxList(); renderFxSel(); }
   setTimeout(layout, 220);
 }
 export function closePanel() {
