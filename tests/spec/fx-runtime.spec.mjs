@@ -273,6 +273,11 @@ async function reviewFixes(browser) {
   check('check: draw on an SVG with strokes and no data-fx yet → allowed', ck.draw === null, JSON.stringify(ck));
   check('check: grow refused on CSS rotate / scale properties, allowed on a 3D translation', ck.rot === 'transform' && ck.sc === 'transform' && ck.t3 === null, JSON.stringify(ck));
   await o.ctx.close();
+  // Reveal owns auto-animate targets and fragments: check() says so (the editor and Animate this slide ask it).
+  o = await open(browser, `<section data-auto-animate><div data-id="card"><p id="ra">Revenue</p></div></section><div class="fragment"><p id="rf">Frag</p></div>`);
+  const rv = await o.pg.evaluate(() => [window.__htmldeckFx.check(document.querySelector('#ra'), 'fade-up'), window.__htmldeckFx.check(document.querySelector('#rf'), 'fade-up')]);
+  check('check: Reveal-owned blocks are refused ("reveal")', rv[0] === 'reveal' && rv[1] === 'reveal', JSON.stringify(rv));
+  await o.ctx.close();
   // count-up really counts and ends on the authored text by itself.
   o = await open(browser, '<section id="s"><p id="n" data-fx="count-up" data-fx-dur="400">1.250,5 ₫</p></section>');
   await show(o.pg, '#s');

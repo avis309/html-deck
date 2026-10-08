@@ -28,7 +28,7 @@ const FX_LABELS = {
   'grow-x': 'Grow →', 'grow-y': 'Grow ↑', 'draw': 'Draw lines', 'spin': 'Spin', 'float': 'Float', 'pulse': 'Pulse',
 };
 // Runtime refusal → the i18n key that explains it.
-export const FX_WHY = { count: 'fx_count_bad', draw: 'fx_bad_draw', inline: 'fx_bad_inline', filter: 'fx_bad_filter', transform: 'fx_bad_transform' };
+export const FX_WHY = { count: 'fx_count_bad', draw: 'fx_bad_draw', inline: 'fx_bad_inline', filter: 'fx_bad_filter', transform: 'fx_bad_transform', reveal: 'lock_fx_fragment' };
 let fxCatalog = null;
 export function renderFxPresets() {
   const sel = $('#fx-preset'), keep = sel.value;

@@ -389,7 +389,7 @@ export function fxRuntime(win, opts) {
     parseCount: parseCount,
     presets: Object.keys(MODULES),
     // Editor: why preset `name` cannot run on el (null when it can), and the module list.
-    check: function (el, name) { var m = MODULES[name]; return m ? refusal(el, m) : 'unknown'; },
+    check: function (el, name) { var m = MODULES[name]; return !m ? 'unknown' : revealOwned(el) ? 'reveal' : refusal(el, m); },
     catalog: function () { return Object.keys(MODULES).map(function (n) { return { name: n, category: MODULES[n].category }; }); },
     // Present bootstraps drive the slides themselves.
     control: function () { if (io) { io.disconnect(); io = null; } if (revealHooks) { revealHooks(); revealHooks = null; } return api; },

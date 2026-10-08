@@ -18,8 +18,9 @@ function isGroup(n) {
   const kids = [...n.children];
   return kids.length >= 3 && kids.every(k => k.localName === kids[0].localName && k.className === kids[0].className);
 }
-function inScene(n, scope) {
-  for (let a = n; a && a !== scope.parentElement; a = a.parentElement) if (sceneNamesFor(a).length) return true;
+// A scene anywhere above (a Reveal vertical stack, the deck wrapper…) owns the block's motion.
+function inScene(n) {
+  for (let a = n; a; a = a.parentElement) if (sceneNamesFor(a).length) return true;
   return false;
 }
 // The effect a block gets, or null. `covered`: inside a block that already moves, where only a
@@ -36,11 +37,12 @@ function pick(n, covered, api) {
 export function planAutoFx(scope) {
   const api = fxApi();
   if (!scope || !api) return [];
-  const plan = [], covered = [];
+  // A slide (or an ancestor) that already moves covers everything in it.
+  const plan = [], covered = scope.closest('[data-fx]') ? [scope] : [];
   for (const n of scope.querySelectorAll('*')) {
     if (plan.length >= MAX_BLOCKS) break;
     if (!isOriginal(n) || !n.getClientRects().length) continue;
-    if (inScene(n, scope)) continue;
+    if (inScene(n)) continue;
     const under = covered.some(r => r.contains(n));
     if (n.hasAttribute('data-fx')) { covered.push(n); continue; }
     const fx = pick(n, under, api);

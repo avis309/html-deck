@@ -1351,8 +1351,8 @@ async function reveal(browser, url) {
   await s.select('#frag');
   await s.frame.locator('#frag').press('Escape');
   await s.page.click('#tb-fx');
-  await s.page.selectOption('#fx-preset', 'fade-in');
-  check('FX on a Reveal fragment: refused, with the reason', /fragment/.test(await s.page.textContent('#toast')) && (await s.content()) === original, await s.page.textContent('#toast'));
+  const fragOpt = await s.page.$eval('#fx-preset option[value="fade-in"]', o => ({ disabled: o.disabled, title: o.title }));
+  check('FX on a Reveal fragment: not offered, with the reason', fragOpt.disabled && /fragment/.test(fragOpt.title) && (await s.content()) === original, JSON.stringify(fragOpt));
   await s.page.keyboard.press('Escape');
   check('edit view: fragments shown for editing', (await s.frame.locator('#frag').evaluate(e => getComputedStyle(e).opacity)) === '1');
   const top = await s.frame.locator('#s1').evaluate(e => parseFloat(getComputedStyle(e).top));
@@ -1569,6 +1569,16 @@ async function fxModules(browser, url) {
     await t.page.click('#tb-fx');
     const st = await t.page.textContent('#fx-doc-state');
     check('unknown preset in a v2 file: "older FX", not "needs Update FX"', !/Update FX to play/.test(st) && /older/.test(st), st);
+    await t.close();
+  }
+  section('FX modules: Animate this slide leaves slides that already move (own effect, scene on an ancestor) alone');
+  for (const ff of ['fx-auto-scope.html', 'fx-auto-scene.html']) {
+    const t = await new Session(browser, url).start();
+    await t.open(wpath(ff));
+    await t.page.click('.rail-item[data-panel="effects"]');
+    await t.page.click('#fx-auto');
+    const cc = await t.content();
+    check(`${ff}: nothing assigned, says so`, cc === disk(ff) && /Nothing/.test(await t.page.textContent('#toast')), firstDiff(cc, disk(ff)));
     await t.close();
   }
   section('FX modules: v2 runtime + v3 preset hint');
