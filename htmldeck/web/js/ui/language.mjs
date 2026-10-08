@@ -103,7 +103,7 @@ export function selectLanguage(lang) {
   const msgs = {
     vi: 'Đã chuyển sang Tiếng Việt',
     en: 'Switched language to English',
-    zh: '已切换为简体中文',
+    zh: '已切换为中文',
     'zh-Hant': '已切換為繁體中文'
   };
   toast(msgs[lang] || lang);

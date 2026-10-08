@@ -1617,8 +1617,15 @@ async function fxModules(browser, url) {
   check('Effects opened with nothing selected: the effect tiles are there, with a hint', await s.page.isVisible('#fx-tiles') && await s.page.isVisible('#fx-nosel'));
   await s.page.click('.fx-tile[data-preset="fade-up"]');
   check('a tile clicked with nothing selected: the hint flashes, nothing changes', await s.page.$eval('#fx-nosel', n => n.classList.contains('flash')) && (await s.content()) === disk(f));
+  const tilesTop = async () => (await s.page.locator('#fx-tiles').boundingBox()).y;
+  const before = await tilesTop();
   await s.frame.locator('#m-done').click({ modifiers: ['Alt'] });
   await s.page.click('#tb-fx');
+  check('selecting a block does not shift the side bar (the hint and the selected card take the same room)', Math.abs((await tilesTop()) - before) < 1, `${before} → ${await tilesTop()}`);
+  const card = await s.page.$eval('#fx-target', n => ({ text: n.textContent, h: n.getBoundingClientRect().height, oneLine: getComputedStyle(n).whiteSpace === 'nowrap', bg: getComputedStyle(n).backgroundColor }));
+  const hint = await s.page.$eval('#fx-nosel', n => ({ h: n.getBoundingClientRect().height || parseFloat(getComputedStyle(n).height), bg: getComputedStyle(n).backgroundColor }));
+  check('the selected block: one line, same box as the hint, in its own (green) colour, no "Selected" label',
+    /^Paragraph: Already animated$/.test(card.text) && card.oneLine && Math.abs(card.h - hint.h) < 0.5 && card.bg !== hint.bg, JSON.stringify({ card, hint }));
   check('▶ on the toolbar opens the Effects side bar (not a popover)', await s.page.evaluate(() => { const p = document.querySelector('#panel'); return p.classList.contains('open') && p.dataset.view === 'effects'; }) && await s.page.isVisible('#fx-tiles'));
   check('the side bar marks the block\'s current effect', await s.page.$eval('.fx-tile[data-preset="pop"]', t => t.classList.contains('on')));
   const state = await s.page.textContent('#fx-doc-state');
@@ -1658,7 +1665,20 @@ async function fxModules(browser, url) {
   check('grow-x on a bar: only data-fx added', c === disk(f).replace('<span class="bar" id="m-bar">', '<span class="bar" id="m-bar" data-fx="grow-x">'), firstDiff(c, disk(f)));
   await s.page.click('#fx-speed [data-v="fast"]');
   check('speed Fast: a shorter duration for this effect (grow 900 → 550 ms)', (await s.content()).includes('<span class="bar" id="m-bar" data-fx="grow-x" data-fx-dur="550">'));
-  await s.undo();
+  check('one by one is off for a block with nothing inside to go one by one', await s.page.$eval('#fx-stagger-on', i => i.disabled));
+  await s.page.click('.fx-tile[data-preset="spin"]');
+  await s.page.click('.fx-tile[data-preset="fade-up"]');
+  check('switching effect keeps the chosen speed, scaled to the new effect (Fast: spin 12 s → rise 0.4 s)',
+    (await s.content()).includes('<span class="bar" id="m-bar" data-fx="fade-up" data-fx-dur="400">'), (await s.content()).match(/<span class="bar"[^>]*>/)?.[0]);
+  await s.page.$eval('#fx-delay-range', r => { r.value = '350'; r.dispatchEvent(new Event('input', { bubbles: true })); });
+  check('the delay slider shows seconds while dragging', (await s.page.textContent('#fx-delay-out')) === '0.35 s', await s.page.textContent('#fx-delay-out'));
+  await s.page.focus('#fx-delay-chips [data-v="500"]');
+  await s.page.keyboard.press('Enter');
+  await s.page.keyboard.press('Delete');
+  const kb = await s.content();
+  check('keys on side bar controls stay there: Enter presses the chip, Delete does not delete the block',
+    kb.includes('id="m-bar" data-fx="fade-up" data-fx-dur="400" data-fx-delay="500"') || /id="m-bar"[^>]*data-fx-delay="500"/.test(kb), kb.match(/<span class="bar"[^>]*>/)?.[0] || 'm-bar gone');
+  while (await s.canUndo()) await s.undo();
   await s.page.keyboard.press('Escape');
   section('FX modules: removing an effect from the slide list');
   await s.page.click('#sb-prev');

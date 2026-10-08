@@ -436,7 +436,7 @@ export const I18N = {
     download_title: '下载当前文件到本地',
     save: '保存',
     save_title: '保存 (Ctrl+S)',
-    lang_btn_title: '切换语言 (VI / EN / 简体中文)',
+    lang_btn_title: '切换语言 (VI / EN / 中文)',
     lang_select_title: '选择语言',
 
     // Rail

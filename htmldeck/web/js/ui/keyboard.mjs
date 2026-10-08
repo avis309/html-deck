@@ -29,6 +29,9 @@ export function onKey(e, fromFrame) {
   if (S.present) { if (e.key === 'Escape') { e.preventDefault(); endPresent(); } return; }
   if (mod && (k === 'f' || k === 'h')) { e.preventDefault(); openFind(k === 'h'); return; }
   if (!fromFrame && isTypingTarget(e.target)) return;
+  // A focused side-bar control (tab, chip, tile) keeps its keys: Enter presses it, Delete does
+  // not delete the selected block. Escape still deselects.
+  if (!fromFrame && e.key !== 'Escape' && e.target?.closest?.('#panel button, #panel label')) return;
   if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
   if (mod && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
   if (mod && e.altKey && k === 'c') { e.preventDefault(); copyStyle(); return; }

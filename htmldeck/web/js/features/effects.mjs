@@ -9,6 +9,7 @@ import { formatBlock, structureBlock } from '../policy/edit-policy.mjs';
 import { isOriginal, liveEl, markOriginals, modelEl, provenanceOf } from '../editor/live-document.mjs';
 import { slideTitle } from '../editor/slide-info.mjs';
 import { curLang, t } from '../shared/lang.mjs';
+import { layerName } from '../i18n.mjs';
 import { toast } from '../shared/toast.mjs';
 import { hooks } from '../shared/hooks.mjs';
 import { lockedHint } from '../editor/guards.mjs';
@@ -130,6 +131,11 @@ export function showFxTab(tab) {
   else renderFxSel();
 }
 // A tile clicked: the block gets that effect (or none), and it plays once on the slide.
+// The speed a block's duration stands for (slow / fast), or null for normal or a custom one.
+function speedOf(name, dur) {
+  if (!name || !dur) return null;
+  return ['slow', 'fast'].find(sp => speedDur(name, sp) === dur) || null;
+}
 export function pickFx(name) {
   if (!S.sel || S.multi) {
     // Nothing to give it to: point at what to do instead of doing nothing.
@@ -141,6 +147,10 @@ export function pickFx(name) {
     pickFx.timer = setTimeout(() => hint.classList.remove('flash'), 1400);
     return;
   }
+  // Switching effect keeps the chosen speed, scaled to the new one; any other duration was
+  // the old effect's and goes.
+  const m = modelEl(S.sel.dataset.edId), was = m?.getAttribute('data-fx') || '', speed = speedOf(was, m?.getAttribute('data-fx-dur') || '');
+  if (name !== was) $('#fx-dur').value = name && speed ? speedDur(name, speed) : '';
   $('#fx-preset').value = name;
   applyFx();   // re-renders the side bar before the preview moves the block
   if (name && modelEl(S.sel.dataset.edId)?.getAttribute('data-fx') === name) previewFx();
@@ -170,7 +180,7 @@ export function renderFxSel() {
   }
   const m = modelEl(node.dataset.edId);
   const snippet = (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 48);
-  $('#fx-target').textContent = node.localName + (snippet ? ': ' + snippet : '');
+  $('#fx-target').textContent = layerName(curLang(), node.localName) + (snippet ? ': ' + snippet : '');
   $('#fx-preset').value = m?.getAttribute('data-fx') || '';
   for (const [sel, attr] of [['#fx-delay', 'data-fx-delay'], ['#fx-dur', 'data-fx-dur'], ['#fx-stagger', 'data-fx-stagger']]) $(sel).value = m?.getAttribute(attr) || '';
   renderFxTiming();
@@ -196,8 +206,13 @@ export function renderFxTiming() {
     b.classList.toggle('on', !!name && d === dur);
     b.title = name ? fmtSec(+d || fxDefaultDur(name)) : '';
   }
-  $('#fx-stagger-on').checked = +$('#fx-stagger').value > 0;
-  for (const n of ['#fx-delay-range', '#fx-stagger-on', '#fx-preview']) $(n).disabled = !name;
+  const on = +$('#fx-stagger').value > 0;
+  $('#fx-stagger-on').checked = on;
+  for (const n of ['#fx-delay-range', '#fx-preview']) $(n).disabled = !name;
+  // One by one needs items inside to take turns (draw: its shapes); a count-up is one number.
+  // Already on, it stays switchable off.
+  const node = S.sel, fits = !!name && name !== 'count-up' && (name === 'draw' || !!node?.children.length);
+  $('#fx-stagger-on').disabled = !fits && !on;
   for (const b of $$('#fx-delay-chips button, #fx-speed button')) b.disabled = !name;
 }
 export function fxBlock(node, preset) {

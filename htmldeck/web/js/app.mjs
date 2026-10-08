@@ -45,6 +45,8 @@ async function boot() {
   S.previewOrigin = cfg.preview_origin || location.origin;
   // The workspace's own scripts run in the edit view only once the user trusted the workspace.
   S.workspaceTrusted = cfg.trusted === true;
+  // A server started before the editor files were updated has older routes (no /api/trust).
+  if (cfg.preview_origin !== undefined && !('trusted' in cfg)) toast('Server is running an older version — please restart htmldeck', { err: true, ms: 10000 });
   loadWorkspaceList();
   // ?file= wins, then an explicit --file, then the last file opened here, then the server default.
   let last = null;
