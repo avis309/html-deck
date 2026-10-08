@@ -31,7 +31,10 @@ if (args.has('--real-only') && args.has('--fixtures-only')) { console.error('Pic
 
 // The fixtures' workspace: a temp folder the server is started on (--root).
 const WORK = fs.mkdtempSync(path.join(os.tmpdir(), 'htmldeck-spec-'));
-const wpath = f => f;   // document paths are relative to the workspace
+const wpath = f => f;
+// Workspace trust is remembered in the user's config folder: the spec uses its own, and its
+// servers trust the workspace (--trust) unless a scenario says otherwise.
+const CONFIG = fs.mkdtempSync(path.join(os.tmpdir(), 'htmldeck-config-'));   // document paths are relative to the workspace
 const disk = f => fs.readFileSync(path.join(WORK, f), 'utf8');
 
 const failures = [], known = [];
@@ -57,9 +60,10 @@ function firstDiff(a, b) {
 const section = t => console.log(`\n┌─ ${t}`);
 
 // ---------------------------------------------------------------- server
-function startServer(extra = [], root = WORK) {
+function startServer(extra = [], root = WORK, { trust = true } = {}) {
   return new Promise((resolve, reject) => {
-    const proc = spawn(PY, ['-u', '-m', 'htmldeck', '--root', root, '--no-browser', '--port', '0', ...extra], { cwd: ROOT, env: { ...process.env, PYTHONPATH: ROOT } });
+    const args = ['-u', '-m', 'htmldeck', '--root', root, '--no-browser', '--port', '0', ...(trust ? ['--trust'] : []), ...extra];
+    const proc = spawn(PY, args, { cwd: ROOT, env: { ...process.env, PYTHONPATH: ROOT, HTMLDECK_CONFIG_DIR: CONFIG } });
     let out = '';
     const fail = err => { clearTimeout(timer); proc.kill(); reject(err); };
     const timer = setTimeout(() => fail(new Error('server did not start: ' + out)), 15000);
@@ -1660,6 +1664,31 @@ async function fxModules(browser, url) {
   await s.close();
 }
 
+// Workspace trust: the workspace's own scripts never run in the edit view until it is trusted.
+async function workspaceTrust(browser) {
+  section('workspace trust: scripts off in the edit view until the workspace is trusted');
+  const srv = await startServer([], WORK, { trust: false });
+  try {
+    const f = 'ws-scripts.html';
+    const s = await new Session(browser, srv.url).start();
+    await s.open(wpath(f));
+    const ran = () => s.frame.locator('html').evaluate(() => window.__wsScript || 0);
+    check('untrusted: the document\'s script did not run', (await ran()) === 0);
+    check('untrusted: a button offers to trust the workspace', await s.page.isVisible('#sb-ws-trust'));
+    check('untrusted: text still editable, file intact', (await s.content()) === disk(f));
+    const seq = await s.seq();
+    await s.page.click('#sb-ws-trust');
+    await s.waitReady(wpath(f), seq);
+    check('trusted: the edit view runs the script', (await ran()) === 1, String(await ran()));
+    check('trusted: the button is gone', await s.page.isHidden('#sb-ws-trust'));
+    await s.close();
+    const again = await new Session(browser, srv.url).start();
+    await again.open(wpath(f));
+    check('trusted is remembered for the workspace', (await again.frame.locator('html').evaluate(() => window.__wsScript || 0)) === 1);
+    await again.close();
+  } finally { await stopServer(srv); }
+}
+
 // Edit mode shows motion in its end state; presenting plays it.
 async function motion(browser, url) {
   section('the edit view freezes motion (CSS, transitions, WAAPI); presenting still runs it');
@@ -1944,7 +1973,7 @@ try {
   server = await startServer(['--test-hooks']);
   browser = await chromium.launch();
   if (!args.has('--real-only')) {
-    for (const scenario of [detection, moduleBurst, textColourHistory, modeSwitch, structural, svgDiagram, dragMove, liveSync, regionFeedback, feedbackAccess, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, fxModules, motion, scenesSpec, remoteScriptsSpec, malformed, untrustedSpec, regressionsSpec, runtimeCssSpec]) {
+    for (const scenario of [detection, moduleBurst, textColourHistory, modeSwitch, structural, svgDiagram, dragMove, liveSync, regionFeedback, feedbackAccess, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, fxModules, workspaceTrust, motion, scenesSpec, remoteScriptsSpec, malformed, untrustedSpec, regressionsSpec, runtimeCssSpec]) {
       try { await scenario(browser, server.url); }
       catch (e) { failures.push(`${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); console.log(`  ✖ ${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); }
     }

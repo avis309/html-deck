@@ -95,7 +95,7 @@ Try it in a clone of this repo: `htmldeck --root samples --file marketing-report
 | **Tailwind CSS** | Classes stay as written; your styles go on top. |
 | **SVG** | Retype a `<text>` / `<tspan>` label in an inline `<svg>`. |
 | **Animations** | The page's own scripts (anime.js, GSAP…) run when presenting a file from the workspace. While editing, CSS and Web Animations are paused, and content a script changes is locked. Add effects from the toolbar without code: entrances, emphasis (pop), data & charts (count-up, grow bars, draw lines) and loops (spin, float, pulse). **Animate this slide** adds them to a whole slide in one undoable step; **Enable FX in the file** keeps them running when the file is opened on its own. |
-| **Safety** | Undo/redo, draft recovery, backups. Remote scripts (a CDN, for example) are blocked while editing until you trust the file; presenting runs on a separate origin. |
+| **Safety** | Undo/redo, draft recovery, backups. A workspace's own scripts do not run while editing until you trust the workspace (asked once, remembered; `--trust` for one session), and remote scripts (a CDN) also wait until you trust the file. Presenting runs everything, on a separate origin. Backups and notes never follow symlinks; HTML export embeds web assets only and never fetches from local or private addresses. |
 
 <details>
 <summary><b>Details for developers</b></summary>

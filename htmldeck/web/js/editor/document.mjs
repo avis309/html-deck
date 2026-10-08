@@ -174,8 +174,25 @@ export async function setTrust(on) {
   if (ok) try { on ? localStorage.setItem(k, remoteScripts().join('\n')) : localStorage.removeItem(k); } catch {}
   renderTrustChip();
 }
+// The document's own code (scripts, inline handlers) that an untrusted workspace keeps off.
+export const hasOwnScripts = () => !!S.model?.querySelector('script:not([data-htmldeck-fx]), [onload], [onclick], [onerror]');
+export function renderWsTrust() {
+  const b = $('#sb-ws-trust');
+  b.hidden = !(S.source?.kind === 'server' && !S.workspaceTrusted && hasOwnScripts());
+  b.textContent = t('ws_trust_off');
+  b.title = t('ws_trust_title');
+}
+// Trusting is remembered for the workspace by the server (user config), then the edit view is
+// rebuilt with the document's scripts.
+export async function trustWorkspace() {
+  try { await postJSON('/api/trust', { trusted: true }); } catch (e) { toast(e.message, { err: true }); return; }
+  S.workspaceTrusted = true;
+  renderWsTrust();
+  await rerender();
+}
 export function renderTrustChip() {
-  const b = $('#sb-trust'), remote = S.source?.kind === 'server' && remoteScripts().length;
+  renderWsTrust();
+  const b = $('#sb-trust'), remote = S.source?.kind === 'server' && S.workspaceTrusted && remoteScripts().length;
   b.hidden = !remote;
   if (!remote) return;
   const on = !!S.mountedTrust;   // what the running frame was built with
@@ -185,7 +202,9 @@ export function renderTrustChip() {
 }
 export async function mountModel(token) {
   const trust = S.trustOverride ?? trustRemote();
-  const nonce = S.source.kind === 'server' ? undefined : newNonce();
+  // Untrusted (a file from the computer, or a workspace not trusted yet): only the editor's
+  // own scripts run, under a nonce the server's CSP enforces.
+  const nonce = S.source.kind === 'server' && S.workspaceTrusted ? undefined : newNonce();
   const { url } = await postJSON('/api/preview', { path: S.source.kind === 'server' ? S.source.path : null, content: renderHTML(nonce), target: 'edit', trust_remote: trust, nonce });
   S.mountedTrust = trust;
   if (token !== S.loadToken) return;
@@ -268,6 +287,7 @@ export function onFrameReady() {
   const n = S.liveById.size;
   renderTrustChip();
   if (S.readOnly) toast(t(S.readOnly), { ms: 6000 });
+  else if (!$('#sb-ws-trust').hidden) toast(t('ws_trust_toast'), { ms: 10000, action: { label: t('ws_trust_action'), fn: trustWorkspace } });
   else if (!$('#sb-trust').hidden && !S.mountedTrust) {
     // A runtime CSS framework (Tailwind Play CDN, Twind, UnoCSS runtime) styles the whole page:
     // blocked, the page looks broken rather than merely static, so say so and keep it up longer.

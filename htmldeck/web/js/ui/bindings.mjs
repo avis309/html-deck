@@ -17,7 +17,7 @@ import { deleteMulti, endMarquee, framePoint, moveMarquee, startMarquee } from '
 import { clearStyle, copyStyle, deleteSel, duplicateSel, insertText, pasteStyle, selectParent } from '../editor/element-actions.mjs';
 import { closePanel, openPanel, renderFileList } from './panels/side-panel.mjs';
 import { closePopups, togglePop } from './toolbar.mjs';
-import { confirmDiscard, openFromHandle, openUpload, pickLocalFile, rerender, setLoading, setTrust, storeMode } from '../editor/document.mjs';
+import { confirmDiscard, openFromHandle, openUpload, pickLocalFile, rerender, setLoading, setTrust, storeMode, trustWorkspace } from '../editor/document.mjs';
 import { contentForSave } from '../editor/live-document.mjs';
 import { flushRemoval, renderNoteList, renderPins } from './feedback-view.mjs';
 import { clearMulti, deselect, select, showSlide } from '../editor/selection.mjs';
@@ -146,6 +146,7 @@ export function bindUI() {
   $('#fx-doc-btn').addEventListener('click', fxDocAction);
   $('#fx-play-slide').addEventListener('click', previewSlideFx);
   $('#fx-auto').addEventListener('click', animateScope);
+  $('#sb-ws-trust').addEventListener('click', trustWorkspace);
   $('#sb-trust').addEventListener('click', () => {
     if (S.mountedTrust) setTrust(false);
     else if (confirm(t('trust_confirm'))) setTrust(true);

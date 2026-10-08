@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<!-- Workspace trust fixture: its own script must not run in the edit view until the workspace is trusted -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Workspace scripts fixture</title>
+</head>
+<body>
+<h1 id="w-title">Has a script</h1>
+<p id="w-text">Words to edit.</p>
+<script>window.__wsScript = (window.__wsScript || 0) + 1;</script>
+</body>
+</html>

@@ -137,9 +137,34 @@ def test_preview_url_sits_next_to_source(root):
     assert ed.preview_url(None, root).count("/") == 1
 
 
+@pytest.fixture(autouse=True)
+def config_dir(tmp_path_factory, monkeypatch):
+    """Workspace trust is remembered in the user's config folder: a fresh one per test."""
+    d = tmp_path_factory.mktemp("config")
+    monkeypatch.setenv("HTMLDECK_CONFIG_DIR", str(d))
+    return d
+
+
+def _serve(root, **attrs):
+    handler = type("H", (ed.HTMLEditorHandler,), {"root": root, "target_file": root / "output/deck/a.html", **attrs})
+    handler.previews = ed.OrderedDict()
+    httpd = ed.http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd
+
+
+@pytest.fixture
+def untrusted_server(root):
+    httpd = _serve(root)
+    yield httpd.server_address[1]
+    httpd.shutdown()
+    httpd.server_close()
+
+
 @pytest.fixture
 def server(root):
-    handler = type("H", (ed.HTMLEditorHandler,), {"root": root, "target_file": root / "output/deck/a.html"})
+    # Most tests are about a workspace whose scripts the user trusted (as --trust does).
+    handler = type("H", (ed.HTMLEditorHandler,), {"root": root, "target_file": root / "output/deck/a.html", "trusted_session": True})
     handler.previews = ed.OrderedDict()
     httpd = ed.http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
@@ -172,7 +197,7 @@ def test_http_config_reports_whether_file_was_explicit(server):
     status, data = _request(server, "GET", "/api/config")
     assert status == 200
     # test_hooks is off unless the server is started with --test-hooks (spec only).
-    assert json.loads(data) == {"default_path": "output/deck/a.html", "explicit": False, "test_hooks": False, "preview_origin": ""}
+    assert json.loads(data) == {"default_path": "output/deck/a.html", "explicit": False, "test_hooks": False, "preview_origin": "", "trusted": True}
 
 
 def test_http_root_redirect_keeps_query(server):
@@ -700,3 +725,33 @@ def test_notes_refuse_symlinked_lock_and_notes_files(root, tmp_path_factory):
     (notes_dir / "a.html.json").symlink_to(out / "secret.json")
     with pytest.raises(ed.EditorError):
         ed.read_notes(target)
+
+
+# ---- workspace trust: a workspace's own scripts never run in the edit view until trusted
+def test_workspace_scripts_are_off_until_the_workspace_is_trusted(untrusted_server, root, config_dir):
+    port, hdr = untrusted_server, {"Content-Type": "application/json"}
+    cfg = lambda: json.loads(_request(port, "GET", "/api/config")[1])
+    assert cfg()["trusted"] is False
+    body = json.dumps({"path": "output/deck/a.html", "content": "<p>x</p>"})
+    status, data = _request(port, "POST", "/api/preview", body, hdr)
+    assert status == 400 and b"trust" in data.lower()          # the open policy is never staged
+    nonce = "c3" * 16
+    body = json.dumps({"path": "output/deck/a.html", "content": "<p>x</p>", "nonce": nonce, "trust_remote": True})
+    url = json.loads(_request(port, "POST", "/api/preview", body, hdr)[1])["url"]
+    assert _head(port, url)[1].startswith(f"script-src 'nonce-{nonce}'")
+    # Trusting is remembered for this workspace (user config), across restarts.
+    status, data = _request(port, "POST", "/api/trust", json.dumps({"trusted": True}), hdr)
+    assert status == 200 and json.loads(data)["trusted"] is True and cfg()["trusted"] is True
+    assert str(root) in (config_dir / "trusted-workspaces.json").read_text(encoding="utf-8")
+    body = json.dumps({"path": "output/deck/a.html", "content": "<p>x</p>"})
+    url = json.loads(_request(port, "POST", "/api/preview", body, hdr)[1])["url"]
+    assert "'unsafe-inline'" in _head(port, url)[1]
+    again = _serve(root)
+    try:
+        assert json.loads(_request(again.server_address[1], "GET", "/api/config")[1])["trusted"] is True
+    finally:
+        again.shutdown()
+        again.server_close()
+    _request(port, "POST", "/api/trust", json.dumps({"trusted": False}), hdr)
+    assert cfg()["trusted"] is False
+    assert _request(port, "POST", "/api/trust", json.dumps({"trusted": "yes"}), hdr)[0] == 400

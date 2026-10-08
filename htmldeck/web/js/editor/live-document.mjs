@@ -51,7 +51,7 @@ export function liveEl(id) {
 // nonce: set for a document from outside the workspace; only the editor's scripts carry it.
 export function renderHTML(nonce) {
   const root = S.model.documentElement.cloneNode(true);
-  if (S.source && S.source.kind !== 'server') neuterScripts(root);
+  if (S.source && (S.source.kind !== 'server' || !S.workspaceTrusted)) neuterScripts(root);
   const head = root.querySelector('head');
   const guard = S.model.createElement('script');
   guard.textContent = FRAME_GUARD;

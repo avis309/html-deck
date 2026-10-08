@@ -42,6 +42,8 @@ async function boot() {
   catch (e) { if (e.status === 404) toast('Server is running an older version — please restart htmldeck', { err: true, ms: 10000 }); }
   // Presenting runs on this second origin (no API there); the editor's own origin otherwise.
   S.previewOrigin = cfg.preview_origin || location.origin;
+  // The workspace's own scripts run in the edit view only once the user trusted the workspace.
+  S.workspaceTrusted = cfg.trusted === true;
   loadWorkspaceList();
   // ?file= wins, then an explicit --file, then the last file opened here, then the server default.
   let last = null;

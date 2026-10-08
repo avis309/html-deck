@@ -553,6 +553,44 @@ def preview_url(source: Path | None, root: Path) -> str:
     return "/" + "/".join(parts)
 
 
+# ---- workspace trust. The edit view shares the editor's origin (it has to: the editor works on
+# its DOM), so a document's own scripts there could call this API. They only run once the user
+# trusted the workspace; until then the editor stages previews with a nonce CSP (its own
+# scripts only). Trusted roots are remembered in the user's config folder, outside workspaces.
+TRUST_FILE = "trusted-workspaces.json"
+
+
+def config_dir() -> Path:
+    env = os.environ.get("HTMLDECK_CONFIG_DIR")
+    if env:
+        return Path(env)
+    if _WINDOWS:
+        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "htmldeck"
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "htmldeck"
+
+
+def trusted_roots() -> set[str]:
+    try:
+        data = json.loads((config_dir() / TRUST_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    roots = data.get("roots") if isinstance(data, dict) else None
+    return {r for r in roots if isinstance(r, str)} if isinstance(roots, list) else set()
+
+
+def set_trusted(root: Path, trusted: bool) -> None:
+    roots = trusted_roots()
+    (roots.add if trusted else roots.discard)(str(root))
+    folder = config_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    tmp = folder / f".{TRUST_FILE}.tmp.{secrets.token_hex(4)}"
+    try:
+        tmp.write_text(json.dumps({"roots": sorted(roots)}, indent=2), encoding="utf-8")
+        _replace(tmp, folder / TRUST_FILE)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def _script_policy(payload: dict, source_path: Path | None) -> str | None:
     """The script-src a staged preview gets, or None for a workspace document's usual policy."""
     if payload.get("no_scripts") is True:
@@ -572,6 +610,10 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
     target_file: Path | None = None   # --file: opened first, allowed even outside the workspace
     explicit_file: bool = False  # --file given: open it instead of the browser's last file
     test_hooks: bool = False  # --test-hooks: the UI honours fault-injection URL params (spec only)
+    trusted_session: bool = False  # --trust: this run trusts the workspace without remembering it
+
+    def _trusted(self) -> bool:
+        return self.trusted_session or str(self.root) in trusted_roots()
     editor_html: Path = EDITOR_HTML
     previews: OrderedDict[str, tuple[bytes, str]] = OrderedDict()   # edit previews: (body, CSP)
     present_previews: OrderedDict[str, tuple[bytes, str]] = OrderedDict()   # preview origin: (body, CSP)
@@ -695,7 +737,7 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
             return
         parsed = urllib.parse.urlparse(self.path)
         route = {"/api/save": self._api_save, "/api/preview": self._api_preview, "/api/notes": self._api_notes_post,
-                 "/api/export": self._api_export}.get(parsed.path)
+                 "/api/export": self._api_export, "/api/trust": self._api_trust}.get(parsed.path)
         if route is None:
             self.send_error(404, "Endpoint not found")
             return
@@ -726,7 +768,15 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
             "explicit": self.explicit_file,
             "test_hooks": self.test_hooks,
             "preview_origin": self.preview_origin,
+            "trusted": self._trusted(),
         }
+
+    def _api_trust(self, parsed):
+        payload = self._read_json()
+        if not isinstance(payload.get("trusted"), bool):
+            raise EditorError(400, "trusted must be true or false")
+        set_trusted(self.root, payload["trusted"])
+        return {"trusted": self._trusted()}
 
     def _api_list_html(self, parsed):
         return {"files": list_html_files(self.root)}
@@ -812,6 +862,8 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
             return {"url": self.preview_origin + url}
         if scripts:
             csp = f"{scripts}; connect-src 'none'; worker-src 'none'; object-src 'none'"
+        elif not self._trusted():
+            raise EditorError(400, "This workspace is not trusted: its scripts do not run in the edit view (preview needs a script nonce)")
         else:
             csp = EDIT_CSP_TRUSTED if payload.get("trust_remote") is True else EDIT_CSP
         with self.previews_lock:
@@ -969,6 +1021,7 @@ def main(argv: list[str] | None = None):
     parser.add_argument("--port", type=int, default=6789, help="First port to try")
     parser.add_argument("--no-browser", action="store_true", help="Do not open the browser")
     parser.add_argument("--dry", action="store_true", help="Validate arguments and exit")
+    parser.add_argument("--trust", action="store_true", help="Run the workspace's own scripts in the edit view for this session (otherwise asked once per workspace)")
     parser.add_argument("--test-hooks", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     utf8_stdio()
@@ -1002,6 +1055,7 @@ def main(argv: list[str] | None = None):
     HTMLEditorHandler.target_file = target
     HTMLEditorHandler.explicit_file = bool(args.file)
     HTMLEditorHandler.test_hooks = args.test_hooks
+    HTMLEditorHandler.trusted_session = args.trust
     httpd = bind_server(args.port)
     preview = start_preview_origin(root)
     url = f"http://127.0.0.1:{httpd.server_address[1]}"
