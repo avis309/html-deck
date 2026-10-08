@@ -97,15 +97,16 @@ export function pickFx(name) {
   applyFx();   // re-renders the side bar before the preview moves the block
   if (name && modelEl(S.sel.dataset.edId)?.getAttribute('data-fx') === name) previewFx();
 }
-// Which presets can run on a block, measured on the block as authored: once per block and
-// document change, never while a preview is moving it (and not on every toolbar refresh).
-let fxFit = { node: null, seq: -1, why: {} };
+// Which presets can run on a block, measured again only when something they depend on changed:
+// the document (history), the view width (responsive CSS), the block's class / style, or its
+// text (typing not yet committed). Not on every toolbar refresh, and never mid-preview.
+let fxFit = { node: null, key: '', why: {} };
 function fxRefusals(node) {
-  const seq = topSeq();
-  if (fxFit.node === node && fxFit.seq === seq) return fxFit.why;
+  const key = [topSeq(), S.win?.innerWidth, node.getAttribute('class'), node.getAttribute('style'), node.textContent].join('\u0001');
+  if (fxFit.node === node && fxFit.key === key) return fxFit.why;
   const api = fxApi(), why = {};
   if (api) for (const b of $$('#fx-tiles .fx-tile')) if (b.dataset.preset) why[b.dataset.preset] = api.check(node, b.dataset.preset);
-  fxFit = { node, seq, why };
+  fxFit = { node, key, why };
   return why;
 }
 // The selected block's part of the side bar: its effect, timing and what the file can play.

@@ -1625,6 +1625,14 @@ async function fxModules(browser, url) {
   const cu = await opt('count-up'), dr = await opt('draw'), fu = await opt('fade-up');
   check('words: count-up disabled, its title gives the reason', cu.disabled && /Count up/.test(cu.title), JSON.stringify(cu));
   check('words: draw disabled with the reason; fade-up enabled', dr.disabled && /stroke/i.test(dr.title) && !fu.disabled, JSON.stringify({ dr, fu }));
+  // Typed over with a number (not committed yet): count-up is offered at once.
+  await s.clickText('#m-plain');
+  await s.frame.locator('#m-plain').evaluate(n => { const r = n.ownerDocument.createRange(); r.selectNodeContents(n); const sel = n.ownerDocument.getSelection(); sel.removeAllRanges(); sel.addRange(r); });
+  await s.page.keyboard.type('42');
+  await s.page.waitForTimeout(150);
+  check('typing a number into the block offers count-up before the edit is committed', !(await opt('count-up')).disabled, JSON.stringify(await opt('count-up')));
+  await s.page.keyboard.press('Escape');
+  while (await s.canUndo()) await s.undo();
   await s.page.keyboard.press('Escape');
   await s.frame.locator('#m-bar').click({ modifiers: ['Alt'] });
   if (await s.page.isHidden('#fx-tiles')) await s.page.click('#tb-fx');
