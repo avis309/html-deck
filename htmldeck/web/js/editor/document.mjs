@@ -27,15 +27,16 @@ export function storeMode(src, mode) {
 // Every open request takes a number: a slower response for an older request must not replace
 // the document opened since (and its edits) after the discard prompt has already been passed.
 export let openSeq = 0;
-export async function openServerFile(path) {
-  if (!confirmDiscard()) return;
+// force: the caller already settled the unsaved edits (live sync reloading the agent's version).
+export async function openServerFile(path, { force = false } = {}) {
+  if (!force && !confirmDiscard()) return;
   const seq = ++openSeq;
   setLoading(true);
   docState('loading', path);
   try {
     const data = await api(`/api/load?path=${encodeURIComponent(path)}`);
     if (seq !== openSeq) return false;
-    if (!await openDocument(data.content, { kind: 'server', path: data.path, name: data.filename, mtime: data.mtime_ns, size: data.size })) return false;
+    if (!await openDocument(data.content, { kind: 'server', path: data.path, name: data.filename, mtime: data.mtime_ns, rev: data.rev, size: data.size })) return false;
     try { localStorage.setItem(LAST_FILE_KEY, data.path); } catch {}
     return true;
   } catch (e) {
@@ -125,6 +126,7 @@ export async function openDocument(html, source) {
     await mountModel(token);
     if (token !== S.loadToken) return false;
     hooks.loadAgentNotes();
+    hooks.watchSource();
     if (!source.restored) hooks.offerDraft(html, source).catch(() => {});
     return true;
   } catch (e) {

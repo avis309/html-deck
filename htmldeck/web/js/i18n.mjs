@@ -41,8 +41,6 @@ export const I18N = {
     color_kids: '{n} đoạn chữ bên trong có màu riêng nên chưa đổi',
     color_kids_apply: 'Áp màu xuống',
     fb_section: 'Phần',
-    fb_copy: 'Sao chép yêu cầu cho AI',
-    fb_for_agent: 'Dành cho agent (lệnh đọc feedback)',
     fb_slide: 'Feedback cho cả slide này',
     fb_page: 'Feedback cho cả phần này',
     fb_open: 'Đang mở ({n})',
@@ -53,8 +51,6 @@ export const I18N = {
     fb_edit_hint: 'Bấm để sửa · Enter lưu · Shift+Enter xuống dòng · Esc huỷ',
     fb_save: 'Lưu',
     fb_lost: '⚠ Không còn tìm thấy vị trí — khối đã bị sửa hoặc xoá',
-    fb_copied: 'Đã sao chép yêu cầu — dán vào Claude / Codex',
-    fb_nothing: 'Không có feedback nào đang mở để gửi',
     fb_whole_slide: 'cả slide',
     multi_count: 'Đã chọn {n}',
     export_title: 'Lưu dưới dạng HTML hoặc PDF',
@@ -69,9 +65,6 @@ export const I18N = {
     fb_region_tag: 'vùng khoanh',
     fb_region_items: '{n} phần tử',
     fb_region_empty: 'không có phần tử (vùng trống)',
-    fb_prompt_head: 'Hãy xử lý {n} feedback đang mở trong file {path}.',
-    fb_prompt_read: 'Đọc vị trí chi tiết (selector, dòng) bằng lệnh:',
-    fb_prompt_done: 'Sửa xong mục nào thì đánh dấu đã xử lý (ID là mã của mục đó):',
     find_ph: 'Tìm trong tài liệu',
     replace_ph: 'Thay bằng',
     find_case: 'Phân biệt chữ hoa / thường',
@@ -156,8 +149,7 @@ export const I18N = {
     layers_hint_bottom: 'Kéo một dòng để đổi vị trí khối: thả lên <b>vạch cam</b> để đặt trên/dưới, thả vào giữa dòng để đặt <b>vào trong</b>. Esc để huỷ.',
     
     // Review panel
-    review_hint: 'Chọn một khối rồi bấm <b>AI Feedback</b> trên thanh nổi để ghi chỗ cần AI sửa — hoặc kéo chuột từ nền slide để quét chọn nhiều khối và viết một feedback cho cả vùng. Xong thì bấm nút dưới đây và dán vào Claude / Codex.',
-    copy_btn: 'Sao chép',
+    review_hint: 'Chọn khối (hoặc quét nhiều khối) rồi bấm <b>AI Feedback</b>. Xong thì bảo agent sửa theo feedback.',
     cmd_copied: 'Đã sao chép lệnh',
     no_notes_yet: 'Chưa có ghi chú nào',
     
@@ -264,6 +256,9 @@ export const I18N = {
     conflict_b: 'Có ai đó (hoặc một script khác) đã sửa file này sau khi bạn mở. Lưu đè sẽ làm mất thay đổi đó — bản cũ vẫn được sao lưu trong thư mục .htmldeck_bak.',
     conflict_dl: 'Tải bản của tôi',
     conflict_force: 'Vẫn ghi đè',
+    disk_h: 'Agent vừa sửa file này', disk_b: 'Bạn còn thay đổi chưa lưu. Tải bản mới của agent thì bản của bạn được tải về máy trước, không mất gì.',
+    disk_reload: 'Tải bản mới của agent', disk_mine: 'Tải về bản của tôi', disk_later: 'Để sau',
+    disk_stale: 'File trên đĩa đã đổi — xem', disk_reloaded: 'Agent vừa sửa file — đã tải bản mới',
     shortcuts_h: 'Phím tắt',
     
     // Key descriptions
@@ -398,8 +393,6 @@ export const I18N = {
     color_kids: '内部有 {n} 段文字有自己的颜色，尚未改变',
     color_kids_apply: '应用到内部',
     fb_section: '部分',
-    fb_copy: '复制给 AI 的请求',
-    fb_for_agent: '供 Agent 使用（读取反馈的命令）',
     fb_slide: '为整张幻灯片添加反馈',
     fb_page: '为整个部分添加反馈',
     fb_open: '待处理 ({n})',
@@ -410,8 +403,6 @@ export const I18N = {
     fb_edit_hint: '点击编辑 · Enter 保存 · Shift+Enter 换行 · Esc 取消',
     fb_save: '保存',
     fb_lost: '⚠ 找不到原位置 — 该区块已被修改或删除',
-    fb_copied: '已复制请求 — 粘贴到 Claude / Codex',
-    fb_nothing: '没有待处理的反馈可发送',
     fb_whole_slide: '整张幻灯片',
     multi_count: '已选 {n} 个',
     export_title: '保存为 HTML 或 PDF',
@@ -426,9 +417,6 @@ export const I18N = {
     fb_region_tag: '框选区域',
     fb_region_items: '{n} 个元素',
     fb_region_empty: '没有元素（空白区域）',
-    fb_prompt_head: '请处理文件 {path} 中 {n} 条待处理反馈。',
-    fb_prompt_read: '使用以下命令读取详细位置（selector、行号）：',
-    fb_prompt_done: '每修复一条后标记为已处理（ID 为该条的编号）：',
     find_ph: '在文档中查找',
     replace_ph: '替换为',
     find_case: '区分大小写',
@@ -513,8 +501,7 @@ export const I18N = {
     layers_hint_bottom: '拖动单行可调整层级：拖至<b>橙色线</b>可置于上/下方，拖至行中可<b>嵌套至内部</b>。Esc 取消。',
 
     // Review panel
-    review_hint: '选中一个区块，点击悬浮栏上的 <b>AI 反馈</b> 写下需要 AI 修改的地方；也可以从幻灯片背景拖动框选多个区块，为整个区域写一条反馈。完成后点击下方按钮并粘贴到 Claude / Codex。',
-    copy_btn: '复制',
+    review_hint: '选中区块（或框选多个）并点击 <b>AI 反馈</b>，然后让 Agent 按反馈修改。',
     cmd_copied: '已复制命令',
     no_notes_yet: '暂无反馈记录',
 
@@ -621,6 +608,9 @@ export const I18N = {
     conflict_b: '在您打开此文件后，其他用户或脚本对其进行了修改。覆盖将丢失最新更改（备份文件保存在 .htmldeck_bak 目录）。',
     conflict_dl: '下载我的版本',
     conflict_force: '仍要覆盖',
+    disk_h: 'Agent 刚修改了此文件', disk_b: '您有未保存的更改。载入 Agent 的版本前会先下载您的版本，不会丢失。',
+    disk_reload: '载入 Agent 的新版本', disk_mine: '下载我的版本', disk_later: '稍后',
+    disk_stale: '磁盘上的文件已更改 — 查看', disk_reloaded: 'Agent 刚修改了文件 — 已载入新版本',
     shortcuts_h: '键盘快捷键',
 
     // Key descriptions
@@ -754,8 +744,6 @@ export const I18N = {
     color_kids: '內部有 {n} 段文字有自己的顏色，尚未改變',
     color_kids_apply: '應用到內部',
     fb_section: '部分',
-    fb_copy: '複製給 AI 的請求',
-    fb_for_agent: '供 Agent 使用（讀取回饋的命令）',
     fb_slide: '為整張投影片新增回饋',
     fb_page: '為整個部分新增回饋',
     fb_open: '待處理 ({n})',
@@ -766,8 +754,6 @@ export const I18N = {
     fb_edit_hint: '點選編輯 · Enter 儲存 · Shift+Enter 換行 · Esc 取消',
     fb_save: '儲存',
     fb_lost: '⚠ 找不到原位置 — 該區塊已被修改或刪除',
-    fb_copied: '已複製請求 — 貼上到 Claude / Codex',
-    fb_nothing: '沒有待處理的回饋可傳送',
     fb_whole_slide: '整張投影片',
     multi_count: '已選 {n} 個',
     export_title: '儲存為 HTML 或 PDF',
@@ -782,9 +768,6 @@ export const I18N = {
     fb_region_tag: '框選區域',
     fb_region_items: '{n} 個元素',
     fb_region_empty: '沒有元素（空白區域）',
-    fb_prompt_head: '請處理檔案 {path} 中 {n} 條待處理回饋。',
-    fb_prompt_read: '使用以下命令讀取詳細位置（selector、行號）：',
-    fb_prompt_done: '每修復一條後標記為已處理（ID 為該條的編號）：',
     find_ph: '在文件中查詢',
     replace_ph: '替換為',
     find_case: '區分大小寫',
@@ -869,8 +852,7 @@ export const I18N = {
     layers_hint_bottom: '拖曳單行可調整層級：拖至<b>橙色線</b>可置於上/下方，拖至行中可<b>巢狀至內部</b>。Esc 取消。',
 
     // Review panel
-    review_hint: '選中一個區塊，點選浮動工具列上的 <b>AI 回饋</b> 寫下需要 AI 修改的地方；也可以從投影片背景拖曳框選多個區塊，為整個區域寫一條回饋。完成後點選下方按鈕並貼上到 Claude / Codex。',
-    copy_btn: '複製',
+    review_hint: '選中區塊（或框選多個）並點選 <b>AI 回饋</b>，然後請 Agent 依回饋修改。',
     cmd_copied: '已複製命令',
     no_notes_yet: '暫無回饋記錄',
 
@@ -977,6 +959,9 @@ export const I18N = {
     conflict_b: '在您開啟此檔案後，其他使用者或指令碼對其進行了修改。覆蓋將丟失最新更改（備份檔案儲存在 .htmldeck_bak 目錄）。',
     conflict_dl: '下載我的版本',
     conflict_force: '仍要覆蓋',
+    disk_h: 'Agent 剛修改了此檔案', disk_b: '您有尚未儲存的變更。載入 Agent 的版本前會先下載您的版本，不會遺失。',
+    disk_reload: '載入 Agent 的新版本', disk_mine: '下載我的版本', disk_later: '稍後',
+    disk_stale: '磁碟上的檔案已變更 — 查看', disk_reloaded: 'Agent 剛修改了檔案 — 已載入新版本',
     shortcuts_h: '鍵盤快捷鍵',
 
     // Key descriptions
@@ -1111,8 +1096,6 @@ export const I18N = {
     color_kids: '{n} text parts inside keep their own colour',
     color_kids_apply: 'Apply to them',
     fb_section: 'Section',
-    fb_copy: 'Copy request for AI',
-    fb_for_agent: 'For agents (command to read feedback)',
     fb_slide: 'Feedback for this whole slide',
     fb_page: 'Feedback for this whole section',
     fb_open: 'Open ({n})',
@@ -1123,8 +1106,6 @@ export const I18N = {
     fb_edit_hint: 'Click to edit · Enter saves · Shift+Enter new line · Esc cancels',
     fb_save: 'Save',
     fb_lost: '⚠ Position no longer found — the block was changed or deleted',
-    fb_copied: 'Request copied — paste it into Claude / Codex',
-    fb_nothing: 'No open feedback to send',
     fb_whole_slide: 'whole slide',
     multi_count: '{n} selected',
     export_title: 'Save as HTML or PDF',
@@ -1139,9 +1120,6 @@ export const I18N = {
     fb_region_tag: 'region',
     fb_region_items: '{n} elements',
     fb_region_empty: 'no elements (empty area)',
-    fb_prompt_head: 'Please handle the {n} open feedback notes in {path}.',
-    fb_prompt_read: 'Read the exact positions (selector, line) with:',
-    fb_prompt_done: 'Mark each note done once it is fixed (ID is the note\'s id):',
     find_ph: 'Find in document',
     replace_ph: 'Replace with',
     find_case: 'Match case',
@@ -1226,8 +1204,7 @@ export const I18N = {
     layers_hint_bottom: 'Drag a row to reorder: drop on <b>orange line</b> for above/below, drop into middle to place <b>inside</b>. Esc to cancel.',
     
     // Review panel
-    review_hint: 'Select a block and click <b>AI Feedback</b> on the floating toolbar to note what the AI should fix — or drag from the slide background to sweep several blocks and write one note for the area. Then click the button below and paste into Claude / Codex.',
-    copy_btn: 'Copy',
+    review_hint: 'Select a block (or sweep several) and click <b>AI Feedback</b>. Then ask your agent to apply the feedback.',
     cmd_copied: 'Command copied',
     no_notes_yet: 'No feedback notes yet',
     
@@ -1334,6 +1311,9 @@ export const I18N = {
     conflict_b: 'Someone (or another script) modified this file after you opened it. Overwriting will lose those changes — a backup is kept in .htmldeck_bak.',
     conflict_dl: 'Download my version',
     conflict_force: 'Overwrite anyway',
+    disk_h: 'An agent just changed this file', disk_b: "You have unsaved edits. Taking the agent's version downloads a copy of yours first, so nothing is lost.",
+    disk_reload: "Load the agent's version", disk_mine: 'Download my version', disk_later: 'Later',
+    disk_stale: 'File changed on disk — review', disk_reloaded: 'An agent changed the file — loaded the new version',
     shortcuts_h: 'Keyboard Shortcuts',
     
     // Key descriptions

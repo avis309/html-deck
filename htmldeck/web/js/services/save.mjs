@@ -34,8 +34,10 @@ export async function save({ force = false, rewriteOk = false } = {}) {
   hooks.updateChrome();
   try {
     if (src.kind === 'server') {
-      const res = await postJSON('/api/save', { path: src.path, content, mtime_ns: src.mtime, force });
+      const res = await postJSON('/api/save', { path: src.path, content, mtime_ns: src.mtime, rev: src.rev, force });
       src.mtime = res.mtime_ns;
+      src.rev = res.rev;
+      $('#disk-stale').hidden = true;   // the agent's version was overwritten on purpose
       if (token !== S.loadToken) return;
       toast(`Saved ${res.file} · ${fmtSize(res.bytes_written)} · backup: ${res.backup.split('/').pop()}`);
     } else if (src.kind === 'handle') {

@@ -167,14 +167,10 @@
           <div id="fx-list"></div>
         </div>
         <div class="panel-body" data-view="review" hidden>
-          <div class="hint" data-i18n-html="review_hint">Select a block and click <b>AI Feedback</b> on the floating toolbar to note what the AI should fix — or drag from the slide background to sweep several blocks and write one note for the area. Then click the button below and paste into Claude / Codex.</div>
-          <button class="btn-primary fb-copy" id="fb-copy"><svg class="icon sm"><use href="#i-copy"/></svg><span data-i18n="fb_copy">Copy request for AI</span></button>
+          <div class="hint" data-i18n-html="review_hint">Select a block (or sweep several) and click <b>AI Feedback</b>. Then ask your agent to apply the feedback.</div>
           <button class="btn-soft" id="fb-slide" style="width:100%;margin-bottom:12px"><svg class="icon sm ai"><use href="#i-ai"/></svg><span id="fb-slide-label"></span></button>
           <div class="seg fb-filter" id="fb-filter"><button data-f="open" class="on"></button><button data-f="done"></button></div>
           <div id="note-list"></div>
-          <details class="agent-more"><summary data-i18n="fb_for_agent">For agents (command to read feedback)</summary>
-            <div id="agent-cmds"></div>
-          </details>
         </div>
         <div class="panel-body" data-view="colors" hidden>
           <div class="seg" id="color-target"><button data-target="text" class="on" data-i18n="color_text">Text Color</button><button data-target="bg" data-i18n="color_bg">Block Background</button></div>
@@ -353,6 +349,7 @@
       </div>
       <footer class="statusbar">
         <button class="sb-btn sb-trust" id="sb-trust" hidden></button>
+        <button class="sb-btn sb-stale" id="disk-stale" hidden data-i18n="disk_stale">File changed on disk — review</button>
         <button class="sb-btn" id="sb-notes" hidden data-i18n="speaker_notes"><svg class="icon sm"><use href="#i-notes"/></svg>Speaker notes</button>
         <select class="sb-select" id="sb-mode" data-i18n-title="sb_mode_title" title="Document display mode">
           <option value="auto" data-i18n="sb_auto">Auto detect</option><option value="deck" data-i18n="sb_deck">Slide deck</option><option value="page" data-i18n="sb_page">Web page</option>
@@ -387,6 +384,17 @@
     <div class="modal-h"><h3 data-i18n="conflict_h">File changed on disk</h3></div>
     <div class="modal-b" data-i18n="conflict_b">Someone (or another script) modified this file after you opened it. Overwriting will lose those changes — a backup is kept in .htmldeck_bak.</div>
     <div class="modal-f"><button class="btn-soft" data-act="cancel" data-i18n="cancel_btn">Cancel</button><button class="btn-soft" data-act="download" data-i18n="conflict_dl">Download my version</button><button class="btn-danger" data-act="force" data-i18n="conflict_force">Overwrite anyway</button></div>
+  </div>
+</div>
+<div class="modal-bg disk-bg" id="modal-disk">
+  <div class="modal disk-modal">
+    <div class="modal-h"><h3 data-i18n="disk_h">An agent just changed this file</h3></div>
+    <div class="modal-b" data-i18n="disk_b">You have unsaved edits. Taking the agent's version downloads a copy of yours first, so nothing is lost.</div>
+    <div class="disk-actions">
+      <button class="btn-primary disk-reload" data-act="reload" data-i18n="disk_reload">Load the agent's version</button>
+      <button class="btn-soft" data-act="mine" data-i18n="disk_mine">Download my version</button>
+      <button class="link-btn" data-act="later" data-i18n="disk_later">Later</button>
+    </div>
   </div>
 </div>
 <div class="modal-bg" id="modal-reformat">

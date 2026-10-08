@@ -62,9 +62,9 @@ AI 也得重新讀一遍很大的檔案，既燒 token 又花時間，還可能�
 
 **搭配 Claude Code 或 Codex：**
 
-1. 說「在 HTML Deck 中開啟我的投影片」（或在 Claude Code 中輸入 `/htmldeck [file]`）。
+1. 說「在 HTML Deck 中開啟我的投影片」（或在 Claude Code 中輸入 `/htmldeck:open [file]`）。
 2. 能改的自己改，其餘的釘上 **AI Feedback** 備註。
-3. 說「處理我的 HTML Deck 備註」。agent 會修改檔案並把備註標記為完成。在 HTML Deck 中重新載入文件即可看到。
+3. 說「處理我的 HTML Deck 備註」。agent 會修改檔案並把備註標記為完成。HTML Deck 會在檔案變更後立即顯示新版本。
 
 **單獨使用**，在存放檔案的資料夾中：
 

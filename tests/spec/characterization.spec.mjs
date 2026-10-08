@@ -158,12 +158,36 @@ class Session {
   dirty() { return this.page.evaluate(() => document.querySelector('#btn-save').classList.contains('dirty')); }
   canUndo() { return this.page.isEnabled('#btn-undo'); }
   canRedo() { return this.page.isEnabled('#btn-redo'); }
+  // A click on the words of a text block edits it (here: at the end of its last line); beside
+  // them it picks the block up.
+  async clickText(selector) {
+    const loc = this.frame.locator(selector).first();
+    // Where the words are depends on layout: wait until the block stops moving (a slide change).
+    let last = null;
+    for (let i = 0; i < 20; i++) {
+      const b = await loc.boundingBox();
+      if (b && last && Math.abs(b.x - last.x) < 0.5 && Math.abs(b.y - last.y) < 0.5 && Math.abs(b.width - last.width) < 0.5) break;
+      last = b;
+      await this.page.waitForTimeout(50);
+    }
+    const position = await loc.evaluate(el => {
+      if (!el.closest('[data-ed-edit]')) return null;
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      const b = [...r.getClientRects()].filter(x => x.width > 1).pop(), e = el.getBoundingClientRect();
+      return b ? { x: b.right - 1 - e.left, y: b.top + b.height / 2 - e.top, w: e.width } : null;
+    });
+    if (!position) { await loc.click(); return; }
+    // The frame is shown scaled: positions are in the page's pixels.
+    const k = (await loc.boundingBox()).width / position.w;
+    await loc.click({ position: { x: position.x * k, y: position.y * k } });
+  }
   async typeAtEnd(selector, text) {
-    await this.frame.locator(selector).first().click();
+    await this.clickText(selector);
     await this.page.keyboard.press('End');
     await this.page.keyboard.type(text);
   }
-  async select(selector) { await this.frame.locator(selector).first().click(); }
+  async select(selector) { await this.clickText(selector); }
   // The present iframe runs on the preview origin: read it as its own frame, never through the parent.
   async presentFrame() { return (await this.page.waitForSelector('.present-frame')).contentFrame(); }
   async undo() { await this.page.click('#btn-undo'); }
@@ -428,7 +452,7 @@ async function structural(browser, url) {
   await s.page.keyboard.press('Enter');
   await s.page.keyboard.type('Second line');
   await s.select('#c2 h3');
-  await s.frame.locator('#c1 p', { hasText: 'Second line' }).click();
+  await s.clickText('#c1 p');
   check('Enter for a new line, leave the block, come back: still editable', await s.frame.locator('#c1 p').evaluate(e => e.isContentEditable));
   await s.page.keyboard.type(' ok');
   c = await s.content();
@@ -483,18 +507,15 @@ async function structural(browser, url) {
 }
 
 // AI Feedback needs a workspace file: a file opened from the computer says so instead of a dead
-// button; a save only reports success once the server has the note; the copied command runs anywhere.
+// button; a save only reports success once the server has the note.
 async function feedbackAccess(browser, url) {
-  section('AI Feedback: workspace vs local file, save errors, copied command');
+  section('AI Feedback: workspace vs local file, save errors');
   const name = '10月改版 台灣推廣提案.html';
   fs.writeFileSync(path.join(WORK, name), '<!doctype html><html><body><h1 id="t1">10 月改版<br>台灣推廣提案</h1><p id="p1">目標：提升留存</p></body></html>');
   const side = path.join(WORK, '.htmldeck_notes', name + '.json');
   const notes = () => fs.existsSync(side) ? JSON.parse(fs.readFileSync(side, 'utf8')).notes : [];
   const s = await new Session(browser, url).start();
   await s.open(wpath(name));
-  await s.page.waitForSelector('#agent-cmds .agent-cmd button', { state: 'attached' });   // notes load after the document
-  const cmd = await s.page.textContent('#agent-cmds .agent-cmd span');
-  check('copied command: this Python + notes.py by path, with --root and the quoted file', /notes\.py'? --root .+ --file '10月改版 台灣推廣提案\.html'$/.test(cmd), cmd);
 
   // The first save fails: the popup and its text stay, no success message.
   let fail = true;
@@ -522,18 +543,17 @@ async function feedbackAccess(browser, url) {
 
   // The same file opened from the computer: the button explains and leads to the workspace list.
   const seq = await s.seq();
-  // A slow preview for the next document: the previous one's command must not stay copyable meanwhile.
+  // A slow preview for the next document: the previous one's notes must not stay listed meanwhile.
   await s.page.route('**/api/preview', async route => { await new Promise(r => setTimeout(r, 1500)); return route.continue(); });
   await s.page.setInputFiles('#file-input', path.join(WORK, name));
   await s.page.waitForTimeout(300);
-  check('switching documents: the previous notes and command are cleared before the new one is mounted',
-    (await s.page.locator('#agent-cmds button').count()) === 0 && (await s.page.locator('#note-list .note-card').count()) === 0 && await s.page.isDisabled('#fb-copy'));
+  check('switching documents: the previous notes are cleared before the new one is mounted',
+    (await s.page.locator('#note-list .note-card').count()) === 0);
   await s.waitReady(name, seq);
   await s.page.unroute('**/api/preview');
   await s.select('#t1');
   const pill = await s.page.evaluate(() => { const b = document.querySelector('#pill-note'); return { disabled: b.disabled, unavailable: b.classList.contains('unavailable') }; });
   check('local file: AI button stays clickable, shown as unavailable', !pill.disabled && pill.unavailable, JSON.stringify(pill));
-  check('local file: no agent command left over from the workspace file', (await s.page.locator('#agent-cmds button').count()) === 0);
   await s.page.click('#pill-note');
   check('local file: clicking explains instead of opening the popup', await s.page.isHidden('#pop-note') && await s.page.isVisible('#toast .t-act'));
   await s.page.keyboard.press(process.platform === 'darwin' ? 'Meta+Shift+M' : 'Control+Shift+M');
@@ -621,6 +641,151 @@ async function svgDiagram(browser, url) {
   const notes = fs.existsSync(side) ? JSON.parse(fs.readFileSync(side, 'utf8')).notes : [];
   check('AI Feedback on the diagram: one note pointing at the <svg>', notes.length === 1 && /#dia$/.test(notes[0].selector), JSON.stringify(notes));
   check('…and the file is unchanged', (await s.content()) === original && !(await s.dirty()));
+  await s.close();
+}
+
+async function dragMove(browser, url) {
+  section('drag to move: a block from beside its words, a swept group, arrows on the group');
+  const f = 'deck.html';
+  const original = disk(f);
+  const s = await new Session(browser, url).start();
+  await s.open(wpath(f));
+  const box = sel => s.frame.locator(sel).first().boundingBox();
+  const drag = async (from, dx, dy) => {
+    await s.page.mouse.move(from.x, from.y);
+    await s.page.mouse.down();
+    await s.page.mouse.move(from.x + dx / 2, from.y + dy / 2, { steps: 4 });
+    await s.page.mouse.move(from.x + dx, from.y + dy, { steps: 4 });
+    await s.page.mouse.up();
+  };
+  // "translate: 1px" is written for "1px 0px".
+  const shift = (c, tag) => (c.match(new RegExp(`<${tag}[^>]*translate:\\s*(-?\\d+)px(?: (-?\\d+)px)?`)) || []).slice(1).map(v => Number(v || 0));
+  const editable = sel => s.frame.locator(sel).first().evaluate(e => e.isContentEditable);
+  const pill = () => s.page.locator('#multi-pill.show');
+  // Beside the title's words, on its line: the block, not the text.
+  const besideTitle = async () => { const b = await box('#t1'); return { x: b.x + b.width - 12, y: b.y + b.height / 2 }; };
+
+  await s.page.mouse.click(...Object.values(await besideTitle()));
+  await s.page.waitForTimeout(100);
+  check('click beside the words: the block is picked, not edited', (await s.page.isVisible('#sel-box')) && !(await editable('#t1')));
+  await drag(await besideTitle(), 60, 30);
+  let c = await s.content();
+  const [tx, ty] = shift(c, 'h1 id="t1"');
+  check('drag from beside the words moves the block (translate written)', tx > 0 && ty > 0 && (await s.dirty()), `${tx} ${ty}`);
+  check('the move leaves no shield or grab cursor behind', !(await s.page.isVisible('#shield')) && !(await s.frame.locator('html.ed-press, html.ed-moving').count()));
+  await s.undo();
+  check('one undo puts the block back', (await s.content()) === original);
+
+  const lead = await box('p.lead');
+  await drag({ x: lead.x + 4, y: lead.y + 8 }, 110, 0);
+  await s.page.waitForTimeout(100);
+  const picked = await s.frame.locator('p.lead').evaluate(e => e.ownerDocument.getSelection().toString());
+  check('a drag on the words selects text and moves nothing', picked.length > 3 && (await s.content()) === original, JSON.stringify(picked));
+  await s.page.keyboard.press('Escape');
+  await s.page.keyboard.press('Escape');
+
+  // A press dragged out of the page and let go there still ends the move.
+  const fr = await s.page.locator('#frame').boundingBox(), t1 = await besideTitle();
+  await drag(t1, fr.x - 30 - t1.x, 20);
+  check('a move let go outside the page is kept and ends cleanly', shift(await s.content(), 'h1 id="t1"')[0] < 0 && !(await s.page.isVisible('#shield')));
+  await s.undo();
+
+  const sweepGroup = async () => {
+    const h = await box('#t1'), l = await box('p.lead');
+    await drag({ x: fr.x + fr.width * 0.6, y: l.y + l.height + 4 }, fr.x + 2 - (fr.x + fr.width * 0.6), h.y - 6 - (l.y + l.height + 4));
+    await pill().waitFor({ timeout: 3000 }).catch(() => {});
+  };
+  await sweepGroup();
+  check('sweep: a group of 2', /^2\b/.test(await s.page.textContent('#multi-count')));
+  const l0 = await box('p.lead');
+  await drag({ x: l0.x + 8, y: l0.y + 8 }, 50, 24);
+  c = await s.content();
+  const a = shift(c, 'h1 id="t1"'), b = shift(c, 'p class="lead"');
+  check('drag one of the group: both move by the same offset', a.length === 2 && a[0] > 0 && a[0] === b[0] && a[1] === b[1], `${a} / ${b}`);
+  check('the group stays selected after the move', /^2\b/.test(await s.page.textContent('#multi-count')) && (await pill().isVisible()));
+  await s.undo();
+  check('one undo puts the whole group back', (await s.content()) === original);
+
+  await sweepGroup();
+  await s.page.keyboard.press('ArrowRight');
+  await s.page.keyboard.press('Shift+ArrowDown');
+  c = await s.content();
+  check('arrows move the whole group', String(shift(c, 'h1 id="t1"')) === '1,10' && String(shift(c, 'p class="lead"')) === '1,10', `${shift(c, 'h1 id="t1"')} / ${shift(c, 'p class="lead"')}`);
+  await s.undo();
+  await s.undo();
+  c = await s.content();
+  check('each arrow is one undo step for the group', c === original, firstDiff(c, original));
+  await s.redo();
+  c = await s.content();
+  check('redo after group arrows: the first step back', String(shift(c, 'h1 id="t1"')) === '1,0' && String(shift(c, 'p class="lead"')) === '1,0', `${shift(c, 'h1 id="t1"')}`);
+  await s.undo();
+
+  await sweepGroup();
+  await s.clickText('p.lead');
+  await s.page.waitForTimeout(100);
+  check('a click on the words of a group member (no drag): the group goes, that text is edited', !(await pill().isVisible()) && (await editable('p.lead')));
+  await s.close();
+}
+
+async function liveSync(browser, url) {
+  section('live sync: an agent changes the file on disk, the editor follows');
+  const f = 'live.html';
+  fs.copyFileSync(path.join(WORK, 'deck.html'), path.join(WORK, f));
+  const original = disk(f);
+  const write = text => fs.writeFileSync(path.join(WORK, f), text);
+  const s = await new Session(browser, url).start();
+  await s.open(wpath(f));
+  // The frame itself (the same object across its reloads), to run code in it.
+  const ef = async () => (await s.page.$('#frame')).contentFrame();
+  const frameHas = async (text, ms = 6000) => (await ef()).waitForFunction(t => document.body.textContent.includes(t), text, { timeout: ms }).then(() => true).catch(() => false);
+  const activeThumb = () => s.page.evaluate(() => [...document.querySelectorAll('#filmstrip .thumb')].findIndex(t => t.classList.contains('active')));
+  await s.page.locator('#filmstrip .thumb').nth(1).click();
+  await s.page.waitForTimeout(200);
+
+  write(original.replace('Alpha title', 'Alpha title AGENT1'));
+  check('clean: the agent version is shown without F5', await frameHas('AGENT1'));
+  await s.page.waitForTimeout(300);
+  check('clean reload keeps the slide and leaves nothing unsaved', (await activeThumb()) === 1 && !(await s.dirty()), String(await activeThumb()));
+  check('clean reload: a short note says so', /agent/i.test(await s.page.textContent('#toast')), await s.page.textContent('#toast'));
+
+  // A block open for typing, nothing typed: the reload waits until the block is left.
+  await s.page.locator('#filmstrip .thumb').nth(0).click();
+  await s.select('#t1');
+  write(disk(f).replace('AGENT1', 'AGENT1b'));
+  await s.page.waitForTimeout(1500);
+  check('editing (nothing typed): no reload under the caret', !(await frameHas('AGENT1b', 200)) && (await s.frame.locator('#t1').evaluate(e => e.isContentEditable)));
+  await s.frame.locator('#t1').press('Escape');
+  check('left the block: the agent version comes in', await frameHas('AGENT1b'));
+
+  // The editor's own save is not taken for an agent's change.
+  await s.typeAtEnd('#t1', ' MINE');
+  await s.saveKey();
+  await s.waitSaved();
+  await (await ef()).evaluate(() => { window.__notReloaded = 1; });
+  await s.page.waitForTimeout(2000);
+  check('own save: no reload, no dialog', (await (await ef()).evaluate(() => window.__notReloaded)) === 1 && !(await s.page.isVisible('#modal-disk')));
+
+  // Unsaved edits here + a change on disk: ask, never drop either side.
+  await s.typeAtEnd('#t1', ' UNSAVED');
+  write(disk(f).replace('Alpha title', 'Alpha title AGENT2'));
+  await s.page.locator('#modal-disk.show').waitFor({ timeout: 6000 }).catch(() => {});
+  check('dirty: the blurred dialog asks, the page keeps my text', (await s.page.isVisible('#modal-disk')) && (await frameHas('UNSAVED', 500)) && !(await frameHas('AGENT2', 300)));
+  await s.page.click('#modal-disk [data-act="later"]');
+  check('Later: dialog gone, my edits kept, a red reminder in the status bar', !(await s.page.isVisible('#modal-disk')) && (await s.dirty()) && (await s.page.isVisible('#disk-stale')));
+  await s.page.click('#disk-stale');
+  const dl = s.page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
+  await s.page.click('#modal-disk [data-act="reload"]');
+  const mine = await dl;
+  check('take the agent version: mine is downloaded first', !!mine && /live\.html$/.test(mine?.suggestedFilename() || ''));
+  check('take the agent version: shown, nothing unsaved, no reminder', (await frameHas('AGENT2')) && !(await frameHas('UNSAVED', 300)) && !(await s.dirty()) && !(await s.page.isVisible('#disk-stale')));
+
+  // An agent marks notes in the sidecar: the list follows, the page is not reloaded.
+  await s.page.click('.rail-item[data-panel="review"]');
+  await (await ef()).evaluate(() => { window.__notReloaded = 1; });
+  fs.mkdirSync(path.join(WORK, '.htmldeck_notes'), { recursive: true });
+  fs.writeFileSync(path.join(WORK, '.htmldeck_notes', f + '.json'), JSON.stringify({ notes: [{ id: 'n1', note: 'Agent note', status: 'open', created: '2026-10-08T00:00:00Z', selector: '#t1', tag: 'h1', text: 'Alpha' }] }));
+  const listed = await s.page.waitForFunction(() => /1/.test(document.querySelector('#fb-filter').children[0].textContent), null, { timeout: 6000 }).then(() => true).catch(() => false);
+  check('notes sidecar changed: the feedback list follows without a reload', listed && (await (await ef()).evaluate(() => window.__notReloaded)) === 1, await s.page.textContent('#fb-filter'));
   await s.close();
 }
 
@@ -968,7 +1133,7 @@ async function mutating(browser, url) {
   await s.page.keyboard.type('X');
   check('script-generated node: not editable, not dirty, with the reason', !(await s.dirty()) && (await s.content()) === original && /script/i.test(await toastText()), await toastText());
 
-  await s.frame.locator('#counter').click();
+  await s.clickText('#counter');
   check('node whose text a script changed (count-up 42→0): no edit mode, with the reason', !(await editable('#counter')) && /changed this block/.test(await toastText()), await toastText());
   await s.page.keyboard.type('7');
   c = await s.content();
@@ -1676,7 +1841,7 @@ try {
   server = await startServer(['--test-hooks']);
   browser = await chromium.launch();
   if (!args.has('--real-only')) {
-    for (const scenario of [detection, moduleBurst, textColourHistory, modeSwitch, structural, svgDiagram, regionFeedback, feedbackAccess, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, motion, scenesSpec, remoteScriptsSpec, malformed, untrustedSpec, regressionsSpec, runtimeCssSpec]) {
+    for (const scenario of [detection, moduleBurst, textColourHistory, modeSwitch, structural, svgDiagram, dragMove, liveSync, regionFeedback, feedbackAccess, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, motion, scenesSpec, remoteScriptsSpec, malformed, untrustedSpec, regressionsSpec, runtimeCssSpec]) {
       try { await scenario(browser, server.url); }
       catch (e) { failures.push(`${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); console.log(`  ✖ ${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); }
     }

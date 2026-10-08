@@ -7,6 +7,7 @@ import { LAST_FILE_KEY, openServerFile, rerender } from './editor/document.mjs';
 import { S } from './editor/state.mjs';
 import { effectsVisible, renderFxList, stopFxPreview } from './features/effects.mjs';
 import { clearFeedback, loadAgentNotes } from './features/feedback/notes.mjs';
+import { watchSource } from './services/live-sync.mjs';
 import { flushRemoval, pinLoop, renderNoteList, renderPins } from './ui/feedback-view.mjs';
 import { runFind } from './features/find.mjs';
 import { exitCrop } from './features/images.mjs';
@@ -98,6 +99,7 @@ installHooks({
   togglePop,
   trackSection,
   updateChrome,
+  watchSource,
 });
 installPresentListeners();
 installFrameBridges();

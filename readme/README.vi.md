@@ -65,10 +65,10 @@ Cần Python 3.11+ (bản npm cần thêm Node.js 18+). Chạy trên Linux, macO
 
 **Với Claude Code hoặc Codex:**
 
-1. Nói *"mở deck của tôi trong HTML Deck"* (hoặc gõ `/htmldeck [file]` trong Claude Code).
+1. Nói *"mở deck của tôi trong HTML Deck"* (hoặc gõ `/htmldeck:open [file]` trong Claude Code).
 2. Tự sửa những gì bạn sửa được. Ghim ghi chú **AI Feedback** cho phần còn lại.
 3. Nói *"áp dụng các ghi chú HTML Deck của tôi"*. Agent sửa file và đánh dấu ghi chú đã xong.
-   Tải lại tài liệu trong HTML Deck để thấy thay đổi.
+   HTML Deck hiện bản mới ngay khi file thay đổi.
 
 **Dùng riêng**, trong thư mục chứa file của bạn:
 

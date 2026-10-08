@@ -66,10 +66,10 @@ Needs Python 3.11+ (the npm package also needs Node.js 18+). Linux, macOS and Wi
 
 **With Claude Code or Codex:**
 
-1. Say *"open my deck in HTML Deck"* (or type `/htmldeck [file]` in Claude Code).
+1. Say *"open my deck in HTML Deck"* (or type `/htmldeck:open [file]` in Claude Code).
 2. Edit what you can. Pin **AI Feedback** notes for the rest.
 3. Say *"apply my HTML Deck notes"*. The agent makes the changes and marks the notes done.
-   Reload the document in HTML Deck to see them.
+   HTML Deck shows the new version as soon as the file changes.
 
 **On its own**, in the folder with your files:
 

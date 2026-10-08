@@ -62,9 +62,9 @@ AI 也要重新读一遍很大的文件，既烧 token 又费时间，还可能�
 
 **配合 Claude Code 或 Codex：**
 
-1. 说 *"在 HTML Deck 中打开我的幻灯片"*（或在 Claude Code 中输入 `/htmldeck [file]`）。
+1. 说 *"在 HTML Deck 中打开我的幻灯片"*（或在 Claude Code 中输入 `/htmldeck:open [file]`）。
 2. 能改的自己改，其余的钉上 **AI Feedback** 备注。
-3. 说 *"处理我的 HTML Deck 备注"*。agent 会修改文件并把备注标记为完成。在 HTML Deck 中重新加载文档即可看到。
+3. 说 *"处理我的 HTML Deck 备注"*。agent 会修改文件并把备注标记为完成。HTML Deck 会在文件变更后立即显示新版本。
 
 **单独使用**，在存放文件的文件夹中：
 

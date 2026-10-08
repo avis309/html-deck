@@ -8,7 +8,8 @@ Serves the editor UI plus a small JSON API bound to 127.0.0.1:
 
 - ``GET  /api/config``    default document to open
 - ``GET  /api/list_html`` HTML files in the workspace
-- ``GET  /api/load``      document source + mtime (for conflict detection)
+- ``GET  /api/load``      document source + mtime and revision (for conflict detection)
+- ``GET  /api/watch``     server-sent events when the document or its notes change on disk
 - ``POST /api/preview``   stage the editor's render of a document next to its source,
   so relative assets and the page's own scripts resolve exactly as they do on disk
 - ``POST /api/save``      atomic write with a timestamped backup
@@ -32,6 +33,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import errno
+import hashlib
 import http.server
 import json
 import math
@@ -143,10 +145,27 @@ def list_html_files(root: Path) -> list[dict]:
     return files
 
 
+def revision(raw: bytes) -> str:
+    """What the editor and the watcher call a version of a file: a digest of its bytes."""
+    return hashlib.sha256(raw).hexdigest()[:16]
+
+
+def _snapshot(target: Path) -> tuple[bytes, os.stat_result]:
+    """The file's bytes with the stat of that same version (an agent may be writing it)."""
+    for _ in range(5):
+        before = target.stat()
+        raw = target.read_bytes()
+        after = target.stat()
+        if (before.st_mtime_ns, before.st_size) == (after.st_mtime_ns, after.st_size) == (after.st_mtime_ns, len(raw)):
+            return raw, after
+        time.sleep(0.05)
+    return raw, after
+
+
 def load_html(target: Path, root: Path) -> dict:
     if not target.is_file():
         raise EditorError(404, f"File not found: {display_path(target, root)}")
-    raw = target.read_bytes()
+    raw, st = _snapshot(target)
     try:
         content = raw.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
@@ -155,7 +174,8 @@ def load_html(target: Path, root: Path) -> dict:
         "path": display_path(target, root),
         "filename": target.name,
         "size": len(raw),
-        "mtime_ns": str(target.stat().st_mtime_ns),
+        "mtime_ns": str(st.st_mtime_ns),
+        "rev": revision(raw),
         "content": content,
     }
 
@@ -171,20 +191,26 @@ def _backup(target: Path, stamp: str) -> Path:
     return backup
 
 
-def save_html(target: Path, content: object, expected_mtime_ns: str | None, force: bool, root: Path) -> dict:
+def save_html(target: Path, content: object, expected_mtime_ns: str | None, force: bool, root: Path,
+              expected_rev: str | None = None) -> dict:
     """Atomically overwrite an existing HTML file, refusing if it changed since load."""
     if not isinstance(content, str) or not content.strip():
         raise EditorError(400, "Content is empty or invalid")
-    # The mtime check, backup and replace must be one step, or two tabs can both pass the check.
+    # The check, backup and replace must be one step, or two tabs can both pass the check.
     with SAVE_LOCK:
-        return _save_locked(target, content, expected_mtime_ns, force, root)
+        return _save_locked(target, content, expected_mtime_ns, force, root, expected_rev)
 
 
-def _save_locked(target: Path, content: str, expected_mtime_ns: str | None, force: bool, root: Path) -> dict:
+def _save_locked(target: Path, content: str, expected_mtime_ns: str | None, force: bool, root: Path,
+                 expected_rev: str | None = None) -> dict:
     if not target.is_file():
         raise EditorError(404, "Target file does not exist (the editor does not create files)")
-    current = str(target.stat().st_mtime_ns)
-    if expected_mtime_ns and not force and current != str(expected_mtime_ns):
+    # The revision catches a change that kept the mtime (a coarse clock, a copied file); the
+    # mtime is what an older editor sends.
+    if expected_rev and not force:
+        if revision(target.read_bytes()) != str(expected_rev):
+            raise EditorError(409, "The file was changed outside the editor since it was opened")
+    elif expected_mtime_ns and not force and str(target.stat().st_mtime_ns) != str(expected_mtime_ns):
         raise EditorError(409, "The file was changed outside the editor since it was opened")
 
     stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{time.time_ns() % 1_000_000:06d}"
@@ -193,20 +219,24 @@ def _save_locked(target: Path, content: str, expected_mtime_ns: str | None, forc
     # load_html hands the text over without its BOM: a file that had one keeps it.
     with open(target, "rb") as fh:
         bom = fh.read(3) == b"\xef\xbb\xbf"
+    data = (b"\xef\xbb\xbf" + content.removeprefix("\ufeff").encode("utf-8")) if bom else content.encode("utf-8")
     try:
-        with open(tmp, "w", encoding="utf-8-sig" if bom else "utf-8", newline="") as fh:
-            fh.write(content.removeprefix("\ufeff") if bom else content)
+        with open(tmp, "wb") as fh:
+            fh.write(data)
         shutil.copymode(target, tmp)
         _replace(tmp, target)
     finally:
         tmp.unlink(missing_ok=True)
 
+    # The revision of what this save wrote, not of the file read back: an agent writing right
+    # after would otherwise have its version taken for the editor's own.
     return {
         "success": True,
         "file": display_path(target, root),
         "backup": display_path(backup, root),
-        "bytes_written": target.stat().st_size,
+        "bytes_written": len(data),
         "mtime_ns": str(target.stat().st_mtime_ns),
+        "rev": revision(data),
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
 
@@ -436,6 +466,60 @@ def apply_note_ops(target: Path, ops: object, root: Path) -> dict:
     return {"success": True, "notes": notes, "notes_file": display_path(notes_path(target), root)}
 
 
+WATCH_POLL_S = 0.5
+WATCH_SETTLE_S = 0.4      # a file still being written keeps changing: report it once it rests
+WATCH_PING_S = 15.0
+WATCH_MAX = 32
+WATCH_SLOTS = threading.BoundedSemaphore(WATCH_MAX)
+
+
+def _signature(path: Path) -> tuple[int, int] | None:
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return st.st_mtime_ns, st.st_size
+
+
+class DocWatch:
+    """Changes on disk of one document and its notes sidecar, for one editor tab.
+
+    poll() returns the events due now: {"type": "doc", "rev", "mtime_ns"} once a changed
+    document has rested WATCH_SETTLE_S and its bytes differ from the revision the tab has
+    (its own save included), {"type": "notes"} likewise for the sidecar. A document that is
+    briefly missing (written as delete + create) is waited for, not reported."""
+
+    def __init__(self, target: Path, rev: str | None, clock=time.monotonic):
+        self.target, self.notes, self.rev, self.clock = target, notes_path(target), rev or None, clock
+        self.doc_sig, self.notes_sig = _signature(target), _signature(self.notes)
+        self.doc_since = self.notes_since = None
+        self.check_now = True   # the tab's revision may be stale already
+
+    def poll(self) -> list[dict]:
+        now, events = self.clock(), []
+        sig = _signature(self.target)
+        if sig != self.doc_sig:
+            self.doc_sig, self.doc_since = sig, now
+        elif sig and (self.check_now or (self.doc_since is not None and now - self.doc_since >= WATCH_SETTLE_S)):
+            try:
+                raw, st = _snapshot(self.target)
+            except OSError:
+                raw = None   # locked for a moment (Windows sharing): tried again next poll
+            if raw is not None:
+                self.doc_since, self.check_now = None, False
+                rev = revision(raw)
+                if rev != self.rev:
+                    self.rev = rev
+                    events.append({"type": "doc", "rev": rev, "mtime_ns": str(st.st_mtime_ns)})
+        nsig = _signature(self.notes)
+        if nsig != self.notes_sig:
+            self.notes_sig, self.notes_since = nsig, now
+        elif self.notes_since is not None and now - self.notes_since >= WATCH_SETTLE_S:
+            self.notes_since = None
+            events.append({"type": "notes"})
+        return events
+
+
 def preview_url(source: Path | None, root: Path) -> str:
     """URL for a staged preview that sits in the same directory as its source file."""
     rel_dir = ""
@@ -518,12 +602,16 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
             "/api/list_html": self._api_list_html,
             "/api/load": self._api_load,
             "/api/notes": self._api_notes_get,
+            "/api/watch": self._api_watch,
         }.get(parsed.path)
         if route:
             if not self._same_origin_fetch():
                 self._send_json({"error": "Only the editor may call the API"}, 403)
                 return
-            self._run_api(route, parsed)
+            if route == self._api_watch:
+                self._api_watch(parsed)
+            else:
+                self._run_api(route, parsed)
             return
         if parsed.path in ("/", "/index.html"):
             self.send_response(302)
@@ -626,6 +714,40 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
         target = resolve_html_path(req_path, self.root, self._allowed_extra())
         return load_html(target, self.root)
 
+    def _api_watch(self, parsed):
+        """Server-sent events while the tab keeps the stream open (see DocWatch)."""
+        query = urllib.parse.parse_qs(parsed.query)
+        try:
+            target = resolve_html_path(query.get("path", [None])[0], self.root, self._allowed_extra())
+        except EditorError as exc:
+            self._send_json({"error": str(exc)}, exc.status)
+            return
+        if not WATCH_SLOTS.acquire(blocking=False):
+            self._send_json({"error": "Too many open editor tabs"}, 503)
+            return
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(b"retry: 2000\n\n")
+            self.wfile.flush()
+            watch, pinged = DocWatch(target, query.get("rev", [None])[0]), time.monotonic()
+            while True:
+                for ev in watch.poll():
+                    kind = ev.pop("type")
+                    self.wfile.write(f"event: {kind}\ndata: {json.dumps(ev)}\n\n".encode())
+                    self.wfile.flush()
+                if time.monotonic() - pinged >= WATCH_PING_S:
+                    pinged = time.monotonic()
+                    self.wfile.write(b": ping\n\n")
+                    self.wfile.flush()
+                time.sleep(WATCH_POLL_S)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass
+        finally:
+            WATCH_SLOTS.release()
+
     def _read_json(self) -> dict:
         length = int(self.headers.get("Content-Length", 0))
         if length <= 0 or length > MAX_BODY_BYTES:
@@ -678,7 +800,8 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
     def _api_save(self, parsed):
         payload = self._read_json()
         target = resolve_html_path(payload.get("path"), self.root, self._allowed_extra())
-        return save_html(target, payload.get("content"), payload.get("mtime_ns"), bool(payload.get("force")), self.root)
+        return save_html(target, payload.get("content"), payload.get("mtime_ns"), bool(payload.get("force")), self.root,
+                         payload.get("rev"))
 
     def _api_export(self, parsed):
         payload = self._read_json()

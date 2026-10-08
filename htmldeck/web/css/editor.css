@@ -412,7 +412,6 @@ details.more[open] summary::before { content: '▾ '; }
 .note-card .nc-actions { display: flex; gap: 4px; margin-left: auto; }
 .note-card .nc-actions button { height: 26px; padding: 0 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
 .note-card .nc-actions button:hover { background: #fff; }
-.fb-copy { margin: 2px 0 12px; }
 .note-card .nc-x { margin-left: auto; flex: none; width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); }
 .note-card .nc-x:hover { background: #fde8e8; color: #c62828; }
 .note-card .nc-check { flex: none; width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); }
@@ -435,18 +434,12 @@ details.more[open] summary::before { content: '▾ '; }
 .toast.has-action { pointer-events: auto; display: flex; align-items: center; gap: 14px; }
 .toast .t-act { color: #ffb38a; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .fb-filter { margin-bottom: 10px; }
-.agent-more { margin-top: 14px; font-size: 12px; color: var(--muted); }
-.agent-more summary { cursor: pointer; font-weight: 600; }
 .note-card .nc-lost { font-size: 11px; font-weight: 700; color: #c62828; margin-top: 4px; }
 .note-card .nc-edit textarea { width: 100%; min-height: 64px; resize: vertical; border: 1px solid var(--accent); border-radius: 8px; padding: 6px 8px; outline: 0; line-height: 1.45; font: inherit; }
 .note-card .nc-edit .row { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
 .note-card .nc-edit .btn-primary { width: auto; height: 30px; padding: 0 12px; font-size: 12px; }
 .note-card .nc-edit .btn-soft { height: 30px; font-size: 12px; }
 .thumb .note-dot { position: absolute; left: 6px; top: 5px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px 9px 9px 3px; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 800; display: grid; place-items: center; border: 1.5px solid #fff; }
-.agent-cmd { display: flex; gap: 6px; align-items: center; margin: 4px 0 14px; padding: 8px 10px; border-radius: 8px; background: var(--hover); font: 500 11px/1.4 'JetBrains Mono', monospace; color: var(--ink-2); word-break: break-all; }
-.agent-cmd span { flex: 1; min-width: 0; }
-.agent-cmd .ac-shell { flex: none; font: 700 10px var(--ui); color: var(--ink-2); }
-.agent-cmd button { flex: none; height: 26px; padding: 0 8px; border-radius: 6px; background: #fff; font: 600 11px var(--ui); box-shadow: var(--shadow-sm); }
 .rail-item .badge-count { position: absolute; margin: -4px 0 0 26px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 800; display: grid; place-items: center; }
 .rail-item { position: relative; }
 
@@ -468,6 +461,13 @@ details.more[open] summary::before { content: '▾ '; }
 
 .sb-trust { color: var(--muted); }
 .sb-trust.on { color: #b42318; font-weight: 700; }
+.sb-stale { color: #fff; background: var(--danger); border-radius: 6px; padding: 0 8px; font-weight: 600; }
+/* An agent changed the file while edits are unsaved: the page goes out of focus behind one big choice. */
+.disk-bg { backdrop-filter: blur(10px); background: rgba(13,18,22,.35); }
+.disk-actions { display: flex; flex-direction: column; gap: 8px; padding: 4px 18px 18px; }
+.disk-actions .disk-reload { width: 100%; height: 52px; font-size: 16px; font-weight: 700; border-radius: 10px; }
+.disk-actions .btn-soft { height: 38px; }
+.disk-actions .link-btn { background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 4px; }
 
 /* presenting: a separate iframe over the stage; the edit iframe stays mounted underneath */
 .stage:fullscreen { background: #000; }

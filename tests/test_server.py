@@ -522,3 +522,117 @@ def test_server_listen_backlog_holds_a_burst_of_module_requests():
     finally:
         real.close()
     assert backlog == [128]
+
+
+# --- live sync: revisions and the watch stream --------------------------------------------
+
+def test_load_and_save_report_the_revision_of_the_bytes(root):
+    target = root / "output/deck/a.html"
+    loaded = ed.load_html(target, root)
+    assert loaded["rev"] == ed.revision(target.read_bytes())
+    saved = ed.save_html(target, "<p>b</p>", None, False, root, loaded["rev"])
+    assert saved["rev"] == ed.revision(target.read_bytes()) != loaded["rev"]
+
+
+def test_save_with_a_revision_catches_a_change_that_kept_the_mtime(root):
+    target = root / "output/deck/a.html"
+    loaded = ed.load_html(target, root)
+    st = target.stat()
+    target.write_text("<p>agent</p>", encoding="utf-8")
+    os.utime(target, ns=(st.st_atime_ns, st.st_mtime_ns))   # same mtime, other bytes
+    with pytest.raises(ed.EditorError) as exc:
+        ed.save_html(target, "<p>mine</p>", loaded["mtime_ns"], False, root, loaded["rev"])
+    assert exc.value.status == 409
+    assert target.read_text(encoding="utf-8") == "<p>agent</p>"
+
+
+class _Clock:
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+
+def _settle(watch, clock, rounds=3):
+    events = []
+    for _ in range(rounds):
+        clock.t += ed.WATCH_SETTLE_S + 0.01   # past it, whatever the float rounding
+        events += watch.poll()
+    return events
+
+
+def test_watch_reports_a_change_once_it_rests(root):
+    target, clock = root / "output/deck/a.html", _Clock()
+    watch = ed.DocWatch(target, ed.load_html(target, root)["rev"], clock)
+    assert _settle(watch, clock) == []
+    target.write_text("<p>agent 1</p>", encoding="utf-8")
+    assert watch.poll() == []   # just changed: may still be written
+    events = _settle(watch, clock)
+    assert [e["type"] for e in events] == ["doc"] and events[0]["rev"] == ed.revision(target.read_bytes())
+    assert _settle(watch, clock) == []
+
+
+def test_watch_tells_a_stale_tab_at_once_and_ignores_its_own_revision(root):
+    target, clock = root / "output/deck/a.html", _Clock()
+    old = ed.load_html(target, root)["rev"]
+    target.write_text("<p>agent</p>", encoding="utf-8")
+    assert [e["type"] for e in ed.DocWatch(target, old, clock).poll()] == ["doc"]   # first poll, no wait
+    current = ed.revision(target.read_bytes())
+    assert _settle(ed.DocWatch(target, current, clock), clock) == []
+
+
+def test_watch_waits_for_a_file_written_as_delete_and_create(root):
+    target, clock = root / "output/deck/a.html", _Clock()
+    watch = ed.DocWatch(target, ed.load_html(target, root)["rev"], clock)
+    _settle(watch, clock)
+    target.unlink()
+    assert _settle(watch, clock) == []
+    target.write_text("<p>new</p>", encoding="utf-8")
+    assert [e["type"] for e in _settle(watch, clock)] == ["doc"]
+
+
+def test_watch_reports_the_notes_sidecar(root):
+    target, clock = root / "output/deck/a.html", _Clock()
+    watch = ed.DocWatch(target, ed.load_html(target, root)["rev"], clock)
+    _settle(watch, clock)
+    ed.write_notes(target, [{"id": "n1", "note": "fix", "status": "open"}], root)
+    assert [e["type"] for e in _settle(watch, clock)] == ["notes"]
+
+
+def test_http_watch_streams_events_and_guards_the_path(server, root):
+    assert _request(server, "GET", "/api/watch?path=../x.html")[0] == 403
+    assert _request(server, "GET", "/api/watch?path=output/deck/a.html", headers={"Sec-Fetch-Site": "cross-site"})[0] == 403
+    conn = http.client.HTTPConnection("127.0.0.1", server, timeout=5)
+    conn.request("GET", "/api/watch?path=output/deck/a.html&rev=stale", headers={"Host": f"127.0.0.1:{server}", "Sec-Fetch-Site": "same-origin"})
+    res = conn.getresponse()
+    assert res.status == 200 and res.getheader("Content-Type").startswith("text/event-stream")
+    seen = b""
+    while b"event: doc" not in seen:
+        seen += res.fp.readline()
+    assert b'"rev"' in res.fp.readline()
+    conn.close()
+
+
+def test_watch_tries_again_when_the_file_is_locked_for_a_moment(root, monkeypatch):
+    target, clock = root / "output/deck/a.html", _Clock()
+    watch = ed.DocWatch(target, ed.load_html(target, root)["rev"], clock)
+    _settle(watch, clock)
+    target.write_text("<p>agent</p>", encoding="utf-8")
+    real, calls = ed._snapshot, []
+
+    def locked_once(path):
+        calls.append(path)
+        if len(calls) == 1:
+            raise PermissionError("sharing violation")
+        return real(path)
+    monkeypatch.setattr(ed, "_snapshot", locked_once)
+    assert [e["type"] for e in _settle(watch, clock)] == ["doc"] and len(calls) == 2
+
+
+def test_save_reports_the_revision_of_what_it_wrote(root):
+    target = root / "output/deck/a.html"
+    target.write_bytes(b"\xef\xbb\xbf<p>bom</p>")
+    loaded = ed.load_html(target, root)
+    saved = ed.save_html(target, "<p>new</p>", None, False, root, loaded["rev"])
+    assert saved["rev"] == ed.revision(b"\xef\xbb\xbf<p>new</p>") == ed.revision(target.read_bytes())

@@ -54,8 +54,6 @@ export function noteTarget(note) {
 export function clearFeedback() {
   hooks.flushRemoval();
   S.agentNotes = [];
-  S.notesCmds = [];
-  renderAgentCmds();
   hooks.renderNoteList();
   hooks.renderPins();
 }
@@ -67,10 +65,21 @@ export async function loadAgentNotes() {
       const res = await api(`/api/notes?path=${encodeURIComponent(src.path)}`);
       if (token !== S.loadToken) return;
       S.agentNotes = res.notes || [];
-      S.notesCmds = res.commands || [];
     } catch (e) { if (token === S.loadToken) toast('Cannot read feedback: ' + e.message, { err: true }); }
   }
-  renderAgentCmds();
+  hooks.renderNoteList();
+  hooks.renderPins();
+}
+// The sidecar changed on disk (an agent marked notes done): show the list again, leaving a note
+// being written, and one being removed (its request answers with the list), as they are.
+export async function refreshAgentNotes() {
+  const token = S.loadToken, src = S.source;
+  if (src?.kind !== 'server' || S.removing) return;
+  try {
+    const res = await api(`/api/notes?path=${encodeURIComponent(src.path)}`);
+    if (token !== S.loadToken || S.removing) return;
+    S.agentNotes = res.notes || [];
+  } catch { return; }
   hooks.renderNoteList();
   hooks.renderPins();
 }
@@ -86,7 +95,6 @@ export async function noteOps(ops) {
     const res = await postJSON('/api/notes', { path: src.path, ops });
     if (token !== S.loadToken) return null;
     S.agentNotes = res.notes || [];
-    if (res.commands) { S.notesCmds = res.commands; renderAgentCmds(); }
     ok = true;
   } catch (e) {
     if (token !== S.loadToken) return null;
@@ -132,32 +140,6 @@ export function reanchorNotes(before) {
     if (Object.keys(patch).length) ops.push({ op: 'update', id: n.id, patch });
   }
   if (ops.length) noteOps(ops);
-}
-// Built by the server (notes_commands): this Python and this copy of htmldeck by absolute path,
-// with the workspace, quoted per shell — on Windows one for PowerShell and one for Git Bash.
-export const agentCmdLines = (suffix = '') => (S.notesCmds || []).map(c => (c.shell ? c.shell + ': ' : '') + c.command + suffix);
-export function renderAgentCmds() {
-  const box = $('#agent-cmds');
-  if (!box) return;
-  box.textContent = '';
-  const row = text => {
-    const r = document.createElement('div');
-    r.className = 'agent-cmd';
-    const span = document.createElement('span');
-    span.textContent = text;
-    r.appendChild(span);
-    return box.appendChild(r);
-  };
-  if (S.source?.kind !== 'server') return void row(t('note_workspace_only'));
-  if (!S.notesCmds?.length) return void row('—');
-  for (const c of S.notesCmds) {
-    const r = row(c.command);
-    if (c.shell) r.insertAdjacentHTML('afterbegin', '<b class="ac-shell"></b>'), r.firstChild.textContent = c.shell;
-    const b = document.createElement('button');
-    b.textContent = t('copy_btn');
-    b.addEventListener('click', () => navigator.clipboard?.writeText(c.command).then(() => toast('Command copied')));
-    r.appendChild(b);
-  }
 }
 // target: the selected block, or a whole slide / report section pinned from the panel.
 // region: { region, canvas, targets } of an area on `target` (see feedbackMulti).
