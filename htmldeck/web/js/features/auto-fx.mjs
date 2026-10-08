@@ -45,6 +45,9 @@ export function planAutoFx(scope) {
   if (!scope || !api) return [];
   // A slide (or an ancestor) that already moves covers everything in it.
   const plan = [], covered = scope.closest('[data-fx]') ? [scope] : [];
+  // Delays count within what the runtime reveals at once: the slide in a deck; on a page each
+  // section / .slide (or the block itself) as it scrolls in.
+  const steps = new Map(), part = n => S.mode === 'deck' ? scope : n.closest('section, .slide') || n;
   for (const n of scope.querySelectorAll('*')) {
     if (plan.length >= MAX_BLOCKS) break;
     if (!isOriginal(n) || !n.getClientRects().length) continue;
@@ -53,7 +56,8 @@ export function planAutoFx(scope) {
     if (n.hasAttribute('data-fx')) { covered.push(n); continue; }
     const fx = pick(n, under, api);
     if (!fx || fxBlock(n, fx['data-fx'])) continue;
-    const delay = Math.min(plan.length * STEP, MAX_DELAY);
+    const key = part(n), k = steps.get(key) || 0, delay = Math.min(k * STEP, MAX_DELAY);
+    steps.set(key, k + 1);
     plan.push({ node: n, attrs: { 'data-fx': fx['data-fx'], 'data-fx-delay': delay ? String(delay) : null, 'data-fx-stagger': fx['data-fx-stagger'] || null } });
     if (fx['data-fx'] !== 'count-up') covered.push(n);
   }

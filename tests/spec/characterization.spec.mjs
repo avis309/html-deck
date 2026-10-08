@@ -1581,6 +1581,20 @@ async function fxModules(browser, url) {
     check(`${ff}: nothing assigned, says so`, cc === disk(ff) && /Nothing/.test(await t.page.textContent('#toast')), firstDiff(cc, disk(ff)));
     await t.close();
   }
+  section('FX modules: Animate this page restarts delays in every part revealed on its own');
+  {
+    const t = await new Session(browser, url).start();
+    await t.open(wpath('fx-auto-page.html'));
+    await t.page.click('.rail-item[data-panel="effects"]');
+    await t.page.click('#fx-auto');
+    const pc = await t.content();
+    const tag = id => pc.match(new RegExp(`<[a-z0-9]+ id="${id}"[^>]*>`))?.[0] || '';
+    check('page: each section starts at no delay, its next block +120; loose blocks no delay',
+      !/delay/.test(tag('p-a')) && /data-fx-delay="120"/.test(tag('p-a2')) && !/delay/.test(tag('p-b')) && /data-fx-delay="120"/.test(tag('p-b2')) &&
+      !/delay/.test(tag('p-loose1')) && !/delay/.test(tag('p-loose2')) && /data-fx=/.test(tag('p-loose2')),
+      ['p-a', 'p-a2', 'p-b', 'p-b2', 'p-loose1', 'p-loose2'].map(tag).join(' '));
+    await t.close();
+  }
   section('FX modules: v2 runtime + v3 preset hint');
   const f = 'fx-modules.html';
   const s = await new Session(browser, url).start();
