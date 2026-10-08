@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<!-- FX modules fixture: a deck using a v3 preset while carrying a v2 runtime block -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FX modules fixture</title>
+<style>
+  body { margin: 0; }
+  .slide { width: 1280px; height: 720px; background: #fff; position: relative; }
+  .kpis { display: flex; gap: 20px; }
+  .kpi { width: 200px; }
+  .bar { display: block; height: 10px; width: 60%; background: #f60; }
+</style>
+</head>
+<body>
+<main class="deck">
+  <section class="slide">
+    <h1 id="m-title">Quarter in numbers</h1>
+    <div class="kpis" id="m-kpis">
+      <div class="kpi"><p id="m-n1">1250</p></div>
+      <div class="kpi"><p id="m-n2">48%</p></div>
+      <div class="kpi"><p id="m-n3">3.2x</p></div>
+    </div>
+    <svg id="m-chart" width="300" height="120" viewBox="0 0 300 120"><path d="M0 100 L100 60 L200 80 L300 20" fill="none" stroke="#333" stroke-width="3"/></svg>
+    <p id="m-text">Growth came from social video.</p>
+    <p id="m-done" data-fx="pop">Already animated</p>
+    <div id="m-scene" data-fx-scene="ticker"><p>Scene text</p></div>
+  </section>
+  <section class="slide">
+    <p id="m-plain">Plain words</p>
+    <span class="bar" id="m-bar"></span>
+  </section>
+</main>
+<script data-htmldeck-fx="2">/* stand-in for an FX v2 runtime block */</script>
+</body>
+</html>

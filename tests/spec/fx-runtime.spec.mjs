@@ -83,6 +83,10 @@ async function api(browser) {
   check('check: fade-up → null, unknown preset → "unknown"', r.fade === null && r.nope === 'unknown', JSON.stringify(r));
   check('catalog: the five v2 presets with categories',
     ['fade-in', 'fade-up', 'zoom-in', 'slide-left', 'count-up'].every(n => r.cat.some(p => p.name === n && p.category)), JSON.stringify(r.cat));
+  const unknown = await open(browser, '<section id="s"><p id="u" data-fx="from-the-future">later</p></section>');
+  await show(unknown.pg, '#s');
+  check('unknown preset (a newer file in an older runtime): shown as authored, not hidden', await unknown.pg.evaluate(() => !document.querySelector('#u').classList.contains('fx-wait') && !document.querySelector('#u').getAnimations().length));
+  await unknown.ctx.close();
   await ctx.close();
 }
 

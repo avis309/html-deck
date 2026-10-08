@@ -1,6 +1,6 @@
 // Effects (data-fx): picker, preview, document script.
 import { $, $$, escapeHTML, fmtSize } from '../core/utils.mjs';
-import { FX_VERSION, fxRuntime, fxScriptSource } from '../fx/runtime.mjs';
+import { FX_PRESETS_BY_VERSION, FX_VERSION, fxRuntime, fxScriptSource } from '../fx/runtime.mjs';
 import { S, el, formatFlags } from '../editor/state.mjs';
 import { deselect, select } from '../editor/selection.mjs';
 import { doRemove, nodeRefs, setAttrs } from '../core/operations.mjs';
@@ -119,8 +119,12 @@ export function renderFxDoc() {
   const box = $('#fx-doc'), script = fxScriptEl(), used = !!S.model?.querySelector('[data-fx]');
   box.hidden = !script && !used;
   if (box.hidden) return;
-  const old = script && script.getAttribute('data-htmldeck-fx') !== String(FX_VERSION);
-  $('#fx-doc-state').textContent = t(!script ? 'fx_doc_off' : old ? 'fx_doc_old' : 'fx_doc_on');
+  const ver = script ? +script.getAttribute('data-htmldeck-fx') : 0;
+  const old = script && ver !== FX_VERSION;
+  // Present always runs the current runtime; the file's own copy may not know a preset it uses.
+  const known = FX_PRESETS_BY_VERSION[ver] || [];
+  const stale = old && [...S.model.querySelectorAll('[data-fx]')].some(n => !known.includes(n.getAttribute('data-fx')));
+  $('#fx-doc-state').textContent = t(!script ? 'fx_doc_off' : stale ? 'fx_doc_stale' : old ? 'fx_doc_old' : 'fx_doc_on');
   const b = $('#fx-doc-btn');
   b.textContent = t(!script ? 'fx_enable' : old ? 'fx_update' : 'fx_disable');
   b.dataset.act = !script ? 'enable' : old ? 'update' : 'disable';

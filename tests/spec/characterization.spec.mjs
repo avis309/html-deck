@@ -1557,6 +1557,20 @@ async function effects(browser, url) {
   await s.close();
 }
 
+// FX modules: version mismatch hint, picker by category, "Animate this slide".
+async function fxModules(browser, url) {
+  section('FX modules: v2 runtime + v3 preset hint');
+  const f = 'fx-modules.html';
+  const s = await new Session(browser, url).start();
+  await s.open(wpath(f));
+  await s.frame.locator('#m-done').click({ modifiers: ['Alt'] });
+  await s.page.click('#tb-fx');
+  const state = await s.page.textContent('#fx-doc-state');
+  check('v2 runtime in the file, v3 preset used: the popover asks for Update FX', /Update FX/.test(state), state);
+  await s.page.keyboard.press('Escape');
+  await s.close();
+}
+
 // Edit mode shows motion in its end state; presenting plays it.
 async function motion(browser, url) {
   section('the edit view freezes motion (CSS, transitions, WAAPI); presenting still runs it');
@@ -1841,7 +1855,7 @@ try {
   server = await startServer(['--test-hooks']);
   browser = await chromium.launch();
   if (!args.has('--real-only')) {
-    for (const scenario of [detection, moduleBurst, textColourHistory, modeSwitch, structural, svgDiagram, dragMove, liveSync, regionFeedback, feedbackAccess, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, motion, scenesSpec, remoteScriptsSpec, malformed, untrustedSpec, regressionsSpec, runtimeCssSpec]) {
+    for (const scenario of [detection, moduleBurst, textColourHistory, modeSwitch, structural, svgDiagram, dragMove, liveSync, regionFeedback, feedbackAccess, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, fxModules, motion, scenesSpec, remoteScriptsSpec, malformed, untrustedSpec, regressionsSpec, runtimeCssSpec]) {
       try { await scenario(browser, server.url); }
       catch (e) { failures.push(`${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); console.log(`  ✖ ${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); }
     }

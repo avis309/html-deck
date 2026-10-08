@@ -9,10 +9,14 @@
 // `fx-on` on <html>, `fx-wait` on targets waiting to play, and count-up text while it counts —
 // all undone by settle()/dispose(). It never runs in the editor's edit frame.
 
-export const FX_VERSION = 2;
+export const FX_VERSION = 3;
 // Presets each runtime version knows: a file carrying an older runtime ignores newer ones (the
 // element then simply shows as authored).
-export const FX_PRESETS_BY_VERSION = { 2: ['fade-in', 'fade-up', 'zoom-in', 'slide-left', 'count-up'] };
+var V2 = ['fade-in', 'fade-up', 'zoom-in', 'slide-left', 'count-up'];
+export const FX_PRESETS_BY_VERSION = {
+  2: V2,
+  3: V2.concat(['fade-down', 'slide-right', 'zoom-out', 'blur-in', 'pop', 'grow-x', 'grow-y', 'draw', 'spin', 'float', 'pulse']),
+};
 
 export function fxRuntime(win, opts) {
   opts = opts || {};
@@ -375,7 +379,7 @@ export function fxRuntime(win, opts) {
     return { m: m, delay: c.delay, dur: c.dur, stagger: c.m.previewAs ? 0 : c.stagger, preview: true };
   }
   var api = {
-    version: 2,
+    version: 3,
     parseCount: parseCount,
     presets: Object.keys(MODULES),
     // Editor: why preset `name` cannot run on el (null when it can), and the module list.
