@@ -10,18 +10,25 @@
 // all undone by settle()/dispose(). It never runs in the editor's edit frame.
 
 export const FX_VERSION = 2;
-export const FX_PRESETS = ['fade-in', 'fade-up', 'zoom-in', 'slide-left', 'count-up'];
+// Presets each runtime version knows: a file carrying an older runtime ignores newer ones (the
+// element then simply shows as authored).
+export const FX_PRESETS_BY_VERSION = { 2: ['fade-in', 'fade-up', 'zoom-in', 'slide-left', 'count-up'] };
 
 export function fxRuntime(win, opts) {
   opts = opts || {};
   var doc = win.document, root = doc.documentElement;
-  var PRESETS = {
-    'fade-in': { opacity: true, from: null },
-    'fade-up': { opacity: true, from: 'translateY(40px)' },
-    'zoom-in': { opacity: true, from: 'scale(0.85)' },
-    'slide-left': { opacity: true, from: 'translateX(60px)' },
-    'count-up': { opacity: false, from: null, count: true },
-  };
+  var EASE = 'cubic-bezier(.16,1,.3,1)';
+  // ---- modules: data-fx value → { category, waits (hidden until played), dur (default ms),
+  // from / opacity / filter / ease (entrances), single (never staggers its children),
+  // previewAs (preset its editor preview plays), why + applies(el) (where it can run),
+  // targets(el, c) (what animates), play(target, i, c, run) }. Every module plays through `run`.
+  var MODULES = {};
+  function mod(name, m) { m.name = name; m.dur = m.dur || 700; MODULES[name] = m; }
+  function entrance(from, extra) {
+    var m = { category: 'enter', waits: true, opacity: true, from: from, play: playEnter };
+    for (var k in extra || {}) m[k] = extra[k];
+    return m;
+  }
 
   // One number with an unambiguous format, the rest of the text kept verbatim.
   // → { pre, post, value, decimals, group, dec } | null
@@ -63,18 +70,30 @@ export function fxRuntime(win, opts) {
     for (var c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) texts.push(c); else if (c.nodeType !== 8) return null;
     return texts.length === 1 && parseCount(texts[0].nodeValue) ? texts[0] : null;
   }
+  mod('fade-in', entrance(null));
+  mod('fade-up', entrance('translateY(40px)'));
+  mod('zoom-in', entrance('scale(0.85)'));
+  mod('slide-left', entrance('translateX(60px)'));
+  mod('count-up', { category: 'data', waits: false, single: true, previewAs: 'fade-in', why: 'count', applies: function (el) { return !!countNode(el); }, play: playCount });
   function num(v, d) { var n = parseFloat(v); return isFinite(n) && n >= 0 ? n : d; }
   function config(el) {
-    var p = PRESETS[el.getAttribute('data-fx')];
-    if (!p) return null;
-    return { p: p, delay: num(el.getAttribute('data-fx-delay'), 0), dur: num(el.getAttribute('data-fx-dur'), 700), stagger: num(el.getAttribute('data-fx-stagger'), 0) };
+    var m = MODULES[el.getAttribute('data-fx')];
+    if (!m) return null;
+    return { m: m, delay: num(el.getAttribute('data-fx-delay'), 0), dur: num(el.getAttribute('data-fx-dur'), m.dur), stagger: num(el.getAttribute('data-fx-stagger'), 0) };
   }
+  // Why module m cannot run on el (its `why` key), or null.
+  function refusal(el, m) { return m.applies && !m.applies(el) ? (m.why || 'bad') : null; }
+  // el's effect when it can run here, else null.
+  function usable(el) { var c = config(el); return c && !revealOwned(el) && !refusal(el, c.m) ? c : null; }
   // Elements Reveal animates itself: opacity/transform there belong to Reveal.
   function revealOwned(el) {
     return !!(el.closest('.fragment') || el.querySelector('.fragment') ||
       (el.closest('section[data-auto-animate]') && (el.closest('[data-id]') || el.querySelector('[data-id]'))));
   }
-  function targets(el, c) { return c.stagger > 0 && !c.p.count ? Array.prototype.slice.call(el.children) : [el]; }
+  function targets(el, c) {
+    if (c.m.targets) return c.m.targets(el, c);
+    return c.stagger > 0 && !c.m.single ? Array.prototype.slice.call(el.children) : [el];
+  }
   var reduce = !!(win.matchMedia && win.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   // ---- state
@@ -86,6 +105,19 @@ export function fxRuntime(win, opts) {
     if (scope) runs.set(scope, (runs.get(scope) || 0) + 1); else runs.clear();
     anims.forEach(function (a) { var t = a.effect && a.effect.target; if (!scope || (t && scope.contains(t))) { a.cancel(); anims.delete(a); } });
     texts.forEach(function (orig, node) { if (!scope || scope.contains(node)) { node.nodeValue = orig; texts.delete(node); } });
+  }
+  // What a module plays through: every animation, frame and text change it makes is tracked
+  // here, so stop / replay / settle / dispose / preview undo all of it the same way.
+  function runner(scope, t) {
+    return {
+      alive: function () { return !disposed && (runs.get(scope) || 0) === t; },
+      show: function (el) { el.classList.remove('fx-wait'); },
+      animate: function (el, frames, o) { return track(el.animate(frames, o)); },
+      raf: function (fn) { var id = win.requestAnimationFrame(function (now) { rafs.delete(id); fn(now); }); rafs.add(id); },
+      text: function (node, value) { if (!texts.has(node)) texts.set(node, node.nodeValue); node.nodeValue = value; },
+      done: function (node) { if (texts.has(node)) { node.nodeValue = texts.get(node); texts.delete(node); } },
+      owns: function (node) { return texts.has(node); },
+    };
   }
 
   // ---- scenes: author code per scope (registerScene). The runtime owns their lifecycle: it
@@ -150,39 +182,45 @@ export function fxRuntime(win, opts) {
     active.forEach(function (scope) { sceneEls(scope).forEach(function (n) { if (sceneDefsFor(n).indexOf(d) >= 0) startScenes(n); }); });
   }
 
-  // Play the effects inside `scope` (a slide / section / element). Returns the run token.
+  // Entrances: shown first, then measured, so the author's opacity / filter (not the waiting
+  // state's) is the end value; same task as animate(), so nothing is painted in between.
+  function playEnter(target, i, c, run) {
+    var m = c.m, delay = c.delay + i * c.stagger, ease = m.ease || EASE, cs;
+    run.show(target);
+    var frames = [{}, {}];
+    if (m.opacity || m.filter) cs = win.getComputedStyle(target);
+    if (m.opacity) { frames[0].opacity = 0; frames[1].opacity = cs.opacity; }
+    if (m.filter) { frames[0].filter = m.filter; frames[1].filter = cs.filter; }
+    run.animate(target, frames, { duration: c.dur, delay: delay, easing: ease, fill: 'backwards' });
+    if (m.from) run.animate(target, [{ transform: m.from }, { transform: 'none' }], { duration: c.dur, delay: delay, easing: ease, fill: 'backwards', composite: 'add' });
+  }
+  function playCount(target, i, c, run) {
+    var node = countNode(target);
+    run.show(target);
+    if (!node) return;
+    var spec = parseCount(node.nodeValue), delay = c.delay + i * c.stagger, t0 = null;
+    run.text(node, formatCount(spec, 0));
+    run.raf(function step(now) {
+      if (!run.alive() || !run.owns(node)) return;
+      if (t0 === null) t0 = now + delay;
+      var k = Math.min(1, Math.max(0, (now - t0) / c.dur)), e = 1 - Math.pow(1 - k, 3);
+      if (k >= 1) { run.done(node); return; }
+      node.nodeValue = formatCount(spec, spec.value * e);
+      run.raf(step);
+    });
+  }
+  // Play el's effect inside `scope` under run token t. A module that throws leaves its target
+  // visible as authored; the rest of the scope keeps playing.
+  var failed = {};
   function play(el, c, scope, t) {
-    var list = targets(el, c);
-    list.forEach(function (target, i) {
-      var delay = c.delay + i * c.stagger;
-      if (c.p.count) {
-        var node = countNode(target);
-        if (!node) { target.classList.remove('fx-wait'); return; }
-        var spec = parseCount(node.nodeValue), orig = node.nodeValue, start = 0;
-        texts.set(node, orig);
-        node.nodeValue = formatCount(spec, 0);
+    var run = runner(scope, t);
+    targets(el, c).forEach(function (target, i) {
+      if (!target) return;
+      try { c.m.play(target, i, c, run); }
+      catch (e) {
         target.classList.remove('fx-wait');
-        var t0 = null;
-        var step = function (now) {
-          rafs.delete(id);
-          if (disposed || (runs.get(scope) || 0) !== t || !texts.has(node)) return;
-          if (t0 === null) t0 = now + delay;
-          var k = Math.min(1, Math.max(0, (now - t0) / c.dur)), e = 1 - Math.pow(1 - k, 3);
-          node.nodeValue = k >= 1 ? orig : formatCount(spec, start + (spec.value - start) * e);
-          if (k >= 1) { texts.delete(node); return; }
-          id = win.requestAnimationFrame(step); rafs.add(id);
-        };
-        var id = win.requestAnimationFrame(step); rafs.add(id);
-        return;
+        if (!failed[c.m.name] && win.console) { failed[c.m.name] = true; win.console.error('HtmlDeck FX "' + c.m.name + '":', e); }
       }
-      // Shown first, then measured: the author's opacity (not the waiting state's 0) is the
-      // end value. Same task as animate(), so nothing is painted in between.
-      target.classList.remove('fx-wait');
-      var frames = [{}, {}];
-      if (c.p.opacity) { frames[0].opacity = 0; frames[1].opacity = win.getComputedStyle(target).opacity; }
-      var a = target.animate(frames, { duration: c.dur, delay: delay, easing: 'cubic-bezier(.16,1,.3,1)', fill: 'backwards' });
-      track(a);
-      if (c.p.from) track(target.animate([{ transform: c.p.from }, { transform: 'none' }], { duration: c.dur, delay: delay, easing: 'cubic-bezier(.16,1,.3,1)', fill: 'backwards', composite: 'add' }));
     });
   }
   function fxIn(scope) {
@@ -191,10 +229,8 @@ export function fxRuntime(win, opts) {
   }
   function prepare(scope) {
     fxIn(scope).forEach(function (el) {
-      var c = config(el);
-      if (!c || revealOwned(el)) return;
-      if (c.p.count && !countNode(el)) return;
-      if (c.p.opacity) targets(el, c).forEach(function (t) { t.classList.add('fx-wait'); });
+      var c = usable(el);
+      if (c && c.m.waits) targets(el, c).forEach(function (t) { if (t) t.classList.add('fx-wait'); });
     });
   }
   function activate(scope) {
@@ -203,11 +239,7 @@ export function fxRuntime(win, opts) {
     active.add(scope);
     var t = runs.get(scope) || 0;
     if (reduce) return;
-    fxIn(scope).forEach(function (el) {
-      var c = config(el);
-      if (!c || revealOwned(el) || (c.p.count && !countNode(el))) return;
-      play(el, c, scope, t);
-    });
+    fxIn(scope).forEach(function (el) { var c = usable(el); if (c) play(el, c, scope, t); });
     sceneEls(scope).forEach(startScenes);
   }
   // Leaving a scope: cancel and re-arm, so it plays again next time.
@@ -255,10 +287,19 @@ export function fxRuntime(win, opts) {
   }
   function settleScopes() { sceneRuns.forEach(function (r, el) { stopScene(el); }); active.forEach(function (s) { stop(s); }); active.clear(); settle(); }
 
+  // Editor previews never write the DOM: a count-up previews as a fade (its text is what the
+  // editor is editing); loops play 2 short iterations.
+  function forPreview(c) {
+    var m = c.m.previewAs ? MODULES[c.m.previewAs] : c.m;
+    return { m: m, delay: c.delay, dur: c.dur, stagger: c.m.previewAs ? 0 : c.stagger, preview: true };
+  }
   var api = {
     version: 2,
     parseCount: parseCount,
-    presets: Object.keys(PRESETS),
+    presets: Object.keys(MODULES),
+    // Editor: why preset `name` cannot run on el (null when it can), and the module list.
+    check: function (el, name) { var m = MODULES[name]; return m ? refusal(el, m) : 'unknown'; },
+    catalog: function () { return Object.keys(MODULES).map(function (n) { return { name: n, category: MODULES[n].category }; }); },
     // Present bootstraps drive the slides themselves.
     control: function () { if (io) { io.disconnect(); io = null; } if (revealHooks) { revealHooks(); revealHooks = null; } return api; },
     show: activeOnly,
@@ -278,22 +319,16 @@ export function fxRuntime(win, opts) {
     // the DOM: a count-up previews as a fade (its text is what the editor is editing).
     preview: function (el) {
       api.stopPreview();
-      var c = config(el);
+      var c = usable(el);
       if (!c || reduce) return;
-      if (c.p.count) c = { p: PRESETS['fade-in'], delay: c.delay, dur: c.dur, stagger: 0 };
-      play(el, c, el, runs.get(el) || 0);
+      play(el, forPreview(c), el, runs.get(el) || 0);
     },
     stopPreview: function () { stop(null); settle(); },
     // Every data-fx inside a scope at once (the effects panel's "preview slide").
     previewAll: function (scope) {
       api.stopPreview();
       if (reduce || !scope) return;
-      fxIn(scope).forEach(function (el) {
-        var c = config(el);
-        if (!c || revealOwned(el)) return;
-        if (c.p.count) c = { p: PRESETS['fade-in'], delay: c.delay, dur: c.dur, stagger: 0 };
-        play(el, c, scope, runs.get(scope) || 0);
-      });
+      fxIn(scope).forEach(function (el) { var c = usable(el); if (c) play(el, forPreview(c), scope, runs.get(scope) || 0); });
     },
   };
   if (opts.preview) return api;
