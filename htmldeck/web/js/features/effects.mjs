@@ -20,10 +20,33 @@ import { pushOp } from '../editor/history.mjs';
 export function fxApi() { return S.win ? (S.fxPreview ||= fxRuntime(S.win, { preview: true })) : null; }
 export function stopFxPreview() { S.fxPreview?.stopPreview(); }
 export const FX_ATTRS = ['data-fx', 'data-fx-delay', 'data-fx-dur', 'data-fx-stagger'];
+// The picker: presets by category, from the runtime's own catalog (same code the file runs).
+const FX_CATS = ['enter', 'emphasis', 'data', 'loop'];
+const FX_LABELS = {
+  'fade-in': 'Fade in', 'fade-up': 'Fade up', 'fade-down': 'Fade down', 'zoom-in': 'Zoom in', 'zoom-out': 'Zoom out',
+  'slide-left': 'Slide left', 'slide-right': 'Slide right', 'blur-in': 'Blur in', 'pop': 'Pop', 'count-up': 'Count up',
+  'grow-x': 'Grow →', 'grow-y': 'Grow ↑', 'draw': 'Draw lines', 'spin': 'Spin', 'float': 'Float', 'pulse': 'Pulse',
+};
+// Runtime refusal → the i18n key that explains it.
+export const FX_WHY = { count: 'fx_count_bad', draw: 'fx_bad_draw', inline: 'fx_bad_inline', filter: 'fx_bad_filter', transform: 'fx_bad_transform' };
+let fxCatalog = null;
+export function renderFxPresets() {
+  const sel = $('#fx-preset'), keep = sel.value;
+  fxCatalog ||= fxRuntime(window, { preview: true }).catalog();
+  sel.replaceChildren(new Option(t('fx_none'), ''));
+  for (const cat of FX_CATS) {
+    const g = document.createElement('optgroup');
+    g.label = t('fx_cat_' + cat);
+    for (const p of fxCatalog.filter(p => p.category === cat)) g.appendChild(new Option(FX_LABELS[p.name] || p.name, p.name));
+    sel.appendChild(g);
+  }
+  sel.value = keep;
+}
 export function fxBlock(node, preset) {
   const block = S.readOnly || structureBlock(provenanceOf(node)) || formatBlock('fx', formatFlags(node));
   if (block) return block;
-  if (preset === 'count-up' && (node.children.length || !fxApi()?.parseCount(node.textContent))) return 'fx_count_bad';
+  const why = preset && fxApi()?.check(node, preset);
+  if (why) return FX_WHY[why] || 'fx_bad_draw';
   return null;
 }
 export function openFxPop(btn) {
@@ -34,6 +57,13 @@ export function openFxPop(btn) {
   $('#fx-delay').value = m?.getAttribute('data-fx-delay') || '';
   $('#fx-dur').value = m?.getAttribute('data-fx-dur') || '';
   $('#fx-stagger').value = m?.getAttribute('data-fx-stagger') || '';
+  // Presets that cannot run on this block stay listed, disabled, with the reason as title.
+  const cur = $('#fx-preset').value, api = fxApi();
+  for (const o of $$('#fx-preset option')) {
+    const why = o.value && api ? api.check(S.sel, o.value) : null;
+    o.disabled = !!why && o.value !== cur;
+    o.title = why ? t(FX_WHY[why] || 'fx_bad_draw') : '';
+  }
   renderFxDoc();
 }
 export function applyFx() {

@@ -5,7 +5,7 @@ import { PAGE_W_KEY, applyPageWidth } from './chrome.mjs';
 import { addNoteFromPop, feedbackMulti, openNotePop } from '../features/feedback/notes.mjs';
 import { applyAlt, enterCrop, exitCrop, flipImage, normalizeImageURL, openAltPop, openImagePop, replaceImage, replaceWithFile, resetImage, selectedImg, setFit, startCropDrag } from '../features/images.mjs';
 import { applyFont, cycleAlign, setFontSize, toggleCase, toggleStyle } from '../features/formatting.mjs';
-import { applyFx, fxDocAction, openFxPop, previewFx, previewSlideFx } from '../features/effects.mjs';
+import { applyFx, fxDocAction, openFxPop, previewFx, previewSlideFx, renderFxPresets } from '../features/effects.mjs';
 import { applyLink, openLinkPop, removeLink } from '../features/links.mjs';
 import { bindBoxPanel } from './panels/box.mjs';
 import { bindFind } from '../features/find.mjs';
@@ -138,6 +138,7 @@ export function bindUI() {
   $('#tb-spacing').addEventListener('click', e => togglePop('#pop-spacing', e.currentTarget));
   $('#tb-opacity').addEventListener('click', e => togglePop('#pop-opacity', e.currentTarget));
   $('#tb-fx').addEventListener('click', e => openFxPop(e.currentTarget));
+  renderFxPresets();
   for (const id of ['#fx-preset', '#fx-delay', '#fx-dur', '#fx-stagger']) $(id).addEventListener('change', applyFx);
   for (const id of ['#fx-delay', '#fx-dur', '#fx-stagger']) $(id).addEventListener('keydown', e => e.stopPropagation());
   $('#fx-preview').addEventListener('click', previewFx);

@@ -201,7 +201,7 @@
           <button class="tbtn needs-sel text-only" id="tb-align" data-i18n-title="align_title" title="Alignment"><svg class="icon"><use href="#i-al-left"/></svg></button>
           <button class="tbtn needs-sel text-only" id="tb-spacing" data-i18n-title="spacing_title" title="Spacing"><svg class="icon"><use href="#i-spacing"/></svg></button>
           <button class="tbtn needs-sel" id="tb-opacity" data-i18n-title="opacity_title" title="Opacity"><svg class="icon"><use href="#i-opacity"/></svg></button>
-          <button class="tbtn needs-sel" id="tb-fx" data-i18n-title="fx_title" title="Entrance effect (presenting)"><svg class="icon"><use href="#i-play"/></svg></button>
+          <button class="tbtn needs-sel" id="tb-fx" data-i18n-title="fx_title" title="Effect (presenting)"><svg class="icon"><use href="#i-play"/></svg></button>
           <div class="ctx-sep needs-sel"></div>
           <button class="tbtn label needs-sel" id="tb-box" data-i18n-title="box_btn_title" title="Box styles: padding, margin, bg, border, radius, shadow"><svg class="icon"><use href="#i-box"/></svg><span data-i18n="box_btn">Khung</span></button>
           <button class="tbtn needs-sel" id="tb-clear" data-i18n-title="clear_title" title="Clear formatting"><svg class="icon"><use href="#i-eraser"/></svg></button>
@@ -245,12 +245,7 @@
 
         <div class="pop pop-fx" id="pop-fx" hidden>
           <label><span data-i18n="fx_label">Entrance effect</span></label>
-          <select id="fx-preset">
-            <option value="" data-i18n="fx_none">None</option>
-            <option value="fade-in">Fade in</option><option value="fade-up">Fade up</option>
-            <option value="zoom-in">Zoom in</option><option value="slide-left">Slide left</option>
-            <option value="count-up">Count up</option>
-          </select>
+          <select id="fx-preset"></select>
           <div class="fx-grid">
             <label><span data-i18n="fx_delay">Delay (ms)</span><input type="number" id="fx-delay" min="0" step="50" placeholder="0"></label>
             <label><span data-i18n="fx_dur">Duration (ms)</span><input type="number" id="fx-dur" min="50" step="50" placeholder="700"></label>

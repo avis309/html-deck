@@ -1483,8 +1483,10 @@ async function effects(browser, url) {
   await s.redo();
 
   await s.page.click('#filmstrip .thumb >> nth=2');
-  await setFx('#f3', 'count-up');
-  check('count-up on text without a number: refused, with the reason', /Count up/.test(await s.page.textContent('#toast')) && !(await s.content()).includes('id="f3" data-fx'));
+  await s.frame.locator('#f3').click({ modifiers: ['Alt'] });
+  if (await s.page.isHidden('#pop-fx')) await s.page.click('#tb-fx');
+  const f3 = await s.page.$eval('#fx-preset option[value="count-up"]', o => ({ disabled: o.disabled, title: o.title }));
+  check('count-up on text without a number: not offered, with the reason', f3.disabled && /Count up/.test(f3.title) && !(await s.content()).includes('id="f3" data-fx'), JSON.stringify(f3));
   await s.page.keyboard.press('Escape');
   await s.page.click('#filmstrip .thumb >> nth=1');
   await setFx('#num', 'count-up');
@@ -1567,6 +1569,25 @@ async function fxModules(browser, url) {
   await s.page.click('#tb-fx');
   const state = await s.page.textContent('#fx-doc-state');
   check('v2 runtime in the file, v3 preset used: the popover asks for Update FX', /Update FX/.test(state), state);
+  await s.page.keyboard.press('Escape');
+  section('FX modules: picker grouped by category, presets that cannot apply are disabled with the reason');
+  const groups = await s.page.$$eval('#fx-preset optgroup', gs => gs.map(g => [g.label, g.children.length]));
+  check('picker: 4 groups (Entrance, Emphasis, Data & charts, Loop) holding 16 presets',
+    groups.map(g => g[0]).join('|') === 'Entrance|Emphasis|Data & charts|Loop' && groups.reduce((n, g) => n + g[1], 0) === 16, JSON.stringify(groups));
+  await s.page.click('#sb-next');
+  await s.frame.locator('#m-plain').click({ modifiers: ['Alt'] });
+  if (await s.page.isHidden('#pop-fx')) await s.page.click('#tb-fx');
+  const opt = v => s.page.$eval(`#fx-preset option[value="${v}"]`, o => ({ disabled: o.disabled, title: o.title }));
+  const cu = await opt('count-up'), dr = await opt('draw'), fu = await opt('fade-up');
+  check('words: count-up disabled, its title gives the reason', cu.disabled && /Count up/.test(cu.title), JSON.stringify(cu));
+  check('words: draw disabled with the reason; fade-up enabled', dr.disabled && /stroke/i.test(dr.title) && !fu.disabled, JSON.stringify({ dr, fu }));
+  await s.page.keyboard.press('Escape');
+  await s.frame.locator('#m-bar').click({ modifiers: ['Alt'] });
+  if (await s.page.isHidden('#pop-fx')) await s.page.click('#tb-fx');
+  await s.page.selectOption('#fx-preset', 'grow-x');
+  const c = await s.content();
+  check('grow-x on a bar: only data-fx added', c === disk(f).replace('<span class="bar" id="m-bar">', '<span class="bar" id="m-bar" data-fx="grow-x">'), firstDiff(c, disk(f)));
+  await s.undo();
   await s.page.keyboard.press('Escape');
   await s.close();
 }
