@@ -25,8 +25,14 @@ function inScene(n) {
 }
 // The effect a block gets, or null. `covered`: inside a block that already moves, where only a
 // count-up still adds something.
+// A figure, not a sentence or a date that happens to hold a number: at most a short sign or
+// currency before it and a short unit after it ("$1.2M", "48%", "3.2x", "1.250 ₫").
+function isFigure(n, api) {
+  const p = api.parseCount(n.textContent.trim());
+  return !!p && p.pre.replace(/\s/g, '').length <= 2 && !/\s\S/.test(p.post.trim()) && p.post.trim().length <= 3;
+}
 function pick(n, covered, api) {
-  if (isRoot(n) && !api.check(n, 'count-up')) return { 'data-fx': 'count-up' };
+  if (isRoot(n) && !api.check(n, 'count-up') && isFigure(n, api)) return { 'data-fx': 'count-up' };
   if (covered) return null;
   if (n.localName === 'svg') return api.check(n, 'draw') ? { 'data-fx': 'zoom-in' } : { 'data-fx': 'draw', 'data-fx-stagger': STAGGER };
   if (MEDIA.has(n.localName)) return { 'data-fx': 'zoom-in' };

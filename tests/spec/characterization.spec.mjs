@@ -1630,6 +1630,12 @@ async function fxModules(browser, url) {
   await s.undo();
   ac = await s.content();
   check('animate slide: one undo step back to the file', ac === orig, firstDiff(ac, orig));
+  await s.page.click('#sb-next');
+  await s.page.click('#fx-auto');
+  const two = await s.content();
+  check('animate slide: count-up only where the text is a number (not "Aug 12" or a sentence)',
+    /<p id="m-date" data-fx="fade-up"/.test(two) && /<p id="m-sent" data-fx="fade-up"/.test(two) && /<p id="m-kpi" data-fx="count-up"/.test(two), two.match(/<p id="m-(date|sent|kpi)"[^>]*>/g)?.join(' '));
+  await s.undo();
   await s.close();
 }
 
