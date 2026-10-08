@@ -27,7 +27,7 @@ export function applyModeUI() {
   if (!deck) { el.notes.hidden = true; $('#sb-notes').classList.remove('on'); }
   $('#sb-notes').disabled = deck && !S.slides.some(s => $$('.notes', s).some(isOriginal));
   $('#text-hint').innerHTML = deck
-    ? (curLang() === 'zh-Hant' ? '點擊以在目前投影片新增文字方塊。拖曳浮動工具列上的<b>移動</b>控制柄來調整位置。' : curLang() === 'zh' ? '点击向当前幻灯片添加文本框。拖动悬浮栏上的<b>移动</b>手柄调整位置。' : curLang() === 'vi' ? 'Nhấp để thêm hộp chữ vào slide hiện tại. Kéo nút <b>di chuyển</b> trên thanh nổi để đặt lại vị trí.' : 'Click to add text box to current slide. Drag <b>move</b> handle on floating toolbar to reposition.')
+    ? (curLang() === 'zh-Hant' ? '點擊以在目前投影片新增文字方塊。拖曳區塊即可調整位置。' : curLang() === 'zh' ? '点击向当前幻灯片添加文本框。拖动区块即可调整位置。' : curLang() === 'vi' ? 'Nhấp để thêm hộp chữ vào slide hiện tại. Kéo khối để đặt lại vị trí.' : 'Click to add text box to current slide. Drag the block to move it.')
     : (curLang() === 'zh-Hant' ? '新文字會插入目前選取的區塊後（或畫面中央的區塊後）。' : curLang() === 'zh' ? '新文字插入在当前选定区块后（或屏幕中央的区块后）。' : curLang() === 'vi' ? 'Chữ mới được chèn ngay sau khối đang chọn (hoặc khối ở giữa màn hình).' : 'New text is inserted after the selected block (or block in center of screen).');
 }
 export function updateChrome() {

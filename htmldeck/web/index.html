@@ -19,8 +19,6 @@
   <symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></symbol>
   <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
   <symbol id="i-type" viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></symbol>
-  <symbol id="i-pages" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></symbol>
-  <symbol id="i-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="17.5" cy="10.5" r="1.2" fill="currentColor"/><circle cx="8.5" cy="7.5" r="1.2" fill="currentColor"/><circle cx="6.5" cy="12.5" r="1.2" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.55-2.5 5.55-5.55C21.97 6.01 17.46 2 12 2z"/></symbol>
   <symbol id="i-keyboard" viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect width="13" height="13" x="9" y="9" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
@@ -90,9 +88,7 @@
       <button class="rail-item" data-panel="text" data-i18n="rail_text"><span class="ic"><svg class="icon lg"><use href="#i-type"/></svg></span>Text</button>
       <button class="rail-item" data-panel="box" data-i18n="rail_box"><span class="ic"><svg class="icon lg"><use href="#i-box"/></svg></span>Khung</button>
       <button class="rail-item" data-panel="layers" data-i18n="rail_layers"><span class="ic"><svg class="icon lg"><use href="#i-layers"/></svg></span>Layers</button>
-      <button class="rail-item" data-panel="outline" data-i18n="rail_outline"><span class="ic"><svg class="icon lg"><use href="#i-pages"/></svg></span>Outline</button>
       <button class="rail-item" data-panel="effects" data-i18n="rail_effects"><span class="ic"><svg class="icon lg"><use href="#i-play"/></svg></span>Effects</button>
-      <button class="rail-item" data-panel="colors" data-i18n="rail_colors"><span class="ic"><svg class="icon lg"><use href="#i-palette"/></svg></span>Colors</button>
       <button class="rail-item" data-panel="review" data-i18n="rail_review"><span class="ic"><svg class="icon lg ai"><use href="#i-ai"/></svg></span>AI Feedback<span class="badge-count" id="note-count" hidden></span></button>
       <div class="grow"></div>
       <button class="rail-item" id="btn-lang" data-i18n-title="lang_btn_title" title="Switch language / Chuyển ngôn ngữ (VI / EN)"><span class="ic"><svg class="icon lg"><use href="#i-globe"/></svg></span><span id="lang-indicator" style="font-weight:700">VI</span></button>
@@ -112,10 +108,16 @@
           </div>
         </div>
         <div class="panel-body" data-view="text" hidden>
-          <div class="hint" style="margin-bottom:12px" id="text-hint" data-i18n-html="text_hint">Click to add a text box to the current page. Drag the <b>move</b> handle on the floating toolbar to reposition.</div>
+          <div class="hint" style="margin-bottom:12px" id="text-hint" data-i18n-html="text_hint">Click to add a text box to the current page. Drag the block to move it.</div>
           <button class="text-preset h" data-preset="heading" data-i18n="preset_heading">Add Heading</button>
           <button class="text-preset s" data-preset="subheading" data-i18n="preset_subheading">Add Subheading</button>
           <button class="text-preset b" data-preset="body" data-i18n="preset_body">Add Paragraph</button>
+          <div class="sec-label" data-i18n="color_text">Text color</div>
+          <div class="sec-label" style="margin-top:4px" data-i18n="doc_colors">Document Colors</div>
+          <div class="swatches" id="doc-colors"></div>
+          <div class="sec-label" data-i18n="default_colors">Default Colors</div>
+          <div class="swatches" id="default-colors"></div>
+          <div class="hint" style="margin-top:16px" data-i18n="color_hint">Highlight text to color only that selection; otherwise applies to the entire block.</div>
         </div>
         <div class="panel-body" data-view="box" hidden>
           <div class="box-target" id="box-target"></div>
@@ -160,7 +162,6 @@
           <div id="layer-tree"></div>
           <div class="hint" style="margin-top:10px" data-i18n-html="layers_hint_bottom">Drag a row to reorder: drop on <b>orange line</b> for above/below, drop into middle to place <b>inside</b>. Esc to cancel.</div>
         </div>
-        <div class="panel-body" data-view="outline" hidden><div id="outline-list"></div></div>
         <div class="panel-body" data-view="effects" hidden>
           <div class="hint" style="margin-bottom:10px" data-i18n="fx_panel_hint">Effects run when presenting. Select a block, then press ▶ in the toolbar to set one.</div>
           <button class="btn-soft" id="fx-play-slide" style="width:100%;margin-bottom:12px"><svg class="icon sm"><use href="#i-play"/></svg><span data-i18n="fx_play_slide">Preview the whole slide</span></button>
@@ -171,14 +172,6 @@
           <button class="btn-soft" id="fb-slide" style="width:100%;margin-bottom:12px"><svg class="icon sm ai"><use href="#i-ai"/></svg><span id="fb-slide-label"></span></button>
           <div class="seg fb-filter" id="fb-filter"><button data-f="open" class="on"></button><button data-f="done"></button></div>
           <div id="note-list"></div>
-        </div>
-        <div class="panel-body" data-view="colors" hidden>
-          <div class="seg" id="color-target"><button data-target="text" class="on" data-i18n="color_text">Text Color</button><button data-target="bg" data-i18n="color_bg">Block Background</button></div>
-          <div class="sec-label" style="margin-top:4px" data-i18n="doc_colors">Document Colors</div>
-          <div class="swatches" id="doc-colors"></div>
-          <div class="sec-label" data-i18n="default_colors">Default Colors</div>
-          <div class="swatches" id="default-colors"></div>
-          <div class="hint" style="margin-top:16px" data-i18n="color_hint">Highlight text to color only that selection; otherwise applies to the entire block.</div>
         </div>
       </div>
     </aside>

@@ -255,7 +255,6 @@ export function onFrameReady() {
   hooks.applyModeUI();
   if (S.mode === 'deck') { showSlide(0); centerAllSlides(); hooks.buildFilmstrip(); }
   else if (S.sections.length) { hooks.buildFilmstrip(); hooks.trackSection(); }
-  hooks.buildOutline();
   hooks.buildDocColors();
   hooks.layout();
   hooks.updateChrome();

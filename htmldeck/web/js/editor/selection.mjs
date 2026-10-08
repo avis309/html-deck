@@ -86,7 +86,6 @@ export function showSlide(i, { keepSel = false } = {}) {
   if (S.centerRO) { S.centerRO.disconnect(); S.centerRO.observe(S.slides[i]); centerSlide(S.slides[i]); }
   $$('.thumb', el.filmstrip).forEach((t, k) => t.classList.toggle('active', k === i));
   el.filmstrip.children[i]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-  $$('.outline-item', $('#outline-list')).forEach((t, k) => t.classList.toggle('current', k === i));
   hooks.updateChrome();
   if (!el.notes.hidden) loadNotes();
   if (hooks.layersVisible()) hooks.buildLayers();

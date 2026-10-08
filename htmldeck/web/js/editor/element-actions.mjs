@@ -23,7 +23,6 @@ export function deleteSel() {
   doRemove(op);
   pushOp(op);
   hooks.queueThumb(S.slides[S.cur]);
-  hooks.buildOutline();
   if (hooks.layersVisible()) hooks.buildLayers();
   toast('Deleted · Ctrl+Z to undo');
 }
@@ -48,7 +47,6 @@ export function duplicateSel() {
   pushOp({ type: 'insert', label: 'Duplicate', ...nodeRefs(mc, lc) });
   select(lc, { edit: false });
   hooks.queueThumb(lc);
-  hooks.buildOutline();
   if (hooks.layersVisible()) hooks.buildLayers();
 }
 export function insertText(kind) {
@@ -86,7 +84,6 @@ export function insertText(kind) {
   select(l, { edit: true });
   selectAllIn(l);
   hooks.queueThumb(l);
-  hooks.buildOutline();
 }
 export function rootNearViewportCenter() {
   const mid = S.win.innerHeight / 2;

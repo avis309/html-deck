@@ -99,8 +99,7 @@ export function setFontSize(px) {
 }
 export function applyColor(hex) {
   if (!S.sel) return toast('Select a text block first');
-  if (S.colorTarget === 'bg') styleEdit(S.sel, { 'background-color': hex }, 'bg');
-  else if (hasTextSelection()) wrapSelection('color', hex);
+  if (hasTextSelection()) wrapSelection('color', hex);
   else { styleEdit(S.sel, { color: hex }, 'color'); offerChildColor(S.sel, hex); }
   hooks.refreshToolbar();
 }

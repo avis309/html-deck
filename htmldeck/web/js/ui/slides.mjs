@@ -1,10 +1,8 @@
-// Filmstrip, thumbnails, section tracking and the outline panel.
-import { $, $$, escapeHTML } from '../core/utils.mjs';
+// Filmstrip, thumbnails and section tracking.
+import { $$, escapeHTML } from '../core/utils.mjs';
 import { S, el, thumbCSS } from '../editor/state.mjs';
-import { isOriginal, isRoot } from '../editor/live-document.mjs';
-import { select, showSlide } from '../editor/selection.mjs';
+import { showSlide } from '../editor/selection.mjs';
 import { slideTitle, stripItems } from '../editor/slide-info.mjs';
-import { t } from '../shared/lang.mjs';
 import * as Reveal from '../formats/reveal.mjs';
 
 export function buildFilmstrip() {
@@ -77,34 +75,4 @@ export function queueThumb(node) {
   if (i < 0) return;
   clearTimeout(S.thumbTimers.get(i));
   S.thumbTimers.set(i, setTimeout(() => { renderThumb(i); S.thumbTimers.delete(i); }, 450));
-}
-export function buildOutline() {
-  const list = $('#outline-list');
-  if (!S.doc) { list.innerHTML = `<div class="hint">${t('layer_empty')}</div>`; return; }
-  list.innerHTML = '';
-  if (S.mode === 'deck') {
-    S.slides.forEach((s, i) => {
-      const b = document.createElement('button');
-      b.className = 'outline-item' + (i === S.cur ? ' current' : '');
-      b.innerHTML = `<span class="num">${i + 1}</span><span class="t"></span>`;
-      b.querySelector('.t').textContent = slideTitle(s, i);
-      b.addEventListener('click', () => showSlide(i));
-      list.appendChild(b);
-    });
-    return;
-  }
-  const heads = $$('h1, h2, h3', S.doc.body).filter(h => isOriginal(h) && h.textContent.trim());
-  if (!heads.length) { list.innerHTML = `<div class="hint">${t('outline_empty')}</div>`; return; }
-  heads.slice(0, 400).forEach(h => {
-    const b = document.createElement('button');
-    b.className = 'outline-item l' + h.localName[1];
-    b.innerHTML = '<span class="t"></span>';
-    b.querySelector('.t').textContent = h.textContent.replace(/\s+/g, ' ').trim();
-    b.addEventListener('click', () => {
-      h.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      const root = isRoot(h) ? h : h.querySelector('[data-ed-edit]');
-      if (root) setTimeout(() => select(root, { edit: false }), 350);
-    });
-    list.appendChild(b);
-  });
 }

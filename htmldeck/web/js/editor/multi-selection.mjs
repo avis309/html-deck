@@ -151,7 +151,6 @@ export function deleteMulti() {
   if (!ops.length) return;
   pushOp(ops.length === 1 ? ops[0] : { type: 'batch', ops, label: 'Delete' });
   hooks.queueThumb(S.slides[S.cur]);
-  hooks.buildOutline();
   if (hooks.layersVisible()) hooks.buildLayers();
   toast('Deleted · Ctrl+Z to undo');
 }

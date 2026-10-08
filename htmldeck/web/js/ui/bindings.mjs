@@ -114,10 +114,6 @@ export function bindUI() {
   $('#modal-keys').addEventListener('click', e => { if (e.target.id === 'modal-keys' || e.target.closest('[data-act]')) $('#modal-keys').classList.remove('show'); });
 
   $$('[data-preset]').forEach(b => b.addEventListener('click', () => insertText(b.dataset.preset)));
-  $$('#color-target button').forEach(b => b.addEventListener('click', () => {
-    S.colorTarget = b.dataset.target;
-    $$('#color-target button').forEach(x => x.classList.toggle('on', x === b));
-  }));
   renderSwatches($('#default-colors'), DEFAULT_COLORS, false);
 
   const fontSel = $('#tb-font');
@@ -131,7 +127,7 @@ export function bindUI() {
   $('#tb-size-up').addEventListener('click', () => setFontSize((parseFloat($('#tb-size').value) || 16) + 1));
   $('#tb-size').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); setFontSize(parseFloat(e.target.value)); } e.stopPropagation(); });
   $('#tb-size').addEventListener('change', e => setFontSize(parseFloat(e.target.value)));
-  $('#tb-color').addEventListener('click', () => { S.colorTarget = 'text'; $$('#color-target button').forEach(x => x.classList.toggle('on', x.dataset.target === 'text')); if (!el.panel.classList.contains('open') || el.panel.dataset.view !== 'colors') openPanel('colors'); });
+  $('#tb-color').addEventListener('click', () => { if (!el.panel.classList.contains('open') || el.panel.dataset.view !== 'text') openPanel('text'); });
   $('#tb-bold').addEventListener('click', () => toggleStyle('bold'));
   $('#tb-italic').addEventListener('click', () => toggleStyle('italic'));
   $('#tb-underline').addEventListener('click', () => toggleStyle('underline'));

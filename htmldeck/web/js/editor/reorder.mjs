@@ -77,7 +77,6 @@ export function moveNode(node, drop) {
   pushOp(op);
   select(node, { edit: false });
   hooks.queueThumb(node);
-  hooks.buildOutline();
   hooks.renderPins();
   if (hooks.layersVisible()) hooks.buildLayers();
   return true;

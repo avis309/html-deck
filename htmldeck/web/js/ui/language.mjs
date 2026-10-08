@@ -8,7 +8,6 @@ import { renderFileList } from './panels/side-panel.mjs';
 import { renderNoteList } from './feedback-view.mjs';
 import { toast } from '../shared/toast.mjs';
 import { curLang, setLang, t } from '../shared/lang.mjs';
-import { buildOutline } from './slides.mjs';
 
 export function applyLanguage(lang) {
   setLang(lang);
@@ -69,8 +68,7 @@ export function applyLanguage(lang) {
   if (typeof layersVisible === 'function' && layersVisible()) buildLayers();
   if (typeof el !== 'undefined' && el.panel?.classList.contains('open')) {
     const view = el.panel.dataset.view;
-    if (view === 'outline' && typeof buildOutline === 'function') buildOutline();
-    else if (view === 'review' && typeof renderNoteList === 'function') renderNoteList();
+    if (view === 'review' && typeof renderNoteList === 'function') renderNoteList();
     else if (view === 'files' && typeof renderFileList === 'function') renderFileList();
   }
   if (typeof applyModeUI === 'function') applyModeUI();

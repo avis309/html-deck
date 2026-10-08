@@ -98,18 +98,14 @@ export const I18N = {
     rail_text: 'Văn bản',
     rail_box: 'Khung',
     rail_layers: 'Lớp',
-    rail_outline: 'Mục lục',
-    rail_colors: 'Màu sắc',
     rail_review: 'AI Feedback',
     rail_keys: 'Phím tắt',
     
     // Panels
     panel_files: 'Tệp',
-    panel_text: 'Văn bản',
+    panel_text: 'Văn bản & màu',
     panel_box: 'Khung',
     panel_layers: 'Lớp & Khối',
-    panel_outline: 'Mục lục',
-    panel_colors: 'Màu sắc',
     panel_review: 'Feedback cho AI Agent',
     close: 'Đóng',
     pick_file: 'Mở file từ máy tính',
@@ -121,7 +117,7 @@ export const I18N = {
     error_list_files: 'Không tải được danh sách file.',
     
     // Text panel
-    text_hint: 'Nhấp để thêm hộp chữ vào trang hiện tại. Kéo nút <b>di chuyển</b> trên thanh nổi để đặt lại vị trí.',
+    text_hint: 'Nhấp để thêm hộp chữ vào trang hiện tại. Kéo khối để đặt lại vị trí.',
     preset_heading: 'Thêm tiêu đề',
     preset_subheading: 'Thêm tiêu đề phụ',
     preset_body: 'Thêm một đoạn văn bản',
@@ -155,7 +151,6 @@ export const I18N = {
     
     // Colors panel
     color_text: 'Màu chữ',
-    color_bg: 'Màu nền khối',
     doc_colors: 'Màu trong tài liệu',
     default_colors: 'Màu mặc định',
     color_hint: 'Bôi đen một phần chữ để chỉ tô màu phần đó; không bôi đen thì áp cho cả khối.',
@@ -316,7 +311,6 @@ export const I18N = {
     layer_no_blocks: 'Không có khung nào.',
     scope_whole_page: 'Toàn trang',
     layer_limit_more: '… còn nữa — thu gọn bớt các nhánh để xem tiếp.',
-    outline_empty: 'Trang này không có tiêu đề H1–H3.',
     notes_slide_title: 'Ghi chú · Slide',
 
     // Review / feedback
@@ -450,18 +444,14 @@ export const I18N = {
     rail_text: '文本',
     rail_box: '区块',
     rail_layers: '图层',
-    rail_outline: '大纲',
-    rail_colors: '颜色',
     rail_review: 'AI 反馈',
     rail_keys: '快捷键',
 
     // Panels
     panel_files: '文件',
-    panel_text: '文本',
+    panel_text: '文本与颜色',
     panel_box: '区块样式',
     panel_layers: '图层与区块',
-    panel_outline: '文档大纲',
-    panel_colors: '颜色',
     panel_review: 'AI Agent 反馈',
     close: '关闭',
     pick_file: '从电脑打开文件',
@@ -473,7 +463,7 @@ export const I18N = {
     error_list_files: '无法加载文件列表。',
 
     // Text panel
-    text_hint: '点击向当前页面添加文本框。拖动悬浮栏上的<b>移动</b>手柄可调整位置。',
+    text_hint: '点击向当前页面添加文本框。拖动区块即可调整位置。',
     preset_heading: '添加大标题',
     preset_subheading: '添加副标题',
     preset_body: '添加正文段落',
@@ -507,7 +497,6 @@ export const I18N = {
 
     // Colors panel
     color_text: '文字颜色',
-    color_bg: '区块背景色',
     doc_colors: '文档内置颜色',
     default_colors: '默认预设色',
     color_hint: '选中文本的一部分可仅对选区着色；未选中则应用于整个区块。',
@@ -668,7 +657,6 @@ export const I18N = {
     layer_no_blocks: '未找到区块。',
     scope_whole_page: '整页',
     layer_limit_more: '… 更多内容 — 折叠部分分支以查看更多。',
-    outline_empty: '本页未找到 H1–H3 标题。',
     notes_slide_title: '演讲者备注 · 幻灯片',
 
     // Review / feedback
@@ -801,18 +789,14 @@ export const I18N = {
     rail_text: '文字',
     rail_box: '區塊',
     rail_layers: '圖層',
-    rail_outline: '大綱',
-    rail_colors: '顏色',
     rail_review: 'AI 回饋',
     rail_keys: '快捷鍵',
 
     // Panels
     panel_files: '檔案',
-    panel_text: '文字',
+    panel_text: '文字與顏色',
     panel_box: '區塊樣式',
     panel_layers: '圖層與區塊',
-    panel_outline: '文件大綱',
-    panel_colors: '顏色',
     panel_review: 'AI Agent 回饋',
     close: '關閉',
     pick_file: '從電腦開啟檔案',
@@ -824,7 +808,7 @@ export const I18N = {
     error_list_files: '無法載入檔案清單。',
 
     // Text panel
-    text_hint: '點選向當前頁面新增文字框。拖曳浮動工具列上的<b>移動</b>手柄可調整位置。',
+    text_hint: '點選向當前頁面新增文字框。拖曳區塊即可調整位置。',
     preset_heading: '新增大標題',
     preset_subheading: '新增副標題',
     preset_body: '新增正文段落',
@@ -858,7 +842,6 @@ export const I18N = {
 
     // Colors panel
     color_text: '文字顏色',
-    color_bg: '區塊背景色',
     doc_colors: '文件內建顏色',
     default_colors: '預設顏色',
     color_hint: '選中文字的一部分可僅對選區著色；未選中則應用於整個區塊。',
@@ -1019,7 +1002,6 @@ export const I18N = {
     layer_no_blocks: '未找到區塊。',
     scope_whole_page: '整頁',
     layer_limit_more: '… 更多內容 — 摺疊部分分支以檢視更多。',
-    outline_empty: '本頁未找到 H1–H3 標題。',
     notes_slide_title: '演講者備註 · 投影片',
 
     // Review / feedback
@@ -1153,18 +1135,14 @@ export const I18N = {
     rail_text: 'Text',
     rail_box: 'Box',
     rail_layers: 'Layers',
-    rail_outline: 'Outline',
-    rail_colors: 'Colors',
     rail_review: 'AI Feedback',
     rail_keys: 'Shortcuts',
     
     // Panels
     panel_files: 'Files',
-    panel_text: 'Text',
+    panel_text: 'Text & colors',
     panel_box: 'Box',
     panel_layers: 'Layers & Blocks',
-    panel_outline: 'Outline',
-    panel_colors: 'Colors',
     panel_review: 'Feedback for AI Agent',
     close: 'Close',
     pick_file: 'Open file from computer',
@@ -1176,7 +1154,7 @@ export const I18N = {
     error_list_files: 'Failed to load file list.',
     
     // Text panel
-    text_hint: 'Click to add a text box to the current page. Drag the <b>move</b> handle on the floating toolbar to reposition.',
+    text_hint: 'Click to add a text box to the current page. Drag the block to move it.',
     preset_heading: 'Add Heading',
     preset_subheading: 'Add Subheading',
     preset_body: 'Add Paragraph',
@@ -1209,8 +1187,7 @@ export const I18N = {
     no_notes_yet: 'No feedback notes yet',
     
     // Colors panel
-    color_text: 'Text Color',
-    color_bg: 'Block Background',
+    color_text: 'Text color',
     doc_colors: 'Document Colors',
     default_colors: 'Default Colors',
     color_hint: 'Highlight text to color only that selection; otherwise applies to the entire block.',
@@ -1371,7 +1348,6 @@ export const I18N = {
     layer_no_blocks: 'No blocks found.',
     scope_whole_page: 'Entire page',
     layer_limit_more: '… more — collapse branches to see more.',
-    outline_empty: 'No H1–H3 headings on this page.',
     notes_slide_title: 'Notes · Slide',
 
     // Review / feedback

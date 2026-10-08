@@ -141,7 +141,6 @@ export function stepHistory(forward) {
   }
   if (!el.notes.hidden) loadNotes();
   hooks.renderBoxPanel();
-  hooks.buildOutline();
   hooks.renderPins();
   if (hooks.layersVisible()) hooks.buildLayers();
   hooks.updateChrome();

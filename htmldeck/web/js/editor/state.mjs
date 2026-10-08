@@ -62,7 +62,7 @@ export const S = {
   mode: 'page', slides: [], sections: [], cur: 0, scale: 1, fit: true, pageW: 1600,
   sel: null, editing: false, textDirty: false, savedRange: null, lastWrap: null, commitTimer: 0,
   undo: [], redo: [], seq: 0, savedSeq: 0, loadToken: 0, liveById: new Map(),
-  presenting: false, present: null, format: null, readOnly: null, deckW: DECK_W, deckH: DECK_H, colorTarget: 'text', styleClip: null, trackRaf: 0, lastBox: '',
+  presenting: false, present: null, format: null, readOnly: null, deckW: DECK_W, deckH: DECK_H, styleClip: null, trackRaf: 0, lastBox: '',
   thumbTimers: new Map(), files: [], saving: false, saveError: '',
 };
 

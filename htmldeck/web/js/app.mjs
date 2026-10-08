@@ -30,13 +30,12 @@ import { buildLayers, drawOffsets, layersVisible, syncLayers } from './ui/panels
 import { loadWorkspaceList, openPanel, renderFileList } from './ui/panels/side-panel.mjs';
 import { closePopups, refreshToolbar, togglePop } from './ui/toolbar.mjs';
 import { buildDocColors } from './ui/panels/colors.mjs';
-import { buildFilmstrip, buildOutline, queueThumb, trackSection } from './ui/slides.mjs';
+import { buildFilmstrip, queueThumb, trackSection } from './ui/slides.mjs';
 
 async function boot() {
   bindUI();
   applyLanguage(curLang());
   requestAnimationFrame(pinLoop);
-  buildOutline();
   updateChrome();
   let cfg = {};
   try { cfg = await api('/api/config'); }
@@ -64,7 +63,6 @@ installHooks({
   buildDocColors,
   buildFilmstrip,
   buildLayers,
-  buildOutline,
   checkOverflow,
   clearDraft,
   clearFeedback,

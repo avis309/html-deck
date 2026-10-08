@@ -9,7 +9,6 @@ import { openServerFile } from '../../editor/document.mjs';
 import { renderFxList } from '../../features/effects.mjs';
 import { renderNoteList } from '../feedback-view.mjs';
 import { curLang, t } from '../../shared/lang.mjs';
-import { buildOutline } from '../slides.mjs';
 
 // ================================================================ side panel + files
 export function openPanel(name, keepOpen = false) {
@@ -25,7 +24,6 @@ export function openPanel(name, keepOpen = false) {
   panel.classList.add('open');
   if (name === 'box') { drawBoxPanel(); renderBoxPanel(); }
   if (name === 'files') { loadWorkspaceList(); setTimeout(() => $('#file-search').focus(), 60); }
-  if (name === 'outline') buildOutline();
   if (name === 'effects') renderFxList();
   setTimeout(layout, 220);
 }
