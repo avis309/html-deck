@@ -43,6 +43,7 @@ import secrets
 import select
 import shlex
 import shutil
+import stat
 import socket
 import socketserver
 import sys
@@ -182,33 +183,113 @@ def load_html(target: Path, root: Path) -> dict:
     }
 
 
+# On POSIX every sidecar file operation goes through a handle on the folder opened without
+# following links (dir_fd), so a folder swapped for a link after the checks is never followed.
+_DIR_FD = (not _WINDOWS and os.open in os.supports_dir_fd and os.rename in os.supports_dir_fd
+           and hasattr(os, "O_DIRECTORY") and hasattr(os, "O_NOFOLLOW"))
+_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+
+
+def _is_link(path: Path) -> bool:
+    """A symlink, or on Windows any reparse point (a junction is not a symlink to is_symlink())."""
+    try:
+        st = os.lstat(path)
+    except FileNotFoundError:
+        return False
+    return stat.S_ISLNK(st.st_mode) or bool(getattr(st, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
+
+
 def _sidecar_dir(target: Path, name: str, create: bool) -> Path:
-    """A sidecar folder beside the document (backups, notes). Never a symlink: a link planted in
+    """A sidecar folder beside the document (backups, notes). Never a link: a link planted in
     the workspace would make HTML Deck read or write wherever it points."""
     folder = target.parent / name
-    if folder.is_symlink() or (folder.exists() and not folder.is_dir()):
-        raise EditorError(403, f"{name} beside the document is not a plain folder; HTML Deck does not follow it")
+    refuse = EditorError(403, f"{name} beside the document is not a plain folder; HTML Deck does not follow it")
+    if _is_link(folder) or (folder.exists() and not folder.is_dir()):
+        raise refuse
     if create:
         folder.mkdir(exist_ok=True)
-        if folder.is_symlink():
-            raise EditorError(403, f"{name} became a symlink; HTML Deck does not follow it")
+    # Whatever kind of redirect it is, the folder must still be itself.
+    if folder.exists() and (_is_link(folder) or folder.resolve() != target.parent.resolve() / name):
+        raise refuse
     return folder
 
 
 def _no_link(path: Path) -> Path:
-    if path.is_symlink():
+    if _is_link(path):
         raise EditorError(403, f"{path.name} is a symlink; HTML Deck does not follow it")
     return path
 
 
+def _sidecar_opened(folder: Path) -> None:
+    """Test seam: called right after a sidecar folder was checked and opened."""
+
+
+class _Sidecar:
+    """A checked sidecar folder; file operations by name inside it, through its dir_fd on POSIX."""
+
+    def __init__(self, target: Path, name: str, create: bool):
+        self.path = _sidecar_dir(target, name, create)
+        self.fd = None
+        if _DIR_FD and self.path.exists():
+            self.fd = os.open(self.path, os.O_RDONLY | os.O_DIRECTORY | _NOFOLLOW)
+        _sidecar_opened(self.path)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        if self.fd is not None:
+            os.close(self.fd)
+
+    def open(self, name: str, flags: int) -> int:
+        flags |= _NOFOLLOW | getattr(os, "O_BINARY", 0)
+        try:
+            if self.fd is not None:
+                return os.open(name, flags, 0o644, dir_fd=self.fd)
+            return os.open(_no_link(self.path / name), flags, 0o644)
+        except OSError as exc:
+            if exc.errno == errno.ELOOP:   # O_NOFOLLOW met a symlink
+                raise EditorError(403, f"{name} is a symlink; HTML Deck does not follow it") from exc
+            raise
+
+    def exists(self, name: str) -> bool:
+        try:
+            os.stat(name, dir_fd=self.fd, follow_symlinks=False) if self.fd is not None else os.lstat(self.path / name)
+            return True
+        except FileNotFoundError:
+            return False
+
+    def names(self) -> list[str]:
+        return os.listdir(self.fd if self.fd is not None else self.path)
+
+    def replace(self, src: str, dst: str) -> None:
+        if self.fd is not None:
+            os.replace(src, dst, src_dir_fd=self.fd, dst_dir_fd=self.fd)
+        else:
+            _replace(self.path / src, _no_link(self.path / dst))
+
+    def unlink(self, name: str) -> None:
+        try:
+            os.unlink(name, dir_fd=self.fd) if self.fd is not None else (self.path / name).unlink()
+        except FileNotFoundError:
+            pass
+
+
 def _backup(target: Path, stamp: str) -> Path:
-    backup_dir = _sidecar_dir(target, BACKUP_DIR_NAME, create=True)
-    backup = _no_link(backup_dir / f"{target.name}.{stamp}.bak")
-    shutil.copy2(target, backup)
-    old = sorted(backup_dir.glob(f"{target.name}.*.bak"))
-    for stale in old[:-BACKUPS_KEPT]:
-        stale.unlink()
-    return backup
+    with _Sidecar(target, BACKUP_DIR_NAME, create=True) as side:
+        name = f"{target.name}.{stamp}.bak"
+        st = target.stat()
+        with open(target, "rb") as src, os.fdopen(side.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL), "wb") as dst:
+            shutil.copyfileobj(src, dst)
+            dst.flush()
+            if os.utime in os.supports_fd:
+                os.utime(dst.fileno(), ns=(st.st_atime_ns, st.st_mtime_ns))
+        if os.utime not in os.supports_fd:
+            os.utime(side.path / name, ns=(st.st_atime_ns, st.st_mtime_ns))
+        old = sorted(n for n in side.names() if n.startswith(f"{target.name}.") and n.endswith(".bak"))
+        for stale in old[:-BACKUPS_KEPT]:
+            side.unlink(stale)
+        return side.path / name
 
 
 def save_html(target: Path, content: object, expected_mtime_ns: str | None, force: bool, root: Path,
@@ -306,11 +387,16 @@ def notes_commands(target: Path, root: Path, windows: bool = _WINDOWS) -> list[d
 
 
 def read_notes(target: Path) -> list[dict]:
-    _sidecar_dir(target, NOTES_DIR_NAME, create=False)
-    path = _no_link(notes_path(target))
-    if not path.is_file():
+    with _Sidecar(target, NOTES_DIR_NAME, create=False) as side:
+        return _read_notes_in(side, target)
+
+
+def _read_notes_in(side: "_Sidecar", target: Path) -> list[dict]:
+    name = notes_path(target).name
+    if not side.path.exists() or not side.exists(name):
         return []
-    data = json.loads(path.read_text(encoding="utf-8"))
+    with os.fdopen(side.open(name, os.O_RDONLY), "rb") as fh:
+        data = json.loads(fh.read().decode("utf-8"))
     return data.get("notes", []) if isinstance(data, dict) else []
 
 
@@ -389,10 +475,10 @@ def _replace(src: Path, dst: Path) -> None:
 
 
 @contextlib.contextmanager
-def _file_lock(path: Path):
-    """Exclusive lock on ``path`` shared with other processes: flock on POSIX, a one-byte lock on Windows."""
-    # O_NOFOLLOW: a lock file swapped for a symlink after the check is still not followed.
-    fd = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o644)
+def _file_lock(lock: Path | int):
+    """Exclusive lock on a file (a path, or an fd already open) shared with other processes:
+    flock on POSIX, a one-byte lock on Windows."""
+    fd = lock if isinstance(lock, int) else os.open(lock, os.O_RDWR | os.O_CREAT | _NOFOLLOW, 0o644)
     with os.fdopen(fd, "a+") as fh:
         if _WINDOWS:
             fh.seek(0)
@@ -418,20 +504,21 @@ def _file_lock(path: Path):
 
 @contextlib.contextmanager
 def _notes_lock(target: Path):
-    """Cross-process lock: the editor and htmldeck-notes may both edit the same sidecar."""
-    lock_dir = _sidecar_dir(target, NOTES_DIR_NAME, create=True)
-    with SAVE_LOCK, _file_lock(_no_link(lock_dir / ".lock")):
-        yield
+    """Cross-process lock: the editor and htmldeck-notes may both edit the same sidecar. Yields
+    the checked notes folder, for the write made under the lock."""
+    with SAVE_LOCK, _Sidecar(target, NOTES_DIR_NAME, create=True) as side, _file_lock(side.open(".lock", os.O_RDWR | os.O_CREAT)):
+        yield side
 
 
-def _write_notes_file(target: Path, notes: list[dict], root: Path) -> None:
-    path = _no_link(notes_path(target))
-    tmp = path.with_name(f".{path.name}.tmp.{secrets.token_hex(4)}")
+def _write_notes_file(side: _Sidecar, target: Path, notes: list[dict], root: Path) -> None:
+    name = notes_path(target).name
+    tmp = f".{name}.tmp.{secrets.token_hex(4)}"
     try:
-        tmp.write_text(json.dumps({"file": display_path(target, root), "notes": notes}, ensure_ascii=False, indent=2), encoding="utf-8")
-        _replace(tmp, path)
+        with os.fdopen(side.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL), "wb") as fh:
+            fh.write(json.dumps({"file": display_path(target, root), "notes": notes}, ensure_ascii=False, indent=2).encode("utf-8"))
+        side.replace(tmp, name)
     finally:
-        tmp.unlink(missing_ok=True)
+        side.unlink(tmp)
 
 
 def write_notes(target: Path, notes: object, root: Path) -> dict:
@@ -441,8 +528,8 @@ def write_notes(target: Path, notes: object, root: Path) -> dict:
     if not target.is_file():
         raise EditorError(404, "Target file does not exist")
     cleaned = [_clean_note(n) for n in notes]
-    with _notes_lock(target):
-        _write_notes_file(target, cleaned, root)
+    with _notes_lock(target) as side:
+        _write_notes_file(side, target, cleaned, root)
     return {"success": True, "count": len(cleaned), "notes_file": display_path(notes_path(target), root)}
 
 
@@ -458,8 +545,8 @@ def apply_note_ops(target: Path, ops: object, root: Path) -> dict:
         raise EditorError(400, "Missing list of operations")
     if not target.is_file():
         raise EditorError(404, "Target file does not exist")
-    with _notes_lock(target):
-        notes = read_notes(target)
+    with _notes_lock(target) as side:
+        notes = _read_notes_in(side, target)
         by_id = {n.get("id"): n for n in notes}
         for op in ops:
             kind = op.get("op") if isinstance(op, dict) else None
@@ -484,7 +571,7 @@ def apply_note_ops(target: Path, ops: object, root: Path) -> dict:
                 raise EditorError(400, "Invalid note operation")
         if len(notes) > MAX_NOTES:
             raise EditorError(400, "Too many notes")
-        _write_notes_file(target, notes, root)
+        _write_notes_file(side, target, notes, root)
     return {"success": True, "notes": notes, "notes_file": display_path(notes_path(target), root)}
 
 

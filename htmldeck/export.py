@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import base64
 import html as html_lib
+import http.client
 import ipaddress
 import mimetypes
 import re
@@ -106,10 +107,10 @@ class _Resolver:
         if url not in self.cache:
             self.cache[url] = None
             try:
-                if not _public_url(url):
+                left = min(MAX_REMOTE_BYTES, MAX_REMOTE_TOTAL - self.downloaded)
+                if left <= 0 or not _public_url(url):
                     return None
                 req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (HTML Deck export)"})
-                left = min(MAX_REMOTE_BYTES, MAX_REMOTE_TOTAL - self.downloaded)
                 with _OPENER.open(req, timeout=REMOTE_TIMEOUT) as res:
                     data = res.read(left + 1)
                     self.downloaded += len(data)
@@ -123,22 +124,57 @@ class _Resolver:
         return self.cache[url]
 
 
-def _host_allowed(host: str | None) -> bool:
-    """Only hosts whose every address is public: never this machine, the local network,
-    link-local (cloud metadata) or multicast."""
+def _public_addresses(host: str | None) -> list[str]:
+    """The host's addresses when every one is public, else []: never this machine, the local
+    network, link-local (cloud metadata) or multicast."""
     if not host:
-        return False
+        return []
     try:
         infos = socket.getaddrinfo(host, None)
     except (OSError, UnicodeError):
-        return False
-    addrs = {ipaddress.ip_address(i[4][0].split("%")[0]) for i in infos}
-    return bool(addrs) and all(a.is_global and not a.is_multicast for a in addrs)
+        return []
+    addrs = list(dict.fromkeys(i[4][0].split("%")[0] for i in infos))
+    ok = addrs and all((a := ipaddress.ip_address(x)).is_global and not a.is_multicast for x in addrs)
+    return addrs if ok else []
+
+
+def _host_allowed(host: str | None) -> bool:
+    return bool(_public_addresses(host))
 
 
 def _public_url(url: str) -> bool:
     u = urllib.parse.urlsplit(url)
-    return u.scheme in ("http", "https") and _host_allowed(u.hostname)
+    return u.scheme in ("http", "https") and bool(u.hostname)
+
+
+def _pinned_socket(host: str, port: int, timeout: float) -> socket.socket:
+    """Connect to an address checked in the same step: the name is resolved once, so it cannot
+    answer a public address to the check and a local one to the connection (DNS rebinding)."""
+    addrs = _public_addresses(host)
+    if not addrs:
+        raise OSError(f"{host} is not a public address; HTML Deck export does not fetch from it")
+    return socket.create_connection((addrs[0], port), timeout)
+
+
+class _PinnedHTTP(http.client.HTTPConnection):
+    def connect(self):
+        self.sock = _pinned_socket(self.host, self.port, self.timeout)
+
+
+class _PinnedHTTPS(http.client.HTTPSConnection):
+    def connect(self):
+        # TLS still checks the certificate against the host name, not the pinned address.
+        self.sock = self._context.wrap_socket(_pinned_socket(self.host, self.port, self.timeout), server_hostname=self.host)
+
+
+class _PinnedHTTPHandler(urllib.request.HTTPHandler):
+    def http_open(self, req):
+        return self.do_open(_PinnedHTTP, req)
+
+
+class _PinnedHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(_PinnedHTTPS, req, context=self._context)
 
 
 class _PublicRedirects(urllib.request.HTTPRedirectHandler):
@@ -150,7 +186,8 @@ class _PublicRedirects(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-_OPENER = urllib.request.build_opener(_PublicRedirects)
+# No proxy: a proxy would make the connection itself, past the address check.
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _PinnedHTTPHandler, _PinnedHTTPSHandler(), _PublicRedirects)
 
 
 def _mime(name: str) -> str:

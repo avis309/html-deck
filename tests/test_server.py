@@ -755,3 +755,42 @@ def test_workspace_scripts_are_off_until_the_workspace_is_trusted(untrusted_serv
     _request(port, "POST", "/api/trust", json.dumps({"trusted": False}), hdr)
     assert cfg()["trusted"] is False
     assert _request(port, "POST", "/api/trust", json.dumps({"trusted": "yes"}), hdr)[0] == 400
+
+
+def test_sidecar_folder_must_be_itself_not_a_redirect(root, tmp_path_factory, monkeypatch):
+    # A Windows junction is not a symlink to Path.is_symlink(); the folder must still resolve
+    # to itself beside the document.
+    out = _outside(tmp_path_factory)
+    target = root / "output/deck/a.html"
+    _symlink_or_skip(target.parent / ed.NOTES_DIR_NAME, out)
+    monkeypatch.setattr(ed, "_is_link", lambda path: False)   # what a junction looks like
+    with pytest.raises(ed.EditorError):
+        ed.write_notes(target, [_note()], root)
+    assert list(out.iterdir()) == []
+
+
+@pytest.mark.skipif(not ed._DIR_FD, reason="needs dir_fd (POSIX)")
+def test_sidecar_swapped_for_a_symlink_after_the_check_is_not_followed(root, tmp_path_factory, monkeypatch):
+    out = _outside(tmp_path_factory)
+    target = root / "output/deck/a.html"
+    notes = target.parent / ed.NOTES_DIR_NAME
+
+    def swap(folder):   # the race: right after HTML Deck checked and opened the folder
+        if folder.name == ed.NOTES_DIR_NAME and not folder.is_symlink():
+            folder.rename(folder.with_name(".moved"))
+            folder.symlink_to(out, target_is_directory=True)
+    monkeypatch.setattr(ed, "_sidecar_opened", swap)
+    ed.write_notes(target, [_note()], root)
+    assert list(out.iterdir()) == []                       # nothing written through the link
+    assert (target.parent / ".moved" / "a.html.json").is_file()
+    notes.unlink()
+    (target.parent / ".moved").rename(notes)
+
+    def swap_backup(folder):
+        if folder.name == ed.BACKUP_DIR_NAME and not folder.is_symlink():
+            folder.rename(folder.with_name(".moved-bak"))
+            folder.symlink_to(out, target_is_directory=True)
+    monkeypatch.setattr(ed, "_sidecar_opened", swap_backup)
+    mtime = ed.load_html(target, root)["mtime_ns"]
+    ed.save_html(target, "<p>b</p>", mtime, False, root)
+    assert list(out.iterdir()) == [] and list((target.parent / ".moved-bak").glob("a.html.*.bak"))

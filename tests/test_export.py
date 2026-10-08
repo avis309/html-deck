@@ -1,6 +1,7 @@
 import base64
 import http.server
 import threading
+from pathlib import Path
 
 import pytest
 
@@ -72,7 +73,7 @@ def cdn(tmp_path):
 
 
 def test_remote_files_only_when_asked(ws, cdn, monkeypatch):
-    monkeypatch.setattr(ex, "_host_allowed", lambda host: True)   # the test CDN is on 127.0.0.1
+    monkeypatch.setattr(ex, "_public_addresses", lambda host: ["127.0.0.1"])   # the test CDN is on 127.0.0.1
     html = f'<script src="{cdn}/lib.js" integrity="sha384-x" crossorigin="anonymous"></script><link rel="stylesheet" href="{cdn}/f.css">'
     out, rep = run(ws, html)
     assert out == html and rep["remote"] == [f"{cdn}/lib.js", f"{cdn}/f.css"]   # listed, not fetched
@@ -127,13 +128,36 @@ def test_remote_export_never_reaches_local_or_private_addresses(ws, redirector, 
     for host in ("localhost", "127.0.0.1", "10.0.0.1", "192.168.1.1", "169.254.169.254", "[::1]"):
         assert not ex._host_allowed(host.strip("[]")), host
     # A public-looking first hop that redirects to localhost is refused at the redirect.
-    monkeypatch.setattr(ex, "_host_allowed", lambda host, real=ex._host_allowed: host == "127.0.0.1" or real(host))
+    monkeypatch.setattr(ex, "_public_addresses", lambda host, real=ex._public_addresses: ["127.0.0.1"] if host == "127.0.0.1" else real(host))
     out, rep = run(ws, f'<script src="{redirector}/go"></script>', fetch_remote=True)
     assert "window.secret" not in out and rep["missing"] == [f"{redirector}/go"]
 
 
 def test_remote_export_has_a_total_size_budget(ws, cdn, monkeypatch):
-    monkeypatch.setattr(ex, "_host_allowed", lambda host: True)
+    monkeypatch.setattr(ex, "_public_addresses", lambda host: ["127.0.0.1"])
     monkeypatch.setattr(ex, "MAX_REMOTE_TOTAL", 20)
     out, rep = run(ws, f'<script src="{cdn}/lib.js"></script><script src="{cdn}/lib.js?again"></script>', fetch_remote=True)
     assert out.count("window.lib=1") == 1 and rep["missing"] == [f"{cdn}/lib.js?again"]
+
+    # Once the budget is spent, no further request is even opened.
+    opened = []
+    monkeypatch.setattr(ex._OPENER, "open", lambda *a, **k: opened.append(a) or (_ for _ in ()).throw(OSError("x")))
+    res = ex._Resolver(ws, [ws], True)
+    res.downloaded = ex.MAX_REMOTE_TOTAL
+    assert res._fetch(f"{cdn}/lib.js?third") is None and opened == []
+
+
+def test_remote_export_connects_to_the_address_it_checked(monkeypatch):
+    # DNS rebinding: the name resolves to a public address when checked, to localhost when
+    # connecting. The connection must use the checked address.
+    answers = iter([[(2, 1, 6, "", ("93.184.216.34", 0))], [(2, 1, 6, "", ("127.0.0.1", 0))]])
+    monkeypatch.setattr(ex.socket, "getaddrinfo", lambda *a, **k: next(answers))
+    seen = []
+
+    def connect(addr, *a, **k):
+        seen.append(addr[0])
+        raise OSError("stop here")
+    monkeypatch.setattr(ex.socket, "create_connection", connect)
+    res = ex._Resolver(Path("."), [], True)
+    assert res._fetch("http://rebind.example/x.js") is None
+    assert seen == ["93.184.216.34"]

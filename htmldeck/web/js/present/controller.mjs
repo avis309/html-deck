@@ -70,7 +70,9 @@ export function startPresent() {
         ready: m => { clearTimeout(p.deadline); layoutPresent(); p.session.frame.focus(); p.session.frame.contentWindow?.focus(); document.body.dataset.presentIndex = String(m.index); document.body.dataset.presentState = 'active'; if (untrusted && hasAuthorCode(S.model)) toast(t('present_untrusted'), { ms: 6000 }); if (m.split) toast(t('present_split'), { ms: 5000 }); },
         state: i => { document.body.dataset.presentIndex = String(i); },
         exit: () => endPresent(),
-        save: () => save(),
+        // The presented document's own scripts run in that frame and could send this message
+        // themselves: only honoured where the user trusted those scripts.
+        save: () => { if (S.source?.kind === 'server' && S.workspaceTrusted) save(); else toast(t('present_save_untrusted')); },
         fail: reason => fail(reason),
       },
     });

@@ -1676,7 +1676,20 @@ async function workspaceTrust(browser) {
     check('untrusted: the document\'s script did not run', (await ran()) === 0);
     check('untrusted: a button offers to trust the workspace', await s.page.isVisible('#sb-ws-trust'));
     check('untrusted: text still editable, file intact', (await s.content()) === disk(f));
+    // A save message from the presentation (where the document's scripts do run) is not
+    // honoured for an untrusted workspace: those scripts could send it themselves.
+    const before = disk(f);
+    await s.typeAtEnd('#w-text', ' more');
+    await s.page.click('#btn-present');
+    await s.page.waitForFunction(() => document.body.dataset.presentState === 'active', null, { timeout: 15000 });
+    await s.page.keyboard.press('Control+s');
+    await s.page.waitForTimeout(600);
+    check('untrusted: a save sent from the presentation is not made', disk(f) === before && await s.dirty());
+    await s.page.keyboard.press('Escape');
+    await s.page.waitForFunction(() => !document.querySelector('.present-frame'), null, { timeout: 10000 });
+    while (await s.canUndo()) await s.undo();
     const seq = await s.seq();
+    s.expectDialog('confirm', /undo history/, true, { optional: true });   // the edit above left history
     await s.page.click('#sb-ws-trust');
     await s.waitReady(wpath(f), seq);
     check('trusted: the edit view runs the script', (await ran()) === 1, String(await ran()));
