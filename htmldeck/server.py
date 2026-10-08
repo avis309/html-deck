@@ -708,6 +708,16 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
     explicit_file: bool = False  # --file given: open it instead of the browser's last file
     test_hooks: bool = False  # --test-hooks: the UI honours fault-injection URL params (spec only)
     trusted_session: bool = False  # --trust: this run trusts the workspace without remembering it
+    # Keep-alive: the editor loads ~65 modules per page; one TCP connection each ran Windows out
+    # of socket buffers (net::ERR_NO_BUFFER_SPACE). Idle connections close after `timeout` s.
+    protocol_version = "HTTP/1.1"
+    timeout = 30
+
+    def handle_one_request(self):
+        # One handler serves every request of a kept-alive connection: per-request state (the
+        # CSP chosen for a workspace file) must not carry over to the next request.
+        self._csp = None
+        super().handle_one_request()
 
     def _trusted(self) -> bool:
         return self.trusted_session or str(self.root) in trusted_roots()
@@ -779,6 +789,7 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
             # Keep the query so /?file=<path> still opens that file.
             query = "?" + parsed.query if parsed.query else ""
             self.send_header("Location", EDITOR_PREFIX + "index.html" + query)
+            self.send_header("Content-Length", "0")
             self.end_headers()
             return
         if parsed.path.startswith(EDITOR_PREFIX):
@@ -829,6 +840,8 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
         self.send_error(405)
 
     def do_POST(self):
+        # Its body may go unread (a refused or unknown request): never reuse this connection.
+        self.close_connection = True
         if not self._host_ok() or not self._origin_ok() or not self._same_origin_fetch():
             self._send_json({"error": "Invalid Origin"}, 403)
             return
@@ -895,9 +908,12 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"error": "Too many open editor tabs"}, 503)
             return
         try:
+            # A stream has no length: it ends when the connection does.
+            self.close_connection = True
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(b"retry: 2000\n\n")
             self.wfile.flush()
@@ -997,6 +1013,8 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        if self.close_connection:
+            self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(body)
 

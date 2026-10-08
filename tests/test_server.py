@@ -817,3 +817,31 @@ def test_backup_keeps_the_documents_permissions(root):
     ed.save_html(target, "<p>b</p>", mtime, False, root)
     backup = next((target.parent / ed.BACKUP_DIR_NAME).glob("a.html.*.bak"))
     assert backup.stat().st_mode & 0o777 == 0o600
+
+
+def test_editor_files_share_one_connection(server):
+    # The editor loads ~65 modules per page: one TCP connection each ran Windows out of socket
+    # buffers (net::ERR_NO_BUFFER_SPACE). They are kept alive on one connection now.
+    conn = http.client.HTTPConnection("127.0.0.1", server, timeout=5)
+    hdrs = {"Host": f"127.0.0.1:{server}"}
+    for path in ("/__htmldeck/js/app.mjs", "/__htmldeck/css/editor.css", "/", "/__htmldeck/index.html"):
+        conn.request("GET", path, headers=hdrs)
+        res = conn.getresponse()
+        res.read()
+        assert res.status in (200, 302) and not res.will_close, path
+    # Per-request state does not leak to the next request on the connection: a workspace
+    # file's sandbox CSP must not land on the editor page that follows.
+    conn.request("GET", "/output/deck/a.html", headers=hdrs)
+    res = conn.getresponse()
+    res.read()
+    assert (res.getheader("Content-Security-Policy") or "").startswith("sandbox")
+    conn.request("GET", "/__htmldeck/index.html", headers=hdrs)
+    res = conn.getresponse()
+    res.read()
+    assert "sandbox" not in (res.getheader("Content-Security-Policy") or "")
+    # A POST (its body may go unread on an error) ends its connection.
+    conn.request("POST", "/api/nope", body="{}", headers={**hdrs, "Content-Type": "application/json", "Sec-Fetch-Site": "same-origin"})
+    res = conn.getresponse()
+    res.read()
+    assert res.will_close
+    conn.close()
