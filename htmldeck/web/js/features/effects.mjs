@@ -20,45 +20,72 @@ import { pushOp } from '../editor/history.mjs';
 export function fxApi() { return S.win ? (S.fxPreview ||= fxRuntime(S.win, { preview: true })) : null; }
 export function stopFxPreview() { S.fxPreview?.stopPreview(); }
 export const FX_ATTRS = ['data-fx', 'data-fx-delay', 'data-fx-dur', 'data-fx-stagger'];
-// The picker: presets by category, from the runtime's own catalog (same code the file runs).
-const FX_CATS = ['enter', 'emphasis', 'data', 'loop'];
-const FX_LABELS = {
-  'fade-in': 'Fade in', 'fade-up': 'Fade up', 'fade-down': 'Fade down', 'zoom-in': 'Zoom in', 'zoom-out': 'Zoom out',
-  'slide-left': 'Slide left', 'slide-right': 'Slide right', 'blur-in': 'Blur in', 'pop': 'Pop', 'count-up': 'Count up',
-  'grow-x': 'Grow →', 'grow-y': 'Grow ↑', 'draw': 'Draw lines', 'spin': 'Spin', 'float': 'Float', 'pulse': 'Pulse',
-};
+// The side bar groups effects the way Canva does: basic entrances, then data & charts, then
+// the extra (looping) ones. A preset the runtime knows but no group lists is not offered.
+const FX_GROUPS = [
+  ['basic', ['fade-up', 'fade-in', 'fade-down', 'slide-left', 'slide-right', 'zoom-in', 'zoom-out', 'blur-in', 'pop']],
+  ['data', ['count-up', 'grow-x', 'grow-y', 'draw']],
+  ['extra', ['spin', 'float', 'pulse']],
+];
 // Runtime refusal → the i18n key that explains it.
 export const FX_WHY = { count: 'fx_count_bad', draw: 'fx_bad_draw', inline: 'fx_bad_inline', filter: 'fx_bad_filter', transform: 'fx_bad_transform', reveal: 'fx_bad_reveal' };
-// Each tile's little picture, animated on hover by its data-anim (editor.css).
+// Each tile's drawing (Canva-like): `m` is the part that moves on hover (editor.css).
+const L = '#ddd6fe', M = '#c4b5fd', D = '#8b5cf6';
+const SQ = (x, y, fill, cls = '') => `<rect${cls ? ` class="${cls}"` : ''} x="${x}" y="${y}" width="16" height="16" rx="4" fill="${fill}"/>`;
+const ARROW = { up: 'M42 30V12M38 16l4-4 4 4', down: 'M42 10v18M38 24l4 4 4-4', right: 'M14 35h20M30 31l4 4-4 4', left: 'M34 35H14M18 31l-4 4 4 4' };
+const arrow = d => `<path d="${ARROW[d]}" fill="none" stroke="${D}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+// Four diagonal arrows at the corners, pointing out (zoom, pulse) or in (stomp).
+const CORNERS = [[8, 4, 1, 1], [48, 4, -1, 1], [8, 36, 1, -1], [48, 36, -1, -1]];
+const corners = out => CORNERS.map(([x, y, dx, dy]) => {
+  const [hx, hy, ax, ay] = out ? [x, y, dx, dy] : [x + 6 * dx, y + 6 * dy, -dx, -dy];   // arrow head, its arms' direction
+  return `<path d="M${x} ${y}l${6 * dx} ${6 * dy}M${hx} ${hy + 4 * ay}V${hy}H${hx + 4 * ax}" stroke="${D}" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+}).join('');
 const FX_ICONS = {
-  'count-up': '<b>123</b>', 'grow-x': '<i class="bar-x"></i>', 'grow-y': '<i class="bar-y"></i>',
-  'draw': '<svg viewBox="0 0 32 20"><path d="M2 17 L10 8 L18 12 L30 3"/></svg>',
+  '': `<circle cx="28" cy="20" r="11" fill="none" stroke="#8a8a94" stroke-width="2.2"/><path d="M20 28l16-16" stroke="#8a8a94" stroke-width="2.2" stroke-linecap="round"/>`,
+  'fade-up': SQ(16, 22, L) + SQ(16, 16, M) + SQ(16, 8, D, 'm') + arrow('up'),
+  'fade-down': SQ(16, 6, L) + SQ(16, 12, M) + SQ(16, 18, D, 'm') + arrow('down'),
+  'slide-right': SQ(8, 10, L) + SQ(14, 10, M) + SQ(22, 10, D, 'm') + arrow('right'),
+  'slide-left': SQ(34, 10, L) + SQ(28, 10, M) + SQ(20, 10, D, 'm') + arrow('left'),
+  'fade-in': `<g class="m"><rect x="17" y="10" width="7" height="20" rx="2" fill="${L}"/><rect x="23" y="10" width="7" height="20" fill="${M}"/><rect x="29" y="10" width="9" height="20" rx="2" fill="${D}"/></g>`,
+  'zoom-in': `<rect class="m blur" x="19" y="11" width="18" height="18" rx="4" fill="${D}"/>` + corners(true),
+  'zoom-out': `<rect x="15" y="7" width="26" height="26" rx="6" fill="none" stroke="${M}" stroke-width="1.5"/><rect class="m" x="20" y="12" width="16" height="16" rx="4" fill="${D}"/>` + corners(false),
+  'blur-in': `<rect class="m blur" x="17" y="9" width="22" height="22" rx="5" fill="${D}"/>`,
+  'pop': `<rect x="16" y="8" width="24" height="24" rx="6" fill="${L}"/><rect class="m" x="20" y="12" width="16" height="16" rx="4" fill="${D}"/><path d="M10 14q-3 6 0 12M46 14q3 6 0 12M6 11q-5 9 0 18M50 11q5 9 0 18" stroke="${M}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`,
+  'count-up': `<text class="m" x="28" y="26" text-anchor="middle" font-size="15" font-weight="800" fill="${D}" font-family="system-ui, sans-serif">123</text>`,
+  'grow-x': `<rect x="9" y="16" width="38" height="9" rx="4.5" fill="${L}"/><rect class="m gx" x="9" y="16" width="24" height="9" rx="4.5" fill="${D}"/>`,
+  'grow-y': `<rect x="23" y="5" width="10" height="30" rx="5" fill="${L}"/><rect class="m gy" x="23" y="17" width="10" height="18" rx="5" fill="${D}"/>`,
+  'draw': `<polyline points="7,31 17,19 26,24 37,10 49,15" fill="none" stroke="${L}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><polyline class="m draw" points="7,31 17,19 26,24 37,10 49,15" fill="none" stroke="${D}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`,
+  'spin': `<circle cx="28" cy="20" r="8" fill="${D}"/><g class="m"><path d="M15 12a15 15 0 0 1 14-7" stroke="${D}" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M26 2l3 3-3 3" stroke="${D}" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M41 28a15 15 0 0 1-14 7" stroke="${D}" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M30 38l-3-3 3-3" stroke="${D}" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>`,
+  'float': `<circle class="m" cx="28" cy="20" r="9" fill="${D}"/><path d="M13 9q2 2 0 4t0 4M43 23q2 2 0 4t0 4" stroke="${D}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`,
+  'pulse': `<circle cx="28" cy="20" r="11" fill="${L}"/><circle class="m" cx="28" cy="20" r="7" fill="${D}"/>` + corners(true),
 };
+const fxName = name => name ? t('fx_n_' + name.replace('-', '_')) : t('fx_none');
 let fxCatalog = null;
-function fxTile(name, label) {
+function fxTile(name) {
   const b = document.createElement('button');
   b.className = 'fx-tile';
   b.dataset.preset = name;
-  b.innerHTML = `<span class="fx-ico" data-anim="${name || 'none'}">${name ? FX_ICONS[name] || '<i></i>' : '<i class="none"></i>'}</span><span class="n"></span>`;
-  b.querySelector('.n').textContent = label;
+  b.innerHTML = `<span class="fx-ico" data-anim="${name || 'none'}"><svg viewBox="0 0 56 40" aria-hidden="true">${FX_ICONS[name] || ''}</svg></span><span class="n"></span>`;
+  b.querySelector('.n').textContent = fxName(name);
   b.addEventListener('click', () => pickFx(name));
   return b;
 }
-// The Effects side bar: tiles by category, from the runtime's own catalog (same code the file runs).
+// The Effects side bar: tiles in groups; only presets the runtime has (same code the file runs).
 export function renderFxPresets() {
   const box = $('#fx-tiles');
   fxCatalog ||= fxRuntime(window, { preview: true }).catalog();
+  const known = new Set(fxCatalog.map(p => p.name));
   box.replaceChildren();
   const none = document.createElement('div');
   none.className = 'fx-none-row';
-  none.appendChild(fxTile('', t('fx_none')));
+  none.appendChild(fxTile(''));
   box.appendChild(none);
-  for (const cat of FX_CATS) {
+  for (const [group, names] of FX_GROUPS) {
     const g = document.createElement('div');
     g.className = 'fx-group';
     g.innerHTML = `<div class="sec-label"></div><div class="fx-grid-tiles"></div>`;
-    g.querySelector('.sec-label').textContent = t('fx_cat_' + cat);
-    for (const p of fxCatalog.filter(p => p.category === cat)) g.lastChild.appendChild(fxTile(p.name, FX_LABELS[p.name] || p.name));
+    g.querySelector('.sec-label').textContent = t('fx_cat_' + group);
+    for (const n of names.filter(n => known.has(n))) g.lastChild.appendChild(fxTile(n));
     box.appendChild(g);
   }
   if (effectsVisible()) renderFxSel();

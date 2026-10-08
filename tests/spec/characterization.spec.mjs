@@ -1614,8 +1614,10 @@ async function fxModules(browser, url) {
   await s.page.keyboard.press('Escape');
   section('FX modules: picker grouped by category, presets that cannot apply are disabled with the reason');
   const groups = await s.page.$$eval('#fx-tiles .fx-group', gs => gs.map(g => [g.querySelector('.sec-label').textContent, g.querySelectorAll('.fx-tile').length]));
-  check('picker: 4 groups (Entrance, Emphasis, Data & charts, Loop) holding 16 presets',
-    groups.map(g => g[0]).join('|') === 'Entrance|Emphasis|Data & charts|Loop' && groups.reduce((n, g) => n + g[1], 0) === 16, JSON.stringify(groups));
+  check('side bar: Canva-like groups (Basic 9, Data & charts 4, Extra 3)',
+    JSON.stringify(groups) === JSON.stringify([['Basic effects', 9], ['Data & charts', 4], ['Extra effects', 3]]), JSON.stringify(groups));
+  const tile = await s.page.$eval('.fx-tile[data-preset="fade-up"]', b => ({ name: b.querySelector('.n').textContent, svg: !!b.querySelector('.fx-ico svg') }));
+  check('tiles: translated names and a drawn icon (Rise)', tile.name === 'Rise' && tile.svg, JSON.stringify(tile));
   await s.page.click('#sb-next');
   await s.frame.locator('#m-plain').click({ modifiers: ['Alt'] });
   if (await s.page.isHidden('#fx-tiles')) await s.page.click('#tb-fx');
