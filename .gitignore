@@ -10,3 +10,7 @@ node_modules/
 docs/
 build/
 dist/
+# local OS, agent and tool output
+.DS_Store
+.superpowers/
+*.log
