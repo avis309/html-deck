@@ -94,7 +94,7 @@ Try it in a clone of this repo: `htmldeck --root samples --file marketing-report
 | **Reveal.js** | Hand-written decks: stacks, fragments, speaker notes, backgrounds. Markdown slides are read-only. |
 | **Tailwind CSS** | Classes stay as written; your styles go on top. |
 | **SVG** | Retype a `<text>` / `<tspan>` label in an inline `<svg>`. |
-| **Animations** | The page's own scripts (anime.js, GSAP…) run when presenting a file from the workspace. While editing, CSS and Web Animations are paused, and content a script changes is locked. Add `data-fx` entrance effects from the toolbar. |
+| **Animations** | The page's own scripts (anime.js, GSAP…) run when presenting a file from the workspace. While editing, CSS and Web Animations are paused, and content a script changes is locked. Add effects from the toolbar without code: entrances, emphasis (pop), data & charts (count-up, grow bars, draw lines) and loops (spin, float, pulse). **Animate this slide** adds them to a whole slide in one undoable step; **Enable FX in the file** keeps them running when the file is opened on its own. |
 | **Safety** | Undo/redo, draft recovery, backups. Remote scripts (a CDN, for example) are blocked while editing until you trust the file; presenting runs on a separate origin. |
 
 <details>

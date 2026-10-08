@@ -94,7 +94,7 @@ Thử ngay trong bản clone của repo này: `htmldeck --root samples --file ma
 | **Reveal.js** | Deck viết tay: stack, fragment, speaker notes, background. Slide Markdown chỉ đọc. |
 | **Tailwind CSS** | Class giữ nguyên như đã viết; style của bạn được áp lên trên. |
 | **SVG** | Gõ lại nhãn `<text>` / `<tspan>` trong một `<svg>` nằm trong trang. |
-| **Hiệu ứng** | Script riêng của trang (anime.js, GSAP…) chạy khi thuyết trình một file trong workspace. Khi sửa, CSS và Web Animations tạm dừng, nội dung do script thay đổi bị khoá. Thêm hiệu ứng xuất hiện `data-fx` từ thanh công cụ. |
+| **Hiệu ứng** | Script riêng của trang (anime.js, GSAP…) chạy khi thuyết trình một file trong workspace. Khi sửa, CSS và Web Animations tạm dừng, nội dung do script thay đổi bị khoá. Thêm hiệu ứng từ thanh công cụ, không cần code: xuất hiện, nhấn mạnh (pop), dữ liệu & biểu đồ (count-up, thanh dài ra, vẽ nét) và lặp (xoay, lơ lửng, nhịp đập). **Tạo hiệu ứng cho slide này** gán cho cả slide trong một bước hoàn tác được; **Bật FX cho file** giữ hiệu ứng chạy khi mở file độc lập. |
 | **An toàn** | Hoàn tác/làm lại, khôi phục bản nháp, sao lưu. Script từ xa (ví dụ CDN) bị chặn khi sửa cho đến khi bạn tin tưởng file; thuyết trình chạy trên một origin riêng. |
 
 <details>
