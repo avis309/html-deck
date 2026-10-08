@@ -5,6 +5,8 @@ import { S } from '../editor/state.mjs';
 import { setAttrs } from '../core/operations.mjs';
 import { flushPending } from '../editor/edits.mjs';
 import { pushOp } from '../editor/history.mjs';
+import { undo } from '../editor/commands.mjs';
+import { lockedHint } from '../editor/guards.mjs';
 import { isOriginal, isRoot, modelEl } from '../editor/live-document.mjs';
 import { fxApi, fxBlock, fxScope, renderFxDoc, renderFxList, sceneNamesFor } from './effects.mjs';
 import { t } from '../shared/lang.mjs';
@@ -65,6 +67,7 @@ export function planAutoFx(scope) {
 }
 export function animateScope() {
   if (!S.doc) return;
+  if (S.readOnly) return lockedHint(S.readOnly);
   flushPending();
   const plan = planAutoFx(fxScope());
   if (!plan.length) { toast(t('fx_auto_none')); return; }
@@ -80,5 +83,5 @@ export function animateScope() {
   pushOp({ type: 'batch', label: 'Animate slide', ops });
   renderFxList();
   renderFxDoc();
-  toast(t('fx_auto_done').replace('{n}', ops.length));
+  toast(t('fx_auto_done').replace('{n}', ops.length), { ms: 6000, action: { label: t('undo'), fn: undo } });
 }

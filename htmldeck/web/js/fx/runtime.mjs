@@ -242,6 +242,8 @@ export function fxRuntime(win, opts) {
     };
   }
   function svgShape(el) { return !!el.ownerSVGElement; }
+  // A transform does nothing on inline text.
+  function transformable(el) { return svgShape(el) || win.getComputedStyle(el).display !== 'inline'; }
   // grow moves the pivot while it plays: only where the author's transform has none that
   // matters (no transform, or a pure translation).
   function plainTransform(el) {
@@ -287,7 +289,7 @@ export function fxRuntime(win, opts) {
   // Loops: added onto the author's transform, stopped like every other animation on leaving.
   function loop(frames, easing, alternate, dur) {
     return {
-      category: 'loop', waits: false, dur: dur,
+      category: 'loop', waits: false, dur: dur, why: 'inline', applies: transformable,
       play: function (target, i, c, run) {
         run.animate(target, frames, {
           duration: c.preview ? Math.min(c.dur, 2000) : c.dur, delay: c.delay + i * c.stagger, easing: easing,
@@ -390,7 +392,7 @@ export function fxRuntime(win, opts) {
     presets: Object.keys(MODULES),
     // Editor: why preset `name` cannot run on el (null when it can), and the module list.
     check: function (el, name) { var m = MODULES[name]; return !m ? 'unknown' : revealOwned(el) ? 'reveal' : refusal(el, m); },
-    catalog: function () { return Object.keys(MODULES).map(function (n) { return { name: n, category: MODULES[n].category }; }); },
+    catalog: function () { return Object.keys(MODULES).map(function (n) { return { name: n, category: MODULES[n].category, dur: MODULES[n].dur }; }); },
     // Present bootstraps drive the slides themselves.
     control: function () { if (io) { io.disconnect(); io = null; } if (revealHooks) { revealHooks(); revealHooks = null; } return api; },
     show: activeOnly,

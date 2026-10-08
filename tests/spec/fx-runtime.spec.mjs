@@ -271,6 +271,8 @@ async function reviewFixes(browser) {
     <span id="t3" style="display:block;width:50px;transform:translate3d(30px,0,10px)"></span>`);
   const ck = await o.pg.evaluate(() => { const c = (s, n) => window.__htmldeckFx.check(document.querySelector(s), n); return { draw: c('#plain', 'draw'), rot: c('#r2', 'grow-x'), sc: c('#s2', 'grow-y'), t3: c('#t3', 'grow-x') }; });
   check('check: draw on an SVG with strokes and no data-fx yet → allowed', ck.draw === null, JSON.stringify(ck));
+  const il = await o.pg.evaluate(() => { const sp = document.createElement('span'); sp.textContent = 'x'; document.body.appendChild(sp); return ['spin', 'float', 'pulse'].map(n => window.__htmldeckFx.check(sp, n)); });
+  check('check: loops refused on inline text ("inline": a transform does nothing there)', il.every(w => w === 'inline'), JSON.stringify(il));
   check('check: grow refused on CSS rotate / scale properties, allowed on a 3D translation', ck.rot === 'transform' && ck.sc === 'transform' && ck.t3 === null, JSON.stringify(ck));
   await o.ctx.close();
   // Reveal owns auto-animate targets and fragments: check() says so (the editor and Animate this slide ask it).

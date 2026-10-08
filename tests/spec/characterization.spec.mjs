@@ -1445,6 +1445,10 @@ async function reveal(browser, url) {
   await s2.page.keyboard.type('Z');
   c = await s2.content();
   check('Reveal ESM: typing edits nothing, file intact', c === disk(m) && !(await s2.dirty()), firstDiff(c, disk(m)));
+  await s2.page.click('.rail-item[data-panel="effects"]');
+  await s2.page.click('#fx-auto');
+  check('Reveal ESM: Animate this slide says read-only, changes nothing', /read-only/.test(await s2.page.textContent('#toast')) && (await s2.content()) === disk(m), await s2.page.textContent('#toast'));
+  await s2.page.click('.rail-item[data-panel="effects"]');
   await s2.page.click('#btn-present');
   await s2.page.waitForFunction(() => document.body.dataset.presentState === 'active', null, { timeout: 15000 }).catch(() => {});
   check('Reveal ESM: present still works (no index sync)', (await s2.page.evaluate(() => document.body.dataset.presentState)) === 'active');
@@ -1619,6 +1623,8 @@ async function fxModules(browser, url) {
   await s.frame.locator('#m-bar').click({ modifiers: ['Alt'] });
   if (await s.page.isHidden('#pop-fx')) await s.page.click('#tb-fx');
   await s.page.selectOption('#fx-preset', 'grow-x');
+  check('duration field: shows the preset\'s default (grow 900 ms)', (await s.page.getAttribute('#fx-dur', 'placeholder')) === '900', await s.page.getAttribute('#fx-dur', 'placeholder'));
+  check('popover label: not "Entrance" only any more', !/Entrance/.test(await s.page.textContent('#pop-fx [data-i18n="fx_label"]')), await s.page.textContent('#pop-fx [data-i18n="fx_label"]'));
   const c = await s.content();
   check('grow-x on a bar: only data-fx added', c === disk(f).replace('<span class="bar" id="m-bar">', '<span class="bar" id="m-bar" data-fx="grow-x">'), firstDiff(c, disk(f)));
   await s.undo();
@@ -1649,7 +1655,8 @@ async function fxModules(browser, url) {
   const two = await s.content();
   check('animate slide: count-up only where the text is a number (not "Aug 12" or a sentence)',
     /<p id="m-date" data-fx="fade-up"/.test(two) && /<p id="m-sent" data-fx="fade-up"/.test(two) && /<p id="m-kpi" data-fx="count-up"/.test(two), two.match(/<p id="m-(date|sent|kpi)"[^>]*>/g)?.join(' '));
-  await s.undo();
+  await s.page.click('#toast .t-act');
+  check('animate slide: the toast\'s Undo puts the file back', (await s.content()) === orig, firstDiff(await s.content(), orig));
   await s.close();
 }
 

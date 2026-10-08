@@ -28,7 +28,7 @@ const FX_LABELS = {
   'grow-x': 'Grow →', 'grow-y': 'Grow ↑', 'draw': 'Draw lines', 'spin': 'Spin', 'float': 'Float', 'pulse': 'Pulse',
 };
 // Runtime refusal → the i18n key that explains it.
-export const FX_WHY = { count: 'fx_count_bad', draw: 'fx_bad_draw', inline: 'fx_bad_inline', filter: 'fx_bad_filter', transform: 'fx_bad_transform', reveal: 'lock_fx_fragment' };
+export const FX_WHY = { count: 'fx_count_bad', draw: 'fx_bad_draw', inline: 'fx_bad_inline', filter: 'fx_bad_filter', transform: 'fx_bad_transform', reveal: 'fx_bad_reveal' };
 let fxCatalog = null;
 export function renderFxPresets() {
   const sel = $('#fx-preset'), keep = sel.value;
@@ -41,6 +41,11 @@ export function renderFxPresets() {
     sel.appendChild(g);
   }
   sel.value = keep;
+}
+// The duration field shows the chosen preset's own default (a loop's is seconds, not 700 ms).
+export function syncFxDur() {
+  const p = (fxCatalog || []).find(x => x.name === $('#fx-preset').value);
+  $('#fx-dur').placeholder = String(p?.dur || 700);
 }
 export function fxBlock(node, preset) {
   const block = S.readOnly || structureBlock(provenanceOf(node)) || formatBlock('fx', formatFlags(node));
@@ -64,6 +69,7 @@ export function openFxPop(btn) {
     o.disabled = !!why && o.value !== cur;
     o.title = why ? t(FX_WHY[why] || 'fx_bad_draw') : '';
   }
+  syncFxDur();
   renderFxDoc();
 }
 export function applyFx() {
@@ -81,6 +87,7 @@ export function applyFx() {
   setAttrs(m, after);
   setAttrs(node, after);
   pushOp({ type: 'attrs', id, before, after, key: 'fx:' + id, label: 'Effect' });
+  syncFxDur();
   renderFxDoc();
 }
 export function previewFx() {
