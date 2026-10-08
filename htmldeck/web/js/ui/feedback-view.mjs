@@ -1,7 +1,7 @@
 // AI Feedback: pins, note list, removal, copy request.
 import { $, $$ } from '../core/utils.mjs';
 import { S, el } from '../editor/state.mjs';
-import { agentCmdLines, noteOps, noteTarget } from '../features/feedback/notes.mjs';
+import { noteOps, noteTarget } from '../features/feedback/notes.mjs';
 import { api } from '../services/api.mjs';
 import { deselect, select, showSlide } from '../editor/selection.mjs';
 import { positionRegion, regionRect } from '../editor/multi-selection.mjs';
@@ -96,10 +96,8 @@ export function renderNoteList() {
   fb.children[0].textContent = t('fb_open').replace('{n}', open);
   fb.children[1].textContent = t('fb_done').replace('{n}', notes.filter(n => n.status === 'done').length);
   [...fb.children].forEach(b => b.classList.toggle('on', b.dataset.f === filter));
-  const server = S.source?.kind === 'server';
-  $('#fb-copy').disabled = !server || !open;
   const whole = S.mode === 'deck' ? S.slides[S.cur] : S.sections[S.cur];
-  $('#fb-slide').hidden = !server || !whole;
+  $('#fb-slide').hidden = S.source?.kind !== 'server' || !whole;
   $('#fb-slide-label').textContent = t(S.mode === 'deck' ? 'fb_slide' : 'fb_page');
   if (!notes.length) { box.innerHTML = `<div class="hint">${t('no_notes_yet')}</div>`; return; }
   const shown = (S.agentNotes || []).map((n, i) => [n, i]).filter(([n]) => n.status === filter && !isRemoving(n));
@@ -217,25 +215,4 @@ export function toggleNoteDone(card, n) {
     card.style.borderWidth = '0px';
   }, toDone ? 380 : 60);
   setTimeout(() => noteOps([{ op: 'update', id: n.id, patch: { status: toDone ? 'done' : 'open' } }]), toDone ? 720 : 400);
-}
-// One message the user pastes into Claude / Codex: what to fix, where, and how to report back.
-export function copyFeedbackRequest() {
-  const notes = (S.agentNotes || []).map((n, i) => [n, i]).filter(([n]) => n.status === 'open' && !isRemoving(n));
-  if (!notes.length) return toast(t('fb_nothing'));
-  const lines = [t('fb_prompt_head').replace('{n}', notes.length).replace('{path}', S.source.path), ''];
-  for (const [n, i] of notes) {
-    const target = noteTarget(n);
-    const k = target ? stripItems().findIndex(s => s === target || s.contains(target)) : -1;
-    const region = n.kind === 'region';
-    const whole = !region && k >= 0 && stripItems()[k] === target;
-    const where = [(k >= 0 ? (S.mode === 'deck' ? `Slide ${k + 1}` : `${t('fb_section')} ${k + 1}`) : n.slide != null ? `Slide ${n.slide + 1}` : ''),
-      whole ? t('fb_whole_slide') : '', region ? t('fb_region_tag') : ''].filter(Boolean).join(' · ');
-    const quote = region ? (n.targets.length ? n.targets.slice(0, 4).map(x => x.text ? `“${x.text.slice(0, 40)}”` : `<${x.tag}>`).join(', ') : t('fb_region_empty')) + ' → '
-      : n.text && !whole ? '“' + n.text.slice(0, 80) + '” → ' : '';
-    lines.push(`${i + 1}. ${where ? '[' + where + '] ' : ''}${quote}${n.note}`);
-  }
-  if (S.notesCmds?.length) lines.push('', t('fb_prompt_read'), ...agentCmdLines(), '', t('fb_prompt_done'), ...agentCmdLines(' --done ID'));
-  const text = lines.join('\n');
-  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
-    .then(() => toast(t('fb_copied')), () => { S.lastRequest = text; toast(text.slice(0, 120) + '…', { ms: 6000 }); });
 }

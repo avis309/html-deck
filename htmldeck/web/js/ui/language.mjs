@@ -1,10 +1,9 @@
 // UI language: switching it (re-renders the chrome and panels) and the language menu.
 import { $ } from '../core/utils.mjs';
-import { S, el } from '../editor/state.mjs';
+import { el } from '../editor/state.mjs';
 import { applyModeUI, updateChrome } from './chrome.mjs';
 import { boxVisible, drawBoxPanel } from './panels/box.mjs';
 import { buildLayers, layersVisible } from './panels/layers.mjs';
-import { renderAgentCmds } from '../features/feedback/notes.mjs';
 import { renderFileList } from './panels/side-panel.mjs';
 import { renderNoteList } from './feedback-view.mjs';
 import { toast } from '../shared/toast.mjs';
@@ -75,7 +74,6 @@ export function applyLanguage(lang) {
     else if (view === 'files' && typeof renderFileList === 'function') renderFileList();
   }
   if (typeof applyModeUI === 'function') applyModeUI();
-  if (typeof S !== 'undefined' && S) renderAgentCmds();
 }
 
 export function openLangMenu() {

@@ -18,7 +18,7 @@ import { closePanel, openPanel, renderFileList } from './panels/side-panel.mjs';
 import { closePopups, togglePop } from './toolbar.mjs';
 import { confirmDiscard, openFromHandle, openUpload, pickLocalFile, rerender, setLoading, setTrust, storeMode } from '../editor/document.mjs';
 import { contentForSave } from '../editor/live-document.mjs';
-import { copyFeedbackRequest, flushRemoval, renderNoteList, renderPins } from './feedback-view.mjs';
+import { flushRemoval, renderNoteList, renderPins } from './feedback-view.mjs';
 import { clearMulti, deselect, select, showSlide } from '../editor/selection.mjs';
 import { download, save } from '../services/save.mjs';
 import { exportPDF, exportSingleFile, openExportMenu } from '../services/export.mjs';
@@ -232,7 +232,6 @@ export function bindUI() {
   tree.addEventListener('mouseover', e => showHoverBox(layerNode(e.target.closest('.layer-row'))));
   tree.addEventListener('mouseleave', () => showHoverBox(null));
   $('#note-save').addEventListener('click', addNoteFromPop);
-  $('#fb-copy').addEventListener('click', copyFeedbackRequest);
   $('#fb-slide').addEventListener('click', () => openNotePop(S.mode === 'deck' ? S.slides[S.cur] : S.sections[S.cur]));
   $('#multi-note').addEventListener('click', feedbackMulti);
   $('#multi-del').addEventListener('click', deleteMulti);
