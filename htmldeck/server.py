@@ -230,8 +230,15 @@ class _Sidecar:
     def __init__(self, target: Path, name: str, create: bool):
         self.path = _sidecar_dir(target, name, create)
         self.fd = None
-        if _DIR_FD and self.path.exists():
-            self.fd = os.open(self.path, os.O_RDONLY | os.O_DIRECTORY | _NOFOLLOW)
+        # Absent when checked: stays absent for this operation, whatever appears there later.
+        self.absent = not self.path.exists()
+        if _DIR_FD and not self.absent:
+            try:
+                self.fd = os.open(self.path, os.O_RDONLY | os.O_DIRECTORY | _NOFOLLOW)
+            except OSError as exc:
+                if exc.errno in (errno.ELOOP, errno.ENOTDIR):   # swapped for a link or a file
+                    raise EditorError(403, f"{name} beside the document is not a plain folder; HTML Deck does not follow it") from exc
+                raise
         _sidecar_opened(self.path)
 
     def __enter__(self):
@@ -241,12 +248,12 @@ class _Sidecar:
         if self.fd is not None:
             os.close(self.fd)
 
-    def open(self, name: str, flags: int) -> int:
+    def open(self, name: str, flags: int, mode: int = 0o644) -> int:
         flags |= _NOFOLLOW | getattr(os, "O_BINARY", 0)
         try:
             if self.fd is not None:
-                return os.open(name, flags, 0o644, dir_fd=self.fd)
-            return os.open(_no_link(self.path / name), flags, 0o644)
+                return os.open(name, flags, mode, dir_fd=self.fd)
+            return os.open(_no_link(self.path / name), flags, mode)
         except OSError as exc:
             if exc.errno == errno.ELOOP:   # O_NOFOLLOW met a symlink
                 raise EditorError(403, f"{name} is a symlink; HTML Deck does not follow it") from exc
@@ -279,9 +286,12 @@ def _backup(target: Path, stamp: str) -> Path:
     with _Sidecar(target, BACKUP_DIR_NAME, create=True) as side:
         name = f"{target.name}.{stamp}.bak"
         st = target.stat()
-        with open(target, "rb") as src, os.fdopen(side.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL), "wb") as dst:
+        # Created with the document's permissions (a private document keeps a private backup).
+        with open(target, "rb") as src, os.fdopen(side.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, st.st_mode & 0o777), "wb") as dst:
             shutil.copyfileobj(src, dst)
             dst.flush()
+            if hasattr(os, "fchmod"):
+                os.fchmod(dst.fileno(), st.st_mode & 0o777)
             if os.utime in os.supports_fd:
                 os.utime(dst.fileno(), ns=(st.st_atime_ns, st.st_mtime_ns))
         if os.utime not in os.supports_fd:
@@ -393,7 +403,7 @@ def read_notes(target: Path) -> list[dict]:
 
 def _read_notes_in(side: "_Sidecar", target: Path) -> list[dict]:
     name = notes_path(target).name
-    if not side.path.exists() or not side.exists(name):
+    if side.absent or not side.exists(name):
         return []
     with os.fdopen(side.open(name, os.O_RDONLY), "rb") as fh:
         data = json.loads(fh.read().decode("utf-8"))

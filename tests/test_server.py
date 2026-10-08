@@ -794,3 +794,26 @@ def test_sidecar_swapped_for_a_symlink_after_the_check_is_not_followed(root, tmp
     mtime = ed.load_html(target, root)["mtime_ns"]
     ed.save_html(target, "<p>b</p>", mtime, False, root)
     assert list(out.iterdir()) == [] and list((target.parent / ".moved-bak").glob("a.html.*.bak"))
+
+
+@pytest.mark.skipif(not ed._DIR_FD, reason="needs dir_fd (POSIX)")
+def test_notes_folder_created_as_a_link_after_the_check_is_not_read(root, tmp_path_factory, monkeypatch):
+    out = _outside(tmp_path_factory)
+    (out / "a.html.json").write_text('{"notes": [{"id": "x", "note": "outside secret"}]}', encoding="utf-8")
+    target = root / "output/deck/a.html"
+
+    def plant(folder):   # the folder was absent when checked; a link appears right after
+        if folder.name == ed.NOTES_DIR_NAME and not folder.exists():
+            folder.symlink_to(out, target_is_directory=True)
+    monkeypatch.setattr(ed, "_sidecar_opened", plant)
+    assert ed.read_notes(target) == []
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permissions")
+def test_backup_keeps_the_documents_permissions(root):
+    target = root / "output/deck/a.html"
+    target.chmod(0o600)
+    mtime = ed.load_html(target, root)["mtime_ns"]
+    ed.save_html(target, "<p>b</p>", mtime, False, root)
+    backup = next((target.parent / ed.BACKUP_DIR_NAME).glob("a.html.*.bak"))
+    assert backup.stat().st_mode & 0o777 == 0o600
