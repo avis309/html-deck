@@ -12,7 +12,7 @@ import { t } from '../shared/lang.mjs';
 import { toast } from '../shared/toast.mjs';
 import { hooks } from '../shared/hooks.mjs';
 import { lockedHint } from '../editor/guards.mjs';
-import { pushOp } from '../editor/history.mjs';
+import { pushOp, topSeq } from '../editor/history.mjs';
 
 // ================================================================ effects (data-fx)
 // The same runtime the document carries (js/fx/runtime.mjs), in preview mode: it plays one
@@ -94,9 +94,19 @@ export function renderFxPresets() {
 export function pickFx(name) {
   if (!S.sel) return;
   $('#fx-preset').value = name;
-  applyFx();
+  applyFx();   // re-renders the side bar before the preview moves the block
   if (name && modelEl(S.sel.dataset.edId)?.getAttribute('data-fx') === name) previewFx();
-  renderFxSel();
+}
+// Which presets can run on a block, measured on the block as authored: once per block and
+// document change, never while a preview is moving it (and not on every toolbar refresh).
+let fxFit = { node: null, seq: -1, why: {} };
+function fxRefusals(node) {
+  const seq = topSeq();
+  if (fxFit.node === node && fxFit.seq === seq) return fxFit.why;
+  const api = fxApi(), why = {};
+  if (api) for (const b of $$('#fx-tiles .fx-tile')) if (b.dataset.preset) why[b.dataset.preset] = api.check(node, b.dataset.preset);
+  fxFit = { node, seq, why };
+  return why;
 }
 // The selected block's part of the side bar: its effect, timing and what the file can play.
 export function renderFxSel() {
@@ -112,9 +122,9 @@ export function renderFxSel() {
     if (document.activeElement !== $(sel)) $(sel).value = m?.getAttribute(attr) || '';
   }
   // Effects that cannot run on this block stay shown, disabled, with the reason as title.
-  const cur = $('#fx-preset').value, api = fxApi();
+  const cur = $('#fx-preset').value, refusals = fxRefusals(node);
   for (const b of $$('#fx-tiles .fx-tile')) {
-    const why = b.dataset.preset && api ? api.check(node, b.dataset.preset) : null;
+    const why = refusals[b.dataset.preset] || null;
     b.classList.toggle('on', b.dataset.preset === cur);
     b.disabled = !!why && b.dataset.preset !== cur;
     b.title = why ? t(FX_WHY[why] || 'fx_bad_draw') : '';
@@ -142,6 +152,8 @@ export function openFxPanel() {
 export function applyFx() {
   const node = S.sel;
   if (!node) return;
+  // A preview still moving the block would be measured instead of the block as authored.
+  stopFxPreview();
   const preset = $('#fx-preset').value;
   const block = preset ? fxBlock(node, preset) : (S.readOnly || structureBlock(provenanceOf(node)));
   if (block) { lockedHint(block, node); $('#fx-preset').value = modelEl(node.dataset.edId)?.getAttribute('data-fx') || ''; return; }
@@ -156,7 +168,7 @@ export function applyFx() {
   pushOp({ type: 'attrs', id, before, after, key: 'fx:' + id, label: 'Effect' });
   syncFxDur();
   renderFxDoc();
-  if (effectsVisible()) renderFxList();
+  if (effectsVisible()) { renderFxList(); renderFxSel(); }
 }
 export function previewFx() {
   const node = S.sel;

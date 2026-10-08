@@ -1628,6 +1628,9 @@ async function fxModules(browser, url) {
   await s.page.keyboard.press('Escape');
   await s.frame.locator('#m-bar').click({ modifiers: ['Alt'] });
   if (await s.page.isHidden('#fx-tiles')) await s.page.click('#tb-fx');
+  await s.page.click('.fx-tile[data-preset="zoom-in"]');
+  check('a playing preview does not disable tiles that apply (zoom-in previewing, grow still offered)',
+    !(await s.page.$eval('.fx-tile[data-preset="grow-x"]', b => b.disabled)));
   await s.page.click('.fx-tile[data-preset="grow-x"]');
   check('clicking a tile previews it on the slide', (await s.frame.locator('#m-bar').evaluate(n => n.getAnimations().length)) > 0);
   check('duration field: shows the preset\'s default (grow 900 ms)', (await s.page.getAttribute('#fx-dur', 'placeholder')) === '900', await s.page.getAttribute('#fx-dur', 'placeholder'));
@@ -1635,6 +1638,15 @@ async function fxModules(browser, url) {
   check('grow-x on a bar: only data-fx added', c === disk(f).replace('<span class="bar" id="m-bar">', '<span class="bar" id="m-bar" data-fx="grow-x">'), firstDiff(c, disk(f)));
   await s.undo();
   await s.page.keyboard.press('Escape');
+  section('FX modules: removing an effect from the slide list');
+  await s.page.click('#sb-prev');
+  await s.frame.locator('#m-done').click({ modifiers: ['Alt'] });
+  if (await s.page.isHidden('#fx-tiles')) await s.page.click('#tb-fx');
+  await s.page.locator('#fx-list .fx-item', { hasText: 'Already animated' }).locator('.x').click();
+  check('× in the list: the block\'s tile shows None again', await s.page.$eval('.fx-tile[data-preset=""]', b => b.classList.contains('on')) && !(await s.page.$eval('.fx-tile[data-preset="pop"]', b => b.classList.contains('on'))));
+  await s.undo();
+  await s.page.keyboard.press('Escape');
+  await s.page.click('#sb-next');
   section('FX modules: Animate this slide');
   await s.page.click('#sb-prev');
   if (await s.page.isHidden('#fx-auto')) await s.page.click('.rail-item[data-panel="effects"]');
