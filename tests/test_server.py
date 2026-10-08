@@ -742,7 +742,7 @@ def test_workspace_scripts_are_off_until_the_workspace_is_trusted(untrusted_serv
     # Trusting is remembered for this workspace (user config), across restarts.
     status, data = _request(port, "POST", "/api/trust", json.dumps({"trusted": True}), hdr)
     assert status == 200 and json.loads(data)["trusted"] is True and cfg()["trusted"] is True
-    assert str(root) in (config_dir / "trusted-workspaces.json").read_text(encoding="utf-8")
+    assert str(root) in json.loads((config_dir / "trusted-workspaces.json").read_text(encoding="utf-8"))["roots"]   # parsed: JSON escapes Windows backslashes
     body = json.dumps({"path": "output/deck/a.html", "content": "<p>x</p>"})
     url = json.loads(_request(port, "POST", "/api/preview", body, hdr)[1])["url"]
     assert "'unsafe-inline'" in _head(port, url)[1]
