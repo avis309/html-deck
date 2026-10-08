@@ -245,11 +245,16 @@ export function fxRuntime(win, opts) {
   // grow moves the pivot while it plays: only where the author's transform has none that
   // matters (no transform, or a pure translation).
   function plainTransform(el) {
-    var tf = win.getComputedStyle(el).transform, m = /^matrix\(([^)]*)\)$/.exec(tf);
+    var cs = win.getComputedStyle(el), tf = cs.transform;
+    if ((cs.rotate && cs.rotate !== 'none') || (cs.scale && cs.scale !== 'none')) return false;
     if (tf === 'none') return true;
+    var m = /^matrix(3d)?\(([^)]*)\)$/.exec(tf);
     if (!m) return false;
-    var v = m[1].split(',').map(parseFloat);
-    return v[0] === 1 && v[1] === 0 && v[2] === 0 && v[3] === 1;
+    var v = m[2].split(',').map(parseFloat);
+    // Identity apart from the translation entries (2D: e, f; 3D: m41..m43).
+    var id = m[1] ? [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, null, null, null, 1] : [1, 0, 0, 1, null, null];
+    for (var i = 0; i < id.length; i++) if (id[i] !== null && v[i] !== id[i]) return false;
+    return true;
   }
   function growable(el) { return (svgShape(el) || win.getComputedStyle(el).display !== 'inline') && plainTransform(el); }
   function growWhy(el) { return svgShape(el) || win.getComputedStyle(el).display !== 'inline' ? 'transform' : 'inline'; }
@@ -262,13 +267,14 @@ export function fxRuntime(win, opts) {
     if (pl > 0) return pl;
     try { return s.getTotalLength(); } catch (e) { return 0; }
   }
+  function ownShape(s, el) { for (var n = s; n && n !== el; n = n.parentElement) if (n.hasAttribute('data-fx')) return false; return true; }
   function shapesOf(el) {
     var list = el.matches(SHAPES) ? [el] : Array.prototype.slice.call(el.querySelectorAll(SHAPES));
     return list.filter(function (s) {
       var cs = win.getComputedStyle(s);
       // The nearest data-fx owns a shape (a nested draw group keeps its own timing); a
       // non-scaling stroke is dashed in other units than its length.
-      return s.closest('[data-fx]') === el && cs.stroke !== 'none' && cs.strokeDasharray === 'none' && cs.display !== 'none' &&
+      return ownShape(s, el) && cs.stroke !== 'none' && cs.strokeDasharray === 'none' && cs.display !== 'none' &&
         cs.vectorEffect !== 'non-scaling-stroke' && strokeLength(s) > 0;
     });
   }

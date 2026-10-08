@@ -265,6 +265,14 @@ async function reviewFixes(browser) {
   check('draw: a non-scaling stroke is left alone', d.ns.length === 0, JSON.stringify(d.ns));
   check('draw: a nested draw group plays its own delay, once', d.inner.length === 1 && d.inner[0].delay === 1000, JSON.stringify(d.inner));
   await o.ctx.close();
+  // check() on blocks with no effect yet (what the picker and Animate this slide ask).
+  o = await open(browser, `<svg id="plain" width="300" height="50"><path d="M0 10 H300" stroke="#000" fill="none"/></svg>
+    <span id="r2" style="display:block;width:50px;rotate:90deg"></span><span id="s2" style="display:block;width:50px;scale:2"></span>
+    <span id="t3" style="display:block;width:50px;transform:translate3d(30px,0,10px)"></span>`);
+  const ck = await o.pg.evaluate(() => { const c = (s, n) => window.__htmldeckFx.check(document.querySelector(s), n); return { draw: c('#plain', 'draw'), rot: c('#r2', 'grow-x'), sc: c('#s2', 'grow-y'), t3: c('#t3', 'grow-x') }; });
+  check('check: draw on an SVG with strokes and no data-fx yet → allowed', ck.draw === null, JSON.stringify(ck));
+  check('check: grow refused on CSS rotate / scale properties, allowed on a 3D translation', ck.rot === 'transform' && ck.sc === 'transform' && ck.t3 === null, JSON.stringify(ck));
+  await o.ctx.close();
   // count-up really counts and ends on the authored text by itself.
   o = await open(browser, '<section id="s"><p id="n" data-fx="count-up" data-fx-dur="400">1.250,5 ₫</p></section>');
   await show(o.pg, '#s');
