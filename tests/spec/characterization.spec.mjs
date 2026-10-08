@@ -1493,7 +1493,11 @@ async function effects(browser, url) {
   check('deselect: preview cancelled, no animation left in the edit view', (await frameAnims()) === 0);
   await s.undo();
   c = await s.content();
-  check('undo: removes preset and delay together (one step)', c === original, firstDiff(c, original));
+  check('undo: the delay first (its own step), the effect stays', c === original.replace('<p id="f2" class="moved">', '<p id="f2" class="moved" data-fx="fade-up">'), firstDiff(c, original));
+  await s.undo();
+  c = await s.content();
+  check('undo again: the effect goes, back to the file', c === original, firstDiff(c, original));
+  await s.redo();
   await s.redo();
 
   await s.page.click('#filmstrip .thumb >> nth=2');

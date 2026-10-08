@@ -110,10 +110,11 @@ const FX_SPEED = { slow: 1.6, fast: 0.6 };
 const fxDefaultDur = name => (fxCatalog || []).find(p => p.name === name)?.dur || 700;
 const speedDur = (name, speed) => speed === 'normal' ? '' : String(Math.max(50, Math.round(fxDefaultDur(name) * FX_SPEED[speed] / 50) * 50));
 // A timing control changed: the hidden field takes the value, then the block gets it.
+const FX_PART = { '#fx-delay': 'delay', '#fx-dur': 'speed', '#fx-stagger': 'stagger' };
 export function setFxTiming(sel, value) {
   if (!S.sel) return;
   $(sel).value = value;
-  applyFx();
+  applyFx(FX_PART[sel]);
 }
 export function setFxSpeed(speed) {
   const name = $('#fx-preset').value;
@@ -227,7 +228,9 @@ export function openFxPanel() {
   hooks.openPanel('effects', true);
   showFxTab('effects');
 }
-export function applyFx() {
+// part: what changed ('effect', 'delay', 'speed', 'stagger'). Each is its own undo step;
+// repeats of the same one (dragging the delay slider) still merge.
+export function applyFx(part = 'effect') {
   const node = S.sel;
   if (!node) return;
   // A preview still moving the block would be measured instead of the block as authored.
@@ -243,7 +246,7 @@ export function applyFx() {
   if (FX_ATTRS.every(a => before[a] === after[a])) return;
   setAttrs(m, after);
   setAttrs(node, after);
-  pushOp({ type: 'attrs', id, before, after, key: 'fx:' + id, label: 'Effect' });
+  pushOp({ type: 'attrs', id, before, after, key: `fx:${part}:${id}`, label: 'Effect' });
   renderFxTiming();
   renderFxDoc();
   if (effectsVisible()) { renderFxList(); renderFxSel(); }
