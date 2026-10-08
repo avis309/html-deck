@@ -75,6 +75,12 @@ export function fxRuntime(win, opts) {
   mod('zoom-in', entrance('scale(0.85)'));
   mod('slide-left', entrance('translateX(60px)'));
   mod('count-up', { category: 'data', waits: false, single: true, previewAs: 'fade-in', why: 'count', applies: function (el) { return !!countNode(el); }, play: playCount });
+  mod('fade-down', entrance('translateY(-40px)'));
+  mod('slide-right', entrance('translateX(-60px)'));
+  mod('zoom-out', entrance('scale(1.15)'));
+  // Only where the author set no filter: the blur would replace it while it plays.
+  mod('blur-in', entrance(null, { dur: 800, filter: 'blur(12px)', why: 'filter', applies: function (el) { return win.getComputedStyle(el).filter === 'none'; } }));
+  mod('pop', entrance('scale(0.6)', { category: 'emphasis', dur: 600, ease: 'cubic-bezier(.34,1.56,.64,1)' }));
   function num(v, d) { var n = parseFloat(v); return isFinite(n) && n >= 0 ? n : d; }
   function config(el) {
     var m = MODULES[el.getAttribute('data-fx')];

@@ -115,9 +115,34 @@ async function nesting(browser) {
   await ctx.close();
 }
 
+async function entrances(browser) {
+  section('runtime: new entrances and pop');
+  const { pg, ctx, errs } = await open(browser, `<section id="s">
+    <p id="fd" data-fx="fade-down">a</p><p id="sr" data-fx="slide-right">b</p><p id="zo" data-fx="zoom-out">c</p>
+    <p id="bl" data-fx="blur-in">d</p><p id="pp" data-fx="pop">e</p><p id="fl" data-fx="blur-in" style="filter: grayscale(1)">f</p></section>`);
+  const before = await markup(pg);
+  await show(pg, '#s');
+  const from = async s => (await anims(pg, s)).map(a => a.frames[0].transform || a.frames[0].filter).filter(Boolean);
+  check('fade-down: translateY(-40px)', (await from('#fd'))[0] === 'translateY(-40px)', JSON.stringify(await anims(pg, '#fd')));
+  check('slide-right: translateX(-60px)', (await from('#sr'))[0] === 'translateX(-60px)');
+  check('zoom-out: scale(1.15)', (await from('#zo'))[0] === 'scale(1.15)');
+  const bl = await anims(pg, '#bl');
+  check('blur-in: blur(12px) → none, with opacity, 800 ms', bl[0].frames[0].filter === 'blur(12px)' && bl[0].frames[1].filter === 'none' && bl[0].frames[0].opacity === '0' && bl[0].duration === 800, JSON.stringify(bl));
+  const pp = await anims(pg, '#pp');
+  check('pop: scale(0.6) with overshoot easing, 600 ms', pp[1].frames[0].transform === 'scale(0.6)' && /1\.56/.test(pp[0].easing) && pp[0].duration === 600, JSON.stringify(pp));
+  const fl = await pg.evaluate(() => ({ why: window.__htmldeckFx.check(document.querySelector('#fl'), 'blur-in'), n: document.querySelector('#fl').getAnimations().length, wait: document.querySelector('#fl').classList.contains('fx-wait') }));
+  check('blur-in on an authored filter: refused ("filter"), shown as authored', fl.why === 'filter' && fl.n === 0 && !fl.wait, JSON.stringify(fl));
+  const cat = await pg.evaluate(() => window.__htmldeckFx.catalog());
+  check('catalog: pop is emphasis, the others enter', cat.find(p => p.name === 'pop').category === 'emphasis' && cat.find(p => p.name === 'zoom-out').category === 'enter', JSON.stringify(cat));
+  await leave(pg);
+  check('leave: authored DOM back', (await markup(pg)) === before.replace(/ class="fx-wait"/g, ''));
+  check('no errors', !errs.length, errs.join(' | '));
+  await ctx.close();
+}
+
 const browser = await chromium.launch();
 try {
-  for (const scenario of [legacy, api, isolation, nesting]) {
+  for (const scenario of [legacy, api, isolation, nesting, entrances]) {
     try { await scenario(browser); } catch (e) { failures.push(`${scenario.name}: ${e.message}`); console.log(`  ✖ ${scenario.name} crashed: ${e.stack}`); }
   }
 } finally { await browser.close(); }
