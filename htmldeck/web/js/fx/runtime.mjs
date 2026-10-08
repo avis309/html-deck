@@ -321,6 +321,8 @@ export function fxRuntime(win, opts) {
 }
 
 // The inline block a document carries once FX is enabled.
+// LF only: a checkout with CRLF line ends (git on Windows) must not put \r into the document,
+// whose saved bytes are matched against the source.
 export function fxScriptSource() {
-  return `\n/* HtmlDeck FX v${FX_VERSION} — data-fx effects (Web Animations). Managed by HtmlDeck: "Disable FX" removes it. */\n(${fxRuntime.toString()})(window);\n`;
+  return `\n/* HtmlDeck FX v${FX_VERSION} — data-fx effects (Web Animations). Managed by HtmlDeck: "Disable FX" removes it. */\n(${fxRuntime.toString().replace(/\r\n?/g, '\n')})(window);\n`;
 }
