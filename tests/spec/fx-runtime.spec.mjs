@@ -188,9 +188,36 @@ async function draw(browser) {
   await ctx.close();
 }
 
+async function loops(browser) {
+  section('runtime: loops run while shown, stop on leaving, preview briefly, never under reduced motion');
+  const body = `<section id="s1"><p id="sp" data-fx="spin">a</p><p id="fl" data-fx="float" data-fx-delay="300">b</p><p id="pu" data-fx="pulse">c</p></section>
+    <section id="s2"><p>other</p></section>`;
+  const { pg, ctx } = await open(browser, body);
+  check('loops are not hidden while waiting', await pg.evaluate(() => !document.querySelector('.fx-wait')));
+  await show(pg, '#s1');
+  const sp = await anims(pg, '#sp'), fl = await anims(pg, '#fl'), pu = await anims(pg, '#pu');
+  check('spin: rotate 0 → 360deg, linear, infinite, 20 s, added', sp[0].frames[1].transform === 'rotate(360deg)' && sp[0].easing === 'linear' && sp[0].iterations === Infinity && sp[0].duration === 20000 && sp[0].composite === 'add', JSON.stringify(sp));
+  check('float: -8px alternate, delay 300', fl[0].frames[1].transform === 'translateY(-8px)' && fl[0].direction === 'alternate' && fl[0].delay === 300, JSON.stringify(fl));
+  check('pulse: scale(1.06) alternate, 1200 ms', pu[0].frames[1].transform === 'scale(1.06)' && pu[0].duration === 1200, JSON.stringify(pu));
+  for (let k = 0; k < 6; k++) await show(pg, k % 2 ? '#s1' : '#s2');
+  await show(pg, '#s2');
+  check('rapid slide changes: no loop left once its slide is not shown', (await pg.evaluate(() => document.getAnimations().length)) === 0);
+  await pg.evaluate(() => window.__htmldeckFx.preview(document.querySelector('#sp')));
+  const pv = await anims(pg, '#sp');
+  check('preview: 2 iterations of at most 2000 ms', pv[0].iterations === 2 && pv[0].duration === 2000, JSON.stringify(pv));
+  await pg.evaluate(() => window.__htmldeckFx.stopPreview());
+  await ctx.close();
+
+  const rm = await open(browser, `${body}<section id="s3"><span id="g" style="display:block;width:50px;height:5px" data-fx="grow-x"></span></section>`, { reducedMotion: 'reduce' });
+  await show(rm.pg, '#s1');
+  await show(rm.pg, '#s3');
+  check('reduced motion: loops and grow never animate, nothing hidden', (await rm.pg.evaluate(() => document.getAnimations().length + document.querySelectorAll('.fx-wait').length)) === 0);
+  await rm.ctx.close();
+}
+
 const browser = await chromium.launch();
 try {
-  for (const scenario of [legacy, api, isolation, nesting, entrances, grow, draw]) {
+  for (const scenario of [legacy, api, isolation, nesting, entrances, grow, draw, loops]) {
     try { await scenario(browser); } catch (e) { failures.push(`${scenario.name}: ${e.message}`); console.log(`  ✖ ${scenario.name} crashed: ${e.stack}`); }
   }
 } finally { await browser.close(); }

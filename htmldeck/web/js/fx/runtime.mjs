@@ -84,6 +84,9 @@ export function fxRuntime(win, opts) {
   mod('grow-x', { category: 'data', waits: true, dur: 900, why: 'inline', applies: boxed, play: playGrow('x') });
   mod('grow-y', { category: 'data', waits: true, dur: 900, why: 'inline', applies: boxed, play: playGrow('y') });
   mod('draw', { category: 'data', waits: true, dur: 1400, why: 'draw', applies: function (el) { return shapesOf(el).length > 0; }, targets: shapesOf, play: playDraw });
+  mod('spin', loop([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], 'linear', false, 20000));
+  mod('float', loop([{ transform: 'translateY(0px)' }, { transform: 'translateY(-8px)' }], 'ease-in-out', true, 3000));
+  mod('pulse', loop([{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }], 'ease-in-out', true, 1200));
   function num(v, d) { var n = parseFloat(v); return isFinite(n) && n >= 0 ? n : d; }
   function config(el) {
     var m = MODULES[el.getAttribute('data-fx')];
@@ -249,6 +252,18 @@ export function fxRuntime(win, opts) {
     run.show(shape);
     run.animate(shape, [{ strokeDasharray: dash, strokeDashoffset: len }, { strokeDasharray: dash, strokeDashoffset: 0 }],
       { duration: c.dur, delay: c.delay + i * c.stagger, easing: 'ease-in-out', fill: 'backwards' });
+  }
+  // Loops: added onto the author's transform, stopped like every other animation on leaving.
+  function loop(frames, easing, alternate, dur) {
+    return {
+      category: 'loop', waits: false, dur: dur,
+      play: function (target, i, c, run) {
+        run.animate(target, frames, {
+          duration: c.preview ? Math.min(c.dur, 2000) : c.dur, delay: c.delay + i * c.stagger, easing: easing,
+          iterations: c.preview ? 2 : Infinity, direction: alternate ? 'alternate' : 'normal', composite: 'add',
+        });
+      },
+    };
   }
   // Play el's effect inside `scope` under run token t. A module that throws leaves its target
   // visible as authored; the rest of the scope keeps playing.
