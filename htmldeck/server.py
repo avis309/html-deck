@@ -182,10 +182,28 @@ def load_html(target: Path, root: Path) -> dict:
     }
 
 
+def _sidecar_dir(target: Path, name: str, create: bool) -> Path:
+    """A sidecar folder beside the document (backups, notes). Never a symlink: a link planted in
+    the workspace would make HTML Deck read or write wherever it points."""
+    folder = target.parent / name
+    if folder.is_symlink() or (folder.exists() and not folder.is_dir()):
+        raise EditorError(403, f"{name} beside the document is not a plain folder; HTML Deck does not follow it")
+    if create:
+        folder.mkdir(exist_ok=True)
+        if folder.is_symlink():
+            raise EditorError(403, f"{name} became a symlink; HTML Deck does not follow it")
+    return folder
+
+
+def _no_link(path: Path) -> Path:
+    if path.is_symlink():
+        raise EditorError(403, f"{path.name} is a symlink; HTML Deck does not follow it")
+    return path
+
+
 def _backup(target: Path, stamp: str) -> Path:
-    backup_dir = target.parent / BACKUP_DIR_NAME
-    backup_dir.mkdir(exist_ok=True)
-    backup = backup_dir / f"{target.name}.{stamp}.bak"
+    backup_dir = _sidecar_dir(target, BACKUP_DIR_NAME, create=True)
+    backup = _no_link(backup_dir / f"{target.name}.{stamp}.bak")
     shutil.copy2(target, backup)
     old = sorted(backup_dir.glob(f"{target.name}.*.bak"))
     for stale in old[:-BACKUPS_KEPT]:
@@ -288,7 +306,8 @@ def notes_commands(target: Path, root: Path, windows: bool = _WINDOWS) -> list[d
 
 
 def read_notes(target: Path) -> list[dict]:
-    path = notes_path(target)
+    _sidecar_dir(target, NOTES_DIR_NAME, create=False)
+    path = _no_link(notes_path(target))
     if not path.is_file():
         return []
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -372,7 +391,9 @@ def _replace(src: Path, dst: Path) -> None:
 @contextlib.contextmanager
 def _file_lock(path: Path):
     """Exclusive lock on ``path`` shared with other processes: flock on POSIX, a one-byte lock on Windows."""
-    with open(path, "a+") as fh:
+    # O_NOFOLLOW: a lock file swapped for a symlink after the check is still not followed.
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o644)
+    with os.fdopen(fd, "a+") as fh:
         if _WINDOWS:
             fh.seek(0)
             while True:
@@ -398,14 +419,13 @@ def _file_lock(path: Path):
 @contextlib.contextmanager
 def _notes_lock(target: Path):
     """Cross-process lock: the editor and htmldeck-notes may both edit the same sidecar."""
-    lock_dir = notes_path(target).parent
-    lock_dir.mkdir(exist_ok=True)
-    with SAVE_LOCK, _file_lock(lock_dir / ".lock"):
+    lock_dir = _sidecar_dir(target, NOTES_DIR_NAME, create=True)
+    with SAVE_LOCK, _file_lock(_no_link(lock_dir / ".lock")):
         yield
 
 
 def _write_notes_file(target: Path, notes: list[dict], root: Path) -> None:
-    path = notes_path(target)
+    path = _no_link(notes_path(target))
     tmp = path.with_name(f".{path.name}.tmp.{secrets.token_hex(4)}")
     try:
         tmp.write_text(json.dumps({"file": display_path(target, root), "notes": notes}, ensure_ascii=False, indent=2), encoding="utf-8")

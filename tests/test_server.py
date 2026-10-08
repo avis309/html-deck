@@ -653,3 +653,50 @@ def test_http_watch_lets_go_of_a_closed_tab_at_once(server):
     while ed.WATCH_SLOTS._value != free and time.monotonic() < deadline:
         time.sleep(0.05)
     assert ed.WATCH_SLOTS._value == free
+
+
+# ---- sidecars (.htmldeck_bak / .htmldeck_notes) never lead outside the document's folder
+def _outside(tmp_path_factory):
+    d = tmp_path_factory.mktemp("outside")
+    return d.resolve()
+
+
+def test_save_refuses_a_backup_folder_that_is_a_symlink(root, tmp_path_factory):
+    out = _outside(tmp_path_factory)
+    target = root / "output/deck/a.html"
+    _symlink_or_skip(target.parent / ed.BACKUP_DIR_NAME, out)
+    mtime = ed.load_html(target, root)["mtime_ns"]
+    with pytest.raises(ed.EditorError) as exc:
+        ed.save_html(target, "<p>b</p>", mtime, False, root)
+    assert exc.value.status == 403
+    assert list(out.iterdir()) == [] and target.read_text(encoding="utf-8") == "<p>a</p>"
+
+
+def test_notes_refuse_a_notes_folder_that_is_a_symlink(root, tmp_path_factory):
+    out = _outside(tmp_path_factory)
+    target = root / "output/deck/a.html"
+    _symlink_or_skip(target.parent / ed.NOTES_DIR_NAME, out)
+    with pytest.raises(ed.EditorError) as exc:
+        ed.write_notes(target, [_note()], root)
+    assert exc.value.status == 403 and list(out.iterdir()) == []
+    with pytest.raises(ed.EditorError):
+        ed.read_notes(target)
+
+
+def test_notes_refuse_symlinked_lock_and_notes_files(root, tmp_path_factory):
+    out = _outside(tmp_path_factory)
+    target = root / "output/deck/a.html"
+    notes_dir = target.parent / ed.NOTES_DIR_NAME
+    notes_dir.mkdir()
+    try:
+        (notes_dir / ".lock").symlink_to(out / "lock-target")
+    except OSError as exc:
+        pytest.skip(f"symlinks not permitted: {exc}")
+    with pytest.raises(ed.EditorError):
+        ed.write_notes(target, [_note()], root)
+    assert not (out / "lock-target").exists()
+    (notes_dir / ".lock").unlink()
+    (out / "secret.json").write_text('{"notes": [{"id": "x", "note": "outside secret"}]}', encoding="utf-8")
+    (notes_dir / "a.html.json").symlink_to(out / "secret.json")
+    with pytest.raises(ed.EditorError):
+        ed.read_notes(target)
