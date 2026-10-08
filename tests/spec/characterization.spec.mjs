@@ -184,6 +184,21 @@ class Session {
 }
 
 // ---------------------------------------------------------------- scenarios
+// Windows also selects the space after a double-clicked word; the checks are about the word.
+async function trimSelection(s) {
+  await s.frame.locator('body').evaluate(() => {
+    const sel = getSelection();
+    if (!sel.rangeCount) return;
+    const r = sel.getRangeAt(0), n = r.endContainer;
+    if (n.nodeType !== 3) return;
+    let end = r.endOffset;
+    while (end > (n === r.startContainer ? r.startOffset : 0) && /\s/.test(n.data[end - 1])) end--;
+    r.setEnd(n, end);
+    sel.removeAllRanges();
+    sel.addRange(r);
+  });
+}
+
 async function detection(browser, url) {
   section('detection + no-op roundtrip (fixtures)');
   // [badge text, thumbnails]
@@ -364,6 +379,7 @@ async function structural(browser, url) {
   await backToOriginal('move');
 
   await s.frame.locator('#lnk').dblclick({ position: { x: 70, y: 8 } });
+  await trimSelection(s);
   const word = await s.frame.locator('body').evaluate(() => getSelection().toString().trim());
   await s.page.click('#tb-link');
   await s.page.fill('#link-url', 'https://example.com/g');
@@ -398,6 +414,7 @@ async function structural(browser, url) {
   await s.page.click('#find-close');
 
   await s.frame.locator('#lnk').dblclick({ position: { x: 70, y: 8 } });
+  await trimSelection(s);
   await s.page.click('#tb-bold');
   await s.select('#c1 h3');
   await s.select('#lnk');

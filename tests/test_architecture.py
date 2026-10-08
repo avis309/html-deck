@@ -15,7 +15,7 @@ pytestmark = pytest.mark.skipif(NODE is None or not (REPO / "node_modules" / "es
 
 def run(root: Path, baseline: Path, *extra: str):
     p = subprocess.run([NODE, str(TOOL), "--root", str(root), "--baseline", str(baseline), *extra],
-                       capture_output=True, text=True, cwd=REPO)
+                       capture_output=True, text=True, cwd=REPO, check=False)
     return p.returncode, p.stdout + p.stderr
 
 
