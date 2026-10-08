@@ -100,9 +100,24 @@ async function isolation(browser) {
   await ctx.close();
 }
 
+async function nesting(browser) {
+  section('runtime: a child with its own effect is animated once; the parent keeps its timing');
+  const { pg, ctx } = await open(browser, `<section id="s"><ul data-fx="fade-in" data-fx-stagger="100">
+    <li id="a" data-fx="zoom-in">A</li><li id="b">B</li><li id="c">C</li></ul></section>`);
+  await show(pg, '#s');
+  const st = await pg.evaluate(() => ({
+    a: document.querySelector('#a').getAnimations().length,
+    aFrom: document.querySelector('#a').getAnimations().map(x => x.effect.getKeyframes()[0].transform).filter(Boolean),
+    c: document.querySelector('#c').getAnimations()[0]?.effect.getTiming().delay,
+  }));
+  check('own effect wins: #a runs zoom-in only (2 animations, not 3)', st.a === 2 && st.aFrom[0] === 'scale(0.85)', JSON.stringify(st));
+  check('parent stagger keeps the index: #c still delayed 200', st.c === 200, JSON.stringify(st));
+  await ctx.close();
+}
+
 const browser = await chromium.launch();
 try {
-  for (const scenario of [legacy, api, isolation]) {
+  for (const scenario of [legacy, api, isolation, nesting]) {
     try { await scenario(browser); } catch (e) { failures.push(`${scenario.name}: ${e.message}`); console.log(`  ✖ ${scenario.name} crashed: ${e.stack}`); }
   }
 } finally { await browser.close(); }

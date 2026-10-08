@@ -92,7 +92,10 @@ export function fxRuntime(win, opts) {
   }
   function targets(el, c) {
     if (c.m.targets) return c.m.targets(el, c);
-    return c.stagger > 0 && !c.m.single ? Array.prototype.slice.call(el.children) : [el];
+    // A child with its own runnable effect plays that one only; its slot keeps the timing.
+    return c.stagger > 0 && !c.m.single
+      ? Array.prototype.slice.call(el.children).map(function (n) { return usable(n) ? null : n; })
+      : [el];
   }
   var reduce = !!(win.matchMedia && win.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
