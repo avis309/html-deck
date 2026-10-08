@@ -48,6 +48,12 @@ export function onKey(e, fromFrame) {
     return;
   }
   if (S.editing) return;
+  if (S.multi && !mod && !e.altKey && k.startsWith('arrow')) {
+    e.preventDefault();
+    const d = e.shiftKey ? 10 : 1;
+    nudge(k === 'arrowleft' ? -d : k === 'arrowright' ? d : 0, k === 'arrowup' ? -d : k === 'arrowdown' ? d : 0);
+    return;
+  }
   if (S.sel) {
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSel(); }
     else if (e.key === 'Enter' && isRoot(S.sel)) { e.preventDefault(); setEditing(true); placeCaretEnd(S.sel); }

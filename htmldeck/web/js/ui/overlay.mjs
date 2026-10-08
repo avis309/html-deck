@@ -61,8 +61,10 @@ export function placeMenu() {
 // Idea from GrapesJS ComponentDrag: static lines (edges + centre) of the neighbours are measured
 // once at drag start; while dragging, the nearest line within a few screen pixels pulls the box.
 export const SNAP_PX = 6;
-export function snapTargets(node) {
-  const rects = [], seen = new Set([node]);
+export function snapTargets(nodes) {
+  const moving = [].concat(nodes), node = moving[0];
+  const apart = n => !moving.some(m => m.contains(n) || n.contains(m));
+  const rects = [], seen = new Set(moving);
   const add = (n, frame) => {
     if (!n || seen.has(n) || n.nodeType !== 1 || !isOriginal(n)) return;
     seen.add(n);
@@ -75,9 +77,9 @@ export function snapTargets(node) {
   const slide = node.closest('[data-ed-slide]');
   if (slide) add(slide, true);
   let k = 0;
-  for (const c of parent ? parent.children : []) { if (k++ > 200) break; if (!node.contains(c) && !c.contains(node)) add(c, false); }
+  for (const c of parent ? parent.children : []) { if (k++ > 200) break; if (apart(c)) add(c, false); }
   // On a slide, everything the user can pick is a candidate too (Canva-style), not only siblings.
-  if (slide) for (const n of $$('[data-ed-edit], img', slide)) { if (k++ > 400) break; if (!node.contains(n) && !n.contains(node)) add(n, false); }
+  if (slide) for (const n of $$('[data-ed-edit], img', slide)) { if (k++ > 400) break; if (apart(n)) add(n, false); }
   const lines = { x: [], y: [] };
   for (const r of rects) {
     for (const v of [r.l, (r.l + r.r) / 2, r.r]) lines.x.push({ v, r });

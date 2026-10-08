@@ -40,7 +40,9 @@ html.ed-deck [data-ed-slide-anc] { transform: none !important; translate: none !
 ::highlight(ed-find) { background-color: rgba(255,196,0,.45); }
 ::highlight(ed-find-cur) { background-color: #ff9a1f; color: #000; }
 [data-ed-overflow] { outline: 2px dashed #e5484d !important; outline-offset: 2px; }
-html.ed-marquee, html.ed-marquee * { user-select: none !important; cursor: crosshair !important; }`;
+html.ed-marquee, html.ed-marquee * { user-select: none !important; cursor: crosshair !important; }
+html.ed-press, html.ed-press * { user-select: none !important; }
+html.ed-moving, html.ed-moving * { cursor: grabbing !important; }`;
 
 // Runs before the document's own scripts: keyboard goes to the editor, never to deck handlers.
 export const FRAME_GUARD = `(function(){var P=window.parent;if(!P||P===window)return;

@@ -89,15 +89,20 @@ export function regionHit(r) {
 // instead. A block that shows its box (background, border, shadow, media) is its box.
 export function inkRect(n) {
   const r = n.getBoundingClientRect();
-  if (REGION_BOXED.has(n.localName) || n.namespaceURI !== 'http://www.w3.org/1999/xhtml') return r;
-  const cs = S.win.getComputedStyle(n);
-  const border = ['Top', 'Right', 'Bottom', 'Left'].some(k => parseFloat(cs[`border${k}Width`]) > 0 && cs[`border${k}Style`] !== 'none');
-  if (border || cs.backgroundImage !== 'none' || cs.boxShadow !== 'none' || !/^(transparent|rgba\(.*,\s*0\))$/.test(cs.backgroundColor)) return r;
+  if (showsBox(n)) return r;
   if ([...n.children].some(c => !S.win.getComputedStyle(c).display.startsWith('inline'))) return r;
   const range = S.doc.createRange();
   range.selectNodeContents(n);
   const t = range.getBoundingClientRect();
   return t.width && t.height ? t : r;
+}
+// A block the eye sees as a box: media, or a background, border or shadow of its own (a card, a
+// badge), unlike a layout wrapper that only holds other blocks.
+export function showsBox(n) {
+  if (REGION_BOXED.has(n.localName) || n.namespaceURI !== 'http://www.w3.org/1999/xhtml') return true;
+  const cs = S.win.getComputedStyle(n);
+  const border = ['Top', 'Right', 'Bottom', 'Left'].some(k => parseFloat(cs[`border${k}Width`]) > 0 && cs[`border${k}Style`] !== 'none');
+  return border || cs.backgroundImage !== 'none' || cs.boxShadow !== 'none' || !/^(transparent|rgba\(.*,\s*0\))$/.test(cs.backgroundColor);
 }
 // The blocks the box covers: each must lie mostly inside it, and a covered block stands for its
 // covered children (a card, not its title and text one by one), as a click picks one block.
