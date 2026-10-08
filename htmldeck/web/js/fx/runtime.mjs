@@ -81,8 +81,8 @@ export function fxRuntime(win, opts) {
   // Only where the author set no filter: the blur would replace it while it plays.
   mod('blur-in', entrance(null, { dur: 800, filter: 'blur(12px)', why: 'filter', applies: function (el) { return win.getComputedStyle(el).filter === 'none'; } }));
   mod('pop', entrance('scale(0.6)', { category: 'emphasis', dur: 600, ease: 'cubic-bezier(.34,1.56,.64,1)' }));
-  mod('grow-x', { category: 'data', waits: true, dur: 900, why: 'inline', applies: boxed, play: playGrow('x') });
-  mod('grow-y', { category: 'data', waits: true, dur: 900, why: 'inline', applies: boxed, play: playGrow('y') });
+  mod('grow-x', { category: 'data', waits: true, dur: 900, why: growWhy, applies: growable, play: playGrow('x') });
+  mod('grow-y', { category: 'data', waits: true, dur: 900, why: growWhy, applies: growable, play: playGrow('y') });
   mod('draw', { category: 'data', waits: true, dur: 1400, why: 'draw', applies: function (el) { return shapesOf(el).length > 0; }, targets: shapesOf, play: playDraw });
   mod('spin', loop([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], 'linear', false, 20000));
   mod('float', loop([{ transform: 'translateY(0px)' }, { transform: 'translateY(-8px)' }], 'ease-in-out', true, 3000));
@@ -94,7 +94,7 @@ export function fxRuntime(win, opts) {
     return { m: m, delay: num(el.getAttribute('data-fx-delay'), 0), dur: num(el.getAttribute('data-fx-dur'), m.dur), stagger: num(el.getAttribute('data-fx-stagger'), 0) };
   }
   // Why module m cannot run on el (its `why` key), or null.
-  function refusal(el, m) { return m.applies && !m.applies(el) ? (m.why || 'bad') : null; }
+  function refusal(el, m) { return m.applies && !m.applies(el) ? (typeof m.why === 'function' ? m.why(el) : m.why || 'bad') : null; }
   // el's effect when it can run here, else null.
   function usable(el) { var c = config(el); return c && !revealOwned(el) && !refusal(el, c.m) ? c : null; }
   // Elements Reveal animates itself: opacity/transform there belong to Reveal.
@@ -106,7 +106,7 @@ export function fxRuntime(win, opts) {
     if (c.m.targets) return c.m.targets(el, c);
     // A child with its own runnable effect plays that one only; its slot keeps the timing.
     return c.stagger > 0 && !c.m.single
-      ? Array.prototype.slice.call(el.children).map(function (n) { return usable(n) ? null : n; })
+      ? Array.prototype.slice.call(el.children).map(function (n) { return usable(n) || refusal(n, c.m) ? null : n; })
       : [el];
   }
   var reduce = !!(win.matchMedia && win.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -230,21 +230,42 @@ export function fxRuntime(win, opts) {
     return function (target, i, c, run) {
       var o = { duration: c.dur, delay: c.delay + i * c.stagger, easing: EASE, fill: 'backwards' };
       var origin = axis === 'y' ? 'center bottom' : win.getComputedStyle(target).direction === 'rtl' ? 'right center' : 'left center';
+      // An SVG shape scales from its own box, not from the viewport's.
+      var pivot = svgShape(target) ? { transformOrigin: origin, transformBox: 'fill-box' } : { transformOrigin: origin };
       run.show(target);
-      run.animate(target, [{ transformOrigin: origin }, { transformOrigin: origin }], o);
+      run.animate(target, [pivot, pivot], o);
       run.animate(target, [{ transform: axis === 'y' ? 'scaleY(0)' : 'scaleX(0)' }, { transform: 'none' }], { duration: o.duration, delay: o.delay, easing: o.easing, fill: o.fill, composite: 'add' });
     };
   }
-  function boxed(el) { return win.getComputedStyle(el).display !== 'inline'; }
+  function svgShape(el) { return !!el.ownerSVGElement; }
+  // grow moves the pivot while it plays: only where the author's transform has none that
+  // matters (no transform, or a pure translation).
+  function plainTransform(el) {
+    var tf = win.getComputedStyle(el).transform, m = /^matrix\(([^)]*)\)$/.exec(tf);
+    if (tf === 'none') return true;
+    if (!m) return false;
+    var v = m[1].split(',').map(parseFloat);
+    return v[0] === 1 && v[1] === 0 && v[2] === 0 && v[3] === 1;
+  }
+  function growable(el) { return (svgShape(el) || win.getComputedStyle(el).display !== 'inline') && plainTransform(el); }
+  function growWhy(el) { return svgShape(el) || win.getComputedStyle(el).display !== 'inline' ? 'transform' : 'inline'; }
   // Strokes of the SVG shapes inside an element (or the shape itself), drawn in document order.
   // Authored dashes are the author's; shapes with their own data-fx play that instead.
   var SHAPES = 'path,line,polyline,polygon,circle,ellipse,rect';
-  function strokeLength(s) { try { return s.getTotalLength(); } catch (e) { return 0; } }
+  // Dash units follow an authored pathLength; getTotalLength() does not.
+  function strokeLength(s) {
+    var pl = parseFloat(s.getAttribute('pathLength'));
+    if (pl > 0) return pl;
+    try { return s.getTotalLength(); } catch (e) { return 0; }
+  }
   function shapesOf(el) {
     var list = el.matches(SHAPES) ? [el] : Array.prototype.slice.call(el.querySelectorAll(SHAPES));
     return list.filter(function (s) {
       var cs = win.getComputedStyle(s);
-      return (s === el || !s.hasAttribute('data-fx')) && cs.stroke !== 'none' && cs.strokeDasharray === 'none' && cs.display !== 'none' && strokeLength(s) > 0;
+      // The nearest data-fx owns a shape (a nested draw group keeps its own timing); a
+      // non-scaling stroke is dashed in other units than its length.
+      return s.closest('[data-fx]') === el && cs.stroke !== 'none' && cs.strokeDasharray === 'none' && cs.display !== 'none' &&
+        cs.vectorEffect !== 'non-scaling-stroke' && strokeLength(s) > 0;
     });
   }
   function playDraw(shape, i, c, run) {
@@ -274,6 +295,7 @@ export function fxRuntime(win, opts) {
       if (!target) return;
       try { c.m.play(target, i, c, run); }
       catch (e) {
+        anims.forEach(function (a) { if (a.effect && a.effect.target === target) { a.cancel(); anims.delete(a); } });
         target.classList.remove('fx-wait');
         if (!failed[c.m.name] && win.console) { failed[c.m.name] = true; win.console.error('HtmlDeck FX "' + c.m.name + '":', e); }
       }
@@ -296,6 +318,9 @@ export function fxRuntime(win, opts) {
     var t = runs.get(scope) || 0;
     if (reduce) return;
     fxIn(scope).forEach(function (el) { var c = usable(el); if (c) play(el, c, scope, t); });
+    // Whatever was prepared but did not play (refused by now, e.g. a class added since) shows.
+    if (scope.classList) scope.classList.remove('fx-wait');
+    Array.prototype.forEach.call(scope.querySelectorAll('.fx-wait'), function (n) { n.classList.remove('fx-wait'); });
     sceneEls(scope).forEach(startScenes);
   }
   // Leaving a scope: cancel and re-arm, so it plays again next time.

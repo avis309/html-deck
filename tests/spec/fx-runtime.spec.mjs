@@ -215,9 +215,66 @@ async function loops(browser) {
   await rm.ctx.close();
 }
 
+async function reviewFixes(browser) {
+  section('runtime: review fixes (partial failure, orphaned waits, staggered refusals, grow pivots, count-up end)');
+  // A module that throws after creating one animation: nothing of it keeps running.
+  let o = await open(browser, '<section id="s"><p id="bad" data-fx="fade-up" data-fx-delay="500">Bad</p></section>');
+  await o.pg.evaluate(() => {
+    const animate = Element.prototype.animate; let n = 0;
+    Element.prototype.animate = function (...a) { if (this.id === 'bad' && ++n === 2) throw new Error('boom'); return animate.apply(this, a); };
+  });
+  await show(o.pg, '#s');
+  check('partial failure: the half-made animation is cancelled, the target visible', await o.pg.evaluate(() => document.querySelector('#bad').getAnimations().length === 0 && !document.querySelector('#bad').classList.contains('fx-wait')));
+  await o.ctx.close();
+  // Prepared while it could run, refused when shown: it must not stay hidden.
+  o = await open(browser, '<section id="s"><p id="late" data-fx="blur-in">late</p></section>', { css: '.gray{filter:grayscale(1)}' });
+  await o.pg.evaluate(() => document.querySelector('#late').classList.add('gray'));
+  await show(o.pg, '#s');
+  check('refused at play time: not left hidden', await o.pg.evaluate(() => !document.querySelector('#late').classList.contains('fx-wait')));
+  await o.ctx.close();
+  // A staggered parent: children the module cannot run on are skipped (shown, not animated).
+  o = await open(browser, '<section id="s"><div data-fx="blur-in" data-fx-stagger="100"><p id="k1">a</p><p id="k2" style="filter:grayscale(1)">b</p></div></section>');
+  await show(o.pg, '#s');
+  const k = await o.pg.evaluate(() => ({ k1: document.querySelector('#k1').getAnimations().length, k2: document.querySelector('#k2').getAnimations().length, wait: !!document.querySelector('.fx-wait') }));
+  check('stagger: a child with its own filter is not blurred, nothing hidden', k.k1 > 0 && k.k2 === 0 && !k.wait, JSON.stringify(k));
+  await o.ctx.close();
+  // grow keeps the author's pivot: refused on a rotated / scaled element; SVG bars grow from their own edge.
+  o = await open(browser, `<section id="s"><span id="rot" style="display:block;width:200px;height:10px;transform:rotate(90deg)" data-fx="grow-x"></span>
+    <svg width="400" height="100"><rect id="bar" x="100" y="20" width="80" height="40" fill="#f60" data-fx="grow-x"/></svg></section>`);
+  const why = await o.pg.evaluate(() => window.__htmldeckFx.check(document.querySelector('#rot'), 'grow-x'));
+  check('grow on a rotated element: refused ("transform")', why === 'transform', String(why));
+  await show(o.pg, '#s');
+  const bar = await o.pg.evaluate(() => { const r = document.querySelector('#bar'), as = r.getAnimations(); as.forEach(a => { a.pause(); a.currentTime = 450; }); const b = r.getBoundingClientRect(); return { n: as.length, left: b.left - document.querySelector('svg').getBoundingClientRect().left, width: b.width }; });
+  check('grow-x on an SVG rect: grows (narrower mid-way) with its left edge kept at x=100', bar.n > 0 && bar.width < 79 && Math.abs(bar.left - 100) < 1, JSON.stringify(bar));
+  await o.ctx.close();
+  // draw: authored pathLength, non-scaling strokes, nested draw groups keep their own timing.
+  o = await open(browser, `<section id="s"><svg width="400" height="200" data-fx="draw">
+    <path id="pl" d="M0 10 H300" pathLength="1" stroke="#000" fill="none"/>
+    <path id="ns" d="M0 40 H100" transform="scale(2 1)" vector-effect="non-scaling-stroke" stroke="#000" fill="none"/>
+    <g id="grp" data-fx="draw" data-fx-delay="1000"><path id="inner" d="M0 80 H300" stroke="#000" fill="none"/></g></svg></section>`);
+  await show(o.pg, '#s');
+  const d = await o.pg.evaluate(() => {
+    const a = s => document.querySelector(s).getAnimations().map(x => ({ off: x.effect.getKeyframes()[0].strokeDashoffset, delay: x.effect.getTiming().delay }));
+    return { pl: a('#pl'), ns: a('#ns'), inner: a('#inner') };
+  });
+  check('draw: an authored pathLength sets the dash length', d.pl.length === 1 && parseFloat(d.pl[0].off) === 1, JSON.stringify(d.pl));
+  check('draw: a non-scaling stroke is left alone', d.ns.length === 0, JSON.stringify(d.ns));
+  check('draw: a nested draw group plays its own delay, once', d.inner.length === 1 && d.inner[0].delay === 1000, JSON.stringify(d.inner));
+  await o.ctx.close();
+  // count-up really counts and ends on the authored text by itself.
+  o = await open(browser, '<section id="s"><p id="n" data-fx="count-up" data-fx-dur="400">1.250,5 ₫</p></section>');
+  await show(o.pg, '#s');
+  await o.pg.waitForTimeout(200);
+  const mid = await o.pg.textContent('#n');
+  await o.pg.waitForTimeout(500);
+  const end = await o.pg.textContent('#n');
+  check('count-up: an intermediate value, then the authored text', mid !== '1.250,5 ₫' && mid !== '0,0 ₫' && end === '1.250,5 ₫', JSON.stringify({ mid, end }));
+  await o.ctx.close();
+}
+
 const browser = await chromium.launch();
 try {
-  for (const scenario of [legacy, api, isolation, nesting, entrances, grow, draw, loops]) {
+  for (const scenario of [legacy, api, isolation, nesting, entrances, grow, draw, loops, reviewFixes]) {
     try { await scenario(browser); } catch (e) { failures.push(`${scenario.name}: ${e.message}`); console.log(`  ✖ ${scenario.name} crashed: ${e.stack}`); }
   }
 } finally { await browser.close(); }
