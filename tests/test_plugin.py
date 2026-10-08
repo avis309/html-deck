@@ -42,19 +42,19 @@ def test_manifests_carry_author_and_license():
 
 def test_codex_manifest_points_at_the_skills():
     data = _json(".codex-plugin/plugin.json")
-    assert (REPO / data["skills"] / "htmldeck" / "SKILL.md").is_file()
+    assert (REPO / data["skills"] / "open" / "SKILL.md").is_file()
     assert data["interface"]["displayName"] == "HTML Deck"
 
 
 def test_skill_has_frontmatter_and_no_command_shadows_it():
-    skill = _frontmatter("skills/htmldeck/SKILL.md")
-    assert skill["name"] == "htmldeck" and len(skill["description"]) > 80 and skill["argument-hint"]
-    # A command of the same name would list /htmldeck:htmldeck twice in Claude Code.
-    assert not (REPO / "commands" / "htmldeck.md").exists()
+    skill = _frontmatter("skills/open/SKILL.md")
+    assert skill["name"] == "open" and len(skill["description"]) > 80 and skill["argument-hint"]
+    # A command of the same name would list /htmldeck:open twice in Claude Code.
+    assert not (REPO / "commands" / "open.md").exists()
 
 
 def test_skill_names_files_that_exist():
-    text = (REPO / "skills/htmldeck/SKILL.md").read_text(encoding="utf-8")
+    text = (REPO / "skills/open/SKILL.md").read_text(encoding="utf-8")
     for rel in ("scripts/htmldeck-run", "scripts/htmldeck-run.cmd"):
         assert rel in text and (REPO / rel).is_file()
     assert "HTMLDECK_URL=" in text

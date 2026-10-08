@@ -1,5 +1,5 @@
 ---
-name: htmldeck
+name: open
 description: Open the HTML documents of the user's workspace (slide decks, Reveal.js decks, reports, pages) in the HTML Deck visual editor to edit text, restyle, move blocks, add effects and present, saving in place; and act on the review notes ("AI Feedback") the user pinned there. Use when the user wants to edit, tweak, present or review an HTML deck/report/page visually, mentions HTML Deck, or asks to apply the feedback or notes left on an HTML document.
 argument-hint: "[file.html]"
 ---
@@ -47,13 +47,11 @@ Notes the user pins to elements, or to a region drawn on a slide, live in
    line, a CSS selector, a text snippet and what the user wants. A region note also
    gives the area in CSS pixels of its slide (or section) and the elements found in it, each with
    a selector and line: the request applies to that whole area. `--prompt` prints the same notes as
-   one ready-made request. A request the user pastes from the editor already carries the exact
-   command to run (this Python, this copy of HtmlDeck, the workspace); prefer it as given. On
-   Windows it is PowerShell syntax (`& '…python.exe' '…\notes.py' …`).
+   one ready-made request.
 2. Edit the HTML source there yourself, keeping the change minimal.
 3. Mark each one done: `RUN notes --root "<workspace>" --file "<doc>" --done ID`, ID being the note's id (`--done` repeats).
-4. If the document is open in the editor, ask the user to reload it: the editor refuses to save over
-   a file changed on disk.
+4. Nothing to reload: the editor follows the file on disk and shows the new version at once (or,
+   with unsaved edits there, asks the user which version to keep).
 
 ## Rules
 
