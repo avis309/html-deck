@@ -140,9 +140,32 @@ async function entrances(browser) {
   await ctx.close();
 }
 
+async function grow(browser) {
+  section('runtime: grow-x / grow-y scale from an edge, the author\'s transform kept');
+  const css = '.bar{display:block;height:10px;width:200px;background:#f60}.moved{transform:translateX(30px)}';
+  const { pg, ctx } = await open(browser, `<section id="s">
+    <span id="gx" class="bar moved" data-fx="grow-x"></span><span id="gy" class="bar" data-fx="grow-y"></span>
+    <span id="rtl" class="bar" dir="rtl" data-fx="grow-x"></span><span id="in" data-fx="grow-x">inline</span></section>`, { css });
+  await show(pg, '#s');
+  const gx = await anims(pg, '#gx');
+  const origin = gx.find(a => a.frames[0].transformOrigin)?.frames[0].transformOrigin;
+  const scale = gx.find(a => a.composite === 'add');
+  check('grow-x: scaleX(0) added, origin at the left edge, 900 ms', scale?.frames[0].transform === 'scaleX(0)' && /^left/.test(origin) && scale.duration === 900, JSON.stringify(gx));
+  const gy = await anims(pg, '#gy');
+  check('grow-y: scaleY(0) from the bottom', gy.some(a => a.frames[0].transform === 'scaleY(0)') && gy.some(a => /bottom/.test(a.frames[0].transformOrigin || '')), JSON.stringify(gy));
+  const rtl = await anims(pg, '#rtl');
+  check('grow-x in rtl: from the right edge', rtl.some(a => /^right/.test(a.frames[0].transformOrigin || '')), JSON.stringify(rtl));
+  const inl = await pg.evaluate(() => ({ why: window.__htmldeckFx.check(document.querySelector('#in'), 'grow-x'), n: document.querySelector('#in').getAnimations().length }));
+  check('grow on an inline element: refused ("inline"), not animated', inl.why === 'inline' && inl.n === 0, JSON.stringify(inl));
+  await pg.evaluate(() => document.getAnimations().forEach(a => a.finish()));
+  const t = await pg.evaluate(() => getComputedStyle(document.querySelector('#gx')).transform);
+  check('after grow-x: the authored translateX(30px) is intact', t === 'matrix(1, 0, 0, 1, 30, 0)', t);
+  await ctx.close();
+}
+
 const browser = await chromium.launch();
 try {
-  for (const scenario of [legacy, api, isolation, nesting, entrances]) {
+  for (const scenario of [legacy, api, isolation, nesting, entrances, grow]) {
     try { await scenario(browser); } catch (e) { failures.push(`${scenario.name}: ${e.message}`); console.log(`  ✖ ${scenario.name} crashed: ${e.stack}`); }
   }
 } finally { await browser.close(); }

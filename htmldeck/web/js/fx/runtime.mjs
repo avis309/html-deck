@@ -81,6 +81,8 @@ export function fxRuntime(win, opts) {
   // Only where the author set no filter: the blur would replace it while it plays.
   mod('blur-in', entrance(null, { dur: 800, filter: 'blur(12px)', why: 'filter', applies: function (el) { return win.getComputedStyle(el).filter === 'none'; } }));
   mod('pop', entrance('scale(0.6)', { category: 'emphasis', dur: 600, ease: 'cubic-bezier(.34,1.56,.64,1)' }));
+  mod('grow-x', { category: 'data', waits: true, dur: 900, why: 'inline', applies: boxed, play: playGrow('x') });
+  mod('grow-y', { category: 'data', waits: true, dur: 900, why: 'inline', applies: boxed, play: playGrow('y') });
   function num(v, d) { var n = parseFloat(v); return isFinite(n) && n >= 0 ? n : d; }
   function config(el) {
     var m = MODULES[el.getAttribute('data-fx')];
@@ -218,6 +220,18 @@ export function fxRuntime(win, opts) {
       run.raf(step);
     });
   }
+  // Bars, rules, columns: a scale from one edge composited onto the author's transform. The
+  // origin is an animation too (replace mode, same timing), never a written style.
+  function playGrow(axis) {
+    return function (target, i, c, run) {
+      var o = { duration: c.dur, delay: c.delay + i * c.stagger, easing: EASE, fill: 'backwards' };
+      var origin = axis === 'y' ? 'center bottom' : win.getComputedStyle(target).direction === 'rtl' ? 'right center' : 'left center';
+      run.show(target);
+      run.animate(target, [{ transformOrigin: origin }, { transformOrigin: origin }], o);
+      run.animate(target, [{ transform: axis === 'y' ? 'scaleY(0)' : 'scaleX(0)' }, { transform: 'none' }], { duration: o.duration, delay: o.delay, easing: o.easing, fill: o.fill, composite: 'add' });
+    };
+  }
+  function boxed(el) { return win.getComputedStyle(el).display !== 'inline'; }
   // Play el's effect inside `scope` under run token t. A module that throws leaves its target
   // visible as authored; the rest of the scope keeps playing.
   var failed = {};
