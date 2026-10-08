@@ -40,8 +40,10 @@ import math
 import os
 import re
 import secrets
+import select
 import shlex
 import shutil
+import socket
 import socketserver
 import sys
 import threading
@@ -742,11 +744,23 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
                     pinged = time.monotonic()
                     self.wfile.write(b": ping\n\n")
                     self.wfile.flush()
-                time.sleep(WATCH_POLL_S)
+                if self._watch_closed():
+                    break
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             pass
         finally:
             WATCH_SLOTS.release()
+
+    def _watch_closed(self) -> bool:
+        """Wait one poll interval; True once the tab has gone. The tab never sends anything on
+        this stream, so the socket turns readable only when it closes: the thread and its socket
+        are released at once, not at the next ping (Windows runs out of socket buffers when
+        streams of closed tabs pile up)."""
+        try:
+            readable, _, _ = select.select([self.connection], [], [], WATCH_POLL_S)
+            return bool(readable) and not self.connection.recv(1, socket.MSG_PEEK)
+        except OSError:
+            return True
 
     def _read_json(self) -> dict:
         length = int(self.headers.get("Content-Length", 0))

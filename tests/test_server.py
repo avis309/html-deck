@@ -3,6 +3,7 @@ import http.client
 import json
 import os
 import threading
+import time
 
 import pytest
 
@@ -611,6 +612,7 @@ def test_http_watch_streams_events_and_guards_the_path(server, root):
     while b"event: doc" not in seen:
         seen += res.fp.readline()
     assert b'"rev"' in res.fp.readline()
+    res.close()
     conn.close()
 
 
@@ -636,3 +638,18 @@ def test_save_reports_the_revision_of_what_it_wrote(root):
     loaded = ed.load_html(target, root)
     saved = ed.save_html(target, "<p>new</p>", None, False, root, loaded["rev"])
     assert saved["rev"] == ed.revision(b"\xef\xbb\xbf<p>new</p>") == ed.revision(target.read_bytes())
+
+
+def test_http_watch_lets_go_of_a_closed_tab_at_once(server):
+    free = ed.WATCH_SLOTS._value
+    conn = http.client.HTTPConnection("127.0.0.1", server, timeout=5)
+    conn.request("GET", "/api/watch?path=output/deck/a.html", headers={"Host": f"127.0.0.1:{server}", "Sec-Fetch-Site": "same-origin"})
+    res = conn.getresponse()
+    res.fp.readline()
+    assert ed.WATCH_SLOTS._value == free - 1
+    res.close()   # the response holds the socket too
+    conn.close()
+    deadline = time.monotonic() + 3   # well before the 15 s ping
+    while ed.WATCH_SLOTS._value != free and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert ed.WATCH_SLOTS._value == free
