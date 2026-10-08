@@ -83,6 +83,7 @@ export function fxRuntime(win, opts) {
   mod('pop', entrance('scale(0.6)', { category: 'emphasis', dur: 600, ease: 'cubic-bezier(.34,1.56,.64,1)' }));
   mod('grow-x', { category: 'data', waits: true, dur: 900, why: 'inline', applies: boxed, play: playGrow('x') });
   mod('grow-y', { category: 'data', waits: true, dur: 900, why: 'inline', applies: boxed, play: playGrow('y') });
+  mod('draw', { category: 'data', waits: true, dur: 1400, why: 'draw', applies: function (el) { return shapesOf(el).length > 0; }, targets: shapesOf, play: playDraw });
   function num(v, d) { var n = parseFloat(v); return isFinite(n) && n >= 0 ? n : d; }
   function config(el) {
     var m = MODULES[el.getAttribute('data-fx')];
@@ -232,6 +233,23 @@ export function fxRuntime(win, opts) {
     };
   }
   function boxed(el) { return win.getComputedStyle(el).display !== 'inline'; }
+  // Strokes of the SVG shapes inside an element (or the shape itself), drawn in document order.
+  // Authored dashes are the author's; shapes with their own data-fx play that instead.
+  var SHAPES = 'path,line,polyline,polygon,circle,ellipse,rect';
+  function strokeLength(s) { try { return s.getTotalLength(); } catch (e) { return 0; } }
+  function shapesOf(el) {
+    var list = el.matches(SHAPES) ? [el] : Array.prototype.slice.call(el.querySelectorAll(SHAPES));
+    return list.filter(function (s) {
+      var cs = win.getComputedStyle(s);
+      return (s === el || !s.hasAttribute('data-fx')) && cs.stroke !== 'none' && cs.strokeDasharray === 'none' && cs.display !== 'none' && strokeLength(s) > 0;
+    });
+  }
+  function playDraw(shape, i, c, run) {
+    var len = strokeLength(shape), dash = len + ' ' + len;
+    run.show(shape);
+    run.animate(shape, [{ strokeDasharray: dash, strokeDashoffset: len }, { strokeDasharray: dash, strokeDashoffset: 0 }],
+      { duration: c.dur, delay: c.delay + i * c.stagger, easing: 'ease-in-out', fill: 'backwards' });
+  }
   // Play el's effect inside `scope` under run token t. A module that throws leaves its target
   // visible as authored; the rest of the scope keeps playing.
   var failed = {};

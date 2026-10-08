@@ -163,9 +163,34 @@ async function grow(browser) {
   await ctx.close();
 }
 
+async function draw(browser) {
+  section('runtime: draw strokes the SVG shapes inside, in order; dashes and zero-length shapes left alone');
+  const { pg, ctx, errs } = await open(browser, `<section id="s"><svg id="g" width="300" height="100" data-fx="draw" data-fx-stagger="100">
+    <path id="p1" d="M0 50 L300 50" stroke="#000" fill="none"/>
+    <path id="p2" d="M0 80 L300 80" stroke="#000" fill="none" stroke-dasharray="4 4"/>
+    <path id="p3" d="M10 10" stroke="#000" fill="none"/>
+    <circle id="c1" cx="50" cy="50" r="20" stroke="#000" fill="none"/>
+    <rect id="r1" x="0" y="0" width="10" height="10" fill="#000"/></svg>
+    <svg id="none" data-fx="draw"><rect width="10" height="10" fill="#000"/></svg></section>`);
+  const before = await markup(pg);
+  await show(pg, '#s');
+  const p1 = await anims(pg, '#p1');
+  check('draw: the first path dashes from its length to 0, 1400 ms', p1.length === 1 && parseFloat(p1[0].frames[0].strokeDashoffset) === 300 && parseFloat(p1[0].frames[1].strokeDashoffset) === 0 && p1[0].duration === 1400, JSON.stringify(p1));
+  const c1 = await anims(pg, '#c1');
+  check('draw: the circle comes next (stagger 100)', c1.length === 1 && c1[0].delay === 100, JSON.stringify(c1));
+  const left = await pg.evaluate(() => ['#p2', '#p3', '#r1'].map(s => ({ s, n: document.querySelector(s).getAnimations().length, wait: document.querySelector(s).classList.contains('fx-wait') })));
+  check('draw: dashed path, zero-length path, unstroked rect untouched and visible', left.every(x => x.n === 0 && !x.wait), JSON.stringify(left));
+  const no = await pg.evaluate(() => window.__htmldeckFx.check(document.querySelector('#none'), 'draw'));
+  check('draw on an SVG without strokes: refused ("draw")', no === 'draw', String(no));
+  await leave(pg);
+  check('leave: authored DOM back', (await markup(pg)) === before.replace(/ class="fx-wait"/g, ''), await markup(pg));
+  check('no errors', !errs.length, errs.join(' | '));
+  await ctx.close();
+}
+
 const browser = await chromium.launch();
 try {
-  for (const scenario of [legacy, api, isolation, nesting, entrances, grow]) {
+  for (const scenario of [legacy, api, isolation, nesting, entrances, grow, draw]) {
     try { await scenario(browser); } catch (e) { failures.push(`${scenario.name}: ${e.message}`); console.log(`  ✖ ${scenario.name} crashed: ${e.stack}`); }
   }
 } finally { await browser.close(); }
