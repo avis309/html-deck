@@ -2,11 +2,10 @@
 
 # HTML Deck
 
-**A visual editor for the HTML files in your workspace: slide decks, reports, and pages written by
-you or by an AI agent.**
+**Edit HTML slides, reports and pages yourself, without burning tokens.**
 
-Click text to edit it, restyle it, move blocks, add effects and present. The file is patched
-**only where you changed it**, so a save with no edits is byte-identical.
+Fix a typo, change a color or move a block right in the browser, no AI needed. Leave notes for
+the changes that need the agent.
 
 [![CI](https://github.com/avis309/html-deck/actions/workflows/ci.yml/badge.svg)](https://github.com/avis309/html-deck/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/htmldeck?label=pypi)](https://pypi.org/project/htmldeck/)
@@ -14,8 +13,7 @@ Click text to edit it, restyle it, move blocks, add effects and present. The fil
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**Editor in 🇬🇧 English · 🇻🇳 Tiếng Việt · 🇨🇳 简体中文 · 🇹🇼 繁體中文** &nbsp;·&nbsp; **Works with** plain HTML · slide decks ·
-Reveal.js · Tailwind CSS · inline SVG · anime.js and other animation code
+[🇬🇧 English](README.md) • [🇻🇳 Tiếng Việt](readme/README.vi.md) • [🇨🇳 简体中文](readme/README.zh-CN.md) • [🇹🇼 繁體中文](readme/README.zh-TW.md)
 
 <img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/edit.png" alt="Editing a slide title in HTML Deck" width="900">
 
@@ -23,16 +21,17 @@ Reveal.js · Tailwind CSS · inline SVG · anime.js and other animation code
 
 ## Why
 
-- **Edits stay minimal.** HTML Deck patches the source text where you made a change and leaves
-  everything else as it was, including formatting, comments and the agent's own markup. That keeps
-  diffs small and reviewable.
-- **Works with your agent.** Pin a note on any element ("make this shorter"), or drag across a slide
-  to sweep several blocks and leave one note for the area, then ask Claude Code or Codex to apply
-  your HTML Deck notes. The agent reads them, edits the HTML and marks them done.
-- **Presents the real thing.** Presentation runs the deck's own scripts and animations in a
-  separate frame, so presenting never touches the document you are editing.
-- **Local and dependency-free.** One Python 3.11+ standard-library server on `127.0.0.1`. Nothing
-  leaves your machine.
+AI assistants like Claude Code and Codex are great at making slides and pages in HTML. Changing
+them is another story: even a one-word fix sends the AI back through a large file, which burns
+tokens and time, and it may touch things you didn't ask for.
+
+- **Edit it yourself.** Click to change text, colors, fonts, images, layout and effects. No agent
+  needed.
+- **Point the agent to the exact spot.** For bigger changes, pin an **AI Feedback** note on a block
+  or an area ("make this shorter"). The agent knows what to change and where.
+- **Your file stays clean.** Saving updates only the parts you edited, so the rest of the file is
+  left as it was. If a full rewrite is ever needed, you are asked first.
+- **Present it.** Show the deck full screen with its own animations.
 
 <table>
   <tr>
@@ -40,14 +39,14 @@ Reveal.js · Tailwind CSS · inline SVG · anime.js and other animation code
     <td width="50%"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/present.png" alt="Presenting a deck"></td>
   </tr>
   <tr>
-    <td align="center"><b>AI Feedback</b>: pin notes for your agent</td>
+    <td align="center"><b>AI Feedback</b>: notes for your agent</td>
     <td align="center"><b>Present</b> with the deck's own animations</td>
   </tr>
   <tr>
     <td colspan="2"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/svg.png" alt="Retyping a label inside an SVG architecture diagram"></td>
   </tr>
   <tr>
-    <td colspan="2" align="center"><b>Diagrams</b>: retype a label inside an inline SVG, the rest of the drawing stays as it was</td>
+    <td colspan="2" align="center"><b>Diagrams</b>: retype a label inside a diagram</td>
   </tr>
 </table>
 
@@ -57,105 +56,85 @@ Reveal.js · Tailwind CSS · inline SVG · anime.js and other animation code
 |---|---|
 | Claude Code | `/plugin marketplace add avis309/html-deck` then `/plugin install htmldeck@htmldeck` |
 | Codex | `codex plugin marketplace add avis309/html-deck` then `codex plugin add htmldeck@htmldeck` |
-| uv | `uvx htmldeck` (one-off) · `uv tool install htmldeck` |
+| uv | `uvx htmldeck` · `uv tool install htmldeck` |
 | pipx / pip | `pipx install htmldeck` · `pip install htmldeck` |
-| npm | `npx @avis309/htmldeck` (one-off) · `npm i -g @avis309/htmldeck` |
+| npm | `npx @avis309/htmldeck` · `npm i -g @avis309/htmldeck` |
 
-HTML Deck needs Python 3.11+ and nothing else. The npm package and the plugins find Python and run
-it for you. It works on Linux, macOS and Windows.
+Needs Python 3.11+ (the npm package also needs Node.js 18+). Linux, macOS and Windows.
 
-## Use it with an agent
+## Use
 
-In Claude Code or Codex:
+**With Claude Code or Codex:**
 
-1. Ask the agent to open your HTML file in HTML Deck, e.g. *"open my deck in HTML Deck"*. Claude
-   Code also has `/htmldeck [file]`.
-2. Edit in the browser, and pin **AI Feedback** notes where you want the agent to change something.
-3. Ask the agent to *"apply my HTML Deck notes"*.
+1. Say *"open my deck in HTML Deck"* (or type `/htmldeck [file]` in Claude Code).
+2. Edit what you can. Pin **AI Feedback** notes for the rest.
+3. Say *"apply my HTML Deck notes"*. The agent makes the changes and marks the notes done.
+   Reload the document in HTML Deck to see them.
 
-## Run it yourself
+**On its own**, in the folder with your files:
 
 ```bash
-htmldeck                                # workspace = current folder
-htmldeck --file <file>.html             # open that document first
+htmldeck                          # open the editor on the current folder
+htmldeck --file <file>.html       # open that document first
 htmldeck --root <folder> --port 6789 --no-browser
 ```
 
-`<file>.html` is any HTML document in your workspace: a deck, a report, a page.
+It runs on your computer (`127.0.0.1`). **Save** keeps a backup of each version in `.htmldeck_bak/`.
+**Save ▾** also gives you a copy to share: one HTML file with its images, styles and fonts built in,
+or a PDF. The editor starts in your browser's language; change it from the language menu.
 
-To try it on the sample deck (a 17-slide quarterly marketing report with anime.js charts) in a
-clone of this repo, run `htmldeck --root samples --file marketing-report.html`. The same folder
-has `architecture.html`, a page with an SVG diagram whose labels you can edit.
+Try it in a clone of this repo: `htmldeck --root samples --file marketing-report.html`.
 
-The workspace is the folder HTML Deck runs in, or the folder given with `--root`. Every path is
-relative to it, and nothing outside it is served or written, except the file passed with `--file`.
-Each save keeps a timestamped backup in `.htmldeck_bak/` next to the document.
-
-**Save ▾** also saves a copy of the document to share:
-
-- **HTML**: a single file that includes all its images, styles, scripts and fonts, so it opens
-  anywhere, even offline. Resources loaded from the web (a CDN script, web fonts) are included
-  too, unless you clear that option. From a terminal, run
-  `python -m htmldeck.export --file <file>.html --remote`.
-- **PDF**: the document as a PDF file: a deck, a report or any page.
-
-Review notes live beside each document in `.htmldeck_notes/<name>.json`, so **AI Feedback** works
-on documents opened from the workspace's **Files** list (not on a file opened from the computer or
-dropped in). The request copied from the editor carries the exact command for the agent to run,
-on macOS, Linux and Windows (PowerShell) alike. With HtmlDeck installed, scripts and agents can
-also read and resolve notes with:
-
-```bash
-htmldeck-notes --file <file>.html             # list open notes
-htmldeck-notes --file <file>.html --prompt    # the same, as a request ready to paste to an agent
-htmldeck-notes --file <file>.html --done <id> # mark one done
-```
-
-A region note (drag from the slide background to select several blocks, then **AI Feedback** on
-the group's toolbar) also records the area in CSS pixels of its slide or section and the elements
-in it. Versions before 0.1.1 read it as a
-note on the whole slide, and drop the region if they rewrite the notes file.
-
-## What it supports
+## Works with
 
 | | |
 |---|---|
-| 🌐 **Languages** | The whole editor speaks **English**, **Tiếng Việt**, **简体中文** and **繁體中文**. It follows your browser's language on the first visit (`zh-TW`, `zh-HK` and `zh-Hant` open in Traditional Chinese, with Taiwan wording); switch any time from the language menu. |
-| 📄 **Documents** | Plain HTML pages and reports, and decks of `.slide` blocks, whether written by you or generated by an AI agent. |
-| 🎞️ **Reveal.js** | Hand-written Reveal.js decks: vertical stacks, fragments, speaker notes and backgrounds. Reveal's Markdown slides are read-only. |
-| 🎨 **Tailwind CSS** | Utility classes are kept as written. Your restyling is applied on top as the element's own style, and wins even over `!important` utilities. With the Tailwind Play CDN (`cdn.tailwindcss.com`), the editor tells you to trust the file so the edit view is styled too; presenting always is. |
-| 📐 **SVG diagrams** | Click a label in an inline `<svg>` (a `<text>` or `<tspan>`) and type over it; only that text changes in the file. Click a shape to select the whole diagram, for example to pin AI Feedback on it. |
-| ✨ **Animations & effects** | The deck's own animation code (anime.js, GSAP, CSS animations…) runs when presenting and is frozen while editing; code registered as a *scene* is also restarted each time its slide is shown. `data-fx` entrance effects (fade, zoom, slide, count-up) can be set from the toolbar; "Enable FX in the file" adds a small inline runtime so they run when the file is opened on its own. |
-| 🛟 **Safe editing** | Content that the page's own scripts create or change is locked, and the editor shows why. Undo/redo, draft recovery, and a timestamped backup on every save. |
-| 🔒 **Isolation** | Presentations run on a second origin with no access to the editor's API. The edit view blocks remote scripts (from a CDN, for example) unless you trust the file. A file opened from your computer instead of the workspace runs none of its own scripts. Workspace files opened directly on the editor origin are sandboxed. |
+| **Documents** | Plain HTML pages, reports, and decks of `.slide` blocks, written by hand or by an agent. |
+| **Reveal.js** | Hand-written decks: stacks, fragments, speaker notes, backgrounds. Markdown slides are read-only. |
+| **Tailwind CSS** | Classes stay as written; your styles go on top. |
+| **SVG** | Retype a `<text>` / `<tspan>` label in an inline `<svg>`. |
+| **Animations** | The page's own scripts (anime.js, GSAP…) run when presenting a file from the workspace. While editing, CSS and Web Animations are paused, and content a script changes is locked. Add `data-fx` entrance effects from the toolbar. |
+| **Safety** | Undo/redo, draft recovery, backups. Remote scripts (a CDN, for example) are blocked while editing until you trust the file; presenting runs on a separate origin. |
 
 <details>
-<summary><b>Develop</b></summary>
+<summary><b>Details for developers</b></summary>
+
+**Workspace.** The current folder, or `--root`. Nothing outside it is served or written. A `--file`
+outside it makes its folder the workspace (unless `--root` is given).
+
+**Saving.** The source is patched where you edited; when a document can't be patched, the editor
+asks before rewriting it. Backups are kept for files from the workspace (not for a file opened from
+your computer).
+
+**Files opened from your computer** (or dropped in) rather than from the workspace run none of
+their own scripts, even when presenting; HTML export saves the edited file without embedding its
+images and styles; AI Feedback is off.
+
+**Export.** HTML export embeds linked images, styles, scripts and fonts; resources it can't fetch
+stay as links. From a terminal: `python -m htmldeck.export --file <file>.html --remote` (`--remote`
+also embeds web resources). PDF uses the browser's print dialog.
+
+**AI Feedback.** Notes are stored in `.htmldeck_notes/<name>.json` beside the document.
+Each note records the element's selector, a text snippet and its source line; a region note also
+records the area and the elements in it.
+
+```bash
+htmldeck-notes --file <file>.html             # list open notes
+htmldeck-notes --file <file>.html --prompt    # as a request ready to paste to an agent
+htmldeck-notes --file <file>.html --done <id> # mark one done
+```
+
+**Develop.**
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 npm install
-npm run check        # eslint (editor modules) + pytest (server) + browser spec
+npm run check        # eslint + pytest + browser specs
 ```
 
-- `htmldeck/server.py`: HTTP server, workspace guards, save/backup/notes API, preview origin.
-- `htmldeck/web/`: the editor, as native ES modules with no bundler. `js/core` holds the model,
-  serializer and history; `js/runtime` holds provenance and motion freeze; also `js/policy`,
-  `js/formats` (Reveal), `js/present` and `js/fx` (the effects runtime, which is also inlined
-  into documents).
-- `tests/spec/characterization.spec.mjs`: black-box Playwright spec over fixtures in a temporary
-  workspace. To run it on another workspace's files too:
-  `HTMLDECK_REAL_ROOT=… HTMLDECK_REAL_FILES="a.html,b.html" npm run spec`.
-- `tools/align-report.mjs`: `npm run align -- <workspace>` reports what share of a workspace's
-  HTML files save as an in-place patch. The rest still save correctly, through a full rewrite that
-  the editor asks you to confirm.
-- Plugin: `.claude-plugin/`, `.codex-plugin/`, `.agents/plugins/` (marketplaces),
-  `skills/htmldeck/` (also the `/htmldeck [file]` command), and `scripts/htmldeck-run[.cmd]`, which runs this copy with any
-  Python 3.11+.
-- npm wrapper: `packaging/npm/` bundles `htmldeck/` at pack time and runs it with the user's
-  Python.
-- Release: run `python tools/bump_version.py X.Y.Z`, commit, then tag `vX.Y.Z` and push the tag.
-  `.github/workflows/release.yml` publishes to PyPI, then npm, then creates the GitHub Release.
+Server: `htmldeck/server.py`. Editor: `htmldeck/web/js/` (native ES modules, no bundler; `app.mjs`
+boots it; `npm run lint` also checks that imports only go down the layers and never form a cycle). Browser specs: `tests/spec/`. Release: `python tools/bump_version.py X.Y.Z`, commit, tag
+`vX.Y.Z`, push the tag.
 
 </details>
 
