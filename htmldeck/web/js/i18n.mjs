@@ -1,5 +1,5 @@
 // HtmlDeck UI strings (VI / ZH / ZH-HANT / EN) and pure lookups. No DOM, no editor state:
-// callers pass the language (see the wrappers in app.mjs).
+// callers pass the language (see the wrappers in ui/language.mjs).
 
 export const I18N = {
   vi: {

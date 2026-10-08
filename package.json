@@ -3,7 +3,7 @@
   "private": true,
   "description": "Dev tooling for HtmlDeck: lint of the editor's ES modules and the black-box browser spec.",
   "scripts": {
-    "lint": "eslint \"htmldeck/web/js/**/*.mjs\"",
+    "lint": "eslint \"htmldeck/web/js/**/*.mjs\" && node tools/check-architecture.mjs",
     "spec": "node tests/spec/characterization.spec.mjs && node tests/spec/traditional-chinese.spec.mjs",
     "check": "npm run lint && npm run test:py && npm run spec",
     "align": "node tools/align-report.mjs",

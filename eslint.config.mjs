@@ -9,6 +9,8 @@ export default [
     rules: {
       'no-undef': 'error',
       'no-unused-vars': ['error', { vars: 'all', args: 'none', caughtErrors: 'none' }],
+      // A split module must never assign another module's binding (throws at runtime).
+      'no-import-assign': 'error',
     },
   },
 ];
