@@ -16,15 +16,26 @@ from __future__ import annotations
 import argparse
 import base64
 import html as html_lib
+import ipaddress
 import mimetypes
 import re
+import socket
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 from html.parser import HTMLParser
 from pathlib import Path
 
 MAX_REMOTE_BYTES = 25 * 1024 * 1024
+MAX_REMOTE_TOTAL = 100 * 1024 * 1024   # everything one export may download
+# Only files a web page loads are embedded: a document cannot pull credentials.txt or .json
+# data from the workspace into a file meant to be shared.
+ASSET_SUFFIXES = {
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".svg", ".ico", ".bmp",
+    ".woff", ".woff2", ".ttf", ".otf", ".eot", ".css", ".js", ".mjs",
+    ".mp4", ".webm", ".ogg", ".ogv", ".mp3", ".wav", ".m4a", ".mov", ".vtt",
+}
 REMOTE_TIMEOUT = 20
 # Attributes that load a file, per tag. srcset lists several, handled apart.
 URL_ATTRS = {
@@ -47,6 +58,7 @@ class _Resolver:
         self.missing: list[str] = []
         self.remote: list[str] = []
         self.cache: dict[str, tuple[bytes, str] | None] = {}
+        self.downloaded = 0
 
     def _note(self, bucket: list[str], ref: str) -> None:
         if ref not in bucket:
@@ -83,7 +95,8 @@ class _Resolver:
             try:
                 path = path.resolve()
                 inside = next((d for d in self.allowed if path.is_relative_to(d)), None)
-                if inside and path.is_file() and not any(p.startswith(".") for p in path.relative_to(inside).parts):
+                if (inside and path.is_file() and path.suffix.lower() in ASSET_SUFFIXES
+                        and not any(p.startswith(".") for p in path.relative_to(inside).parts)):
                     self.cache[key] = (path.read_bytes(), _mime(path.name))
             except OSError:
                 pass
@@ -93,10 +106,14 @@ class _Resolver:
         if url not in self.cache:
             self.cache[url] = None
             try:
+                if not _public_url(url):
+                    return None
                 req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (HTML Deck export)"})
-                with urllib.request.urlopen(req, timeout=REMOTE_TIMEOUT) as res:
-                    data = res.read(MAX_REMOTE_BYTES + 1)
-                    if len(data) <= MAX_REMOTE_BYTES:
+                left = min(MAX_REMOTE_BYTES, MAX_REMOTE_TOTAL - self.downloaded)
+                with _OPENER.open(req, timeout=REMOTE_TIMEOUT) as res:
+                    data = res.read(left + 1)
+                    self.downloaded += len(data)
+                    if len(data) <= left:
                         mime = res.headers.get_content_type()
                         if mime in ("application/octet-stream", "text/plain"):
                             mime = _mime(urllib.parse.urlsplit(url).path)
@@ -104,6 +121,36 @@ class _Resolver:
             except (OSError, ValueError):
                 pass
         return self.cache[url]
+
+
+def _host_allowed(host: str | None) -> bool:
+    """Only hosts whose every address is public: never this machine, the local network,
+    link-local (cloud metadata) or multicast."""
+    if not host:
+        return False
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except (OSError, UnicodeError):
+        return False
+    addrs = {ipaddress.ip_address(i[4][0].split("%")[0]) for i in infos}
+    return bool(addrs) and all(a.is_global and not a.is_multicast for a in addrs)
+
+
+def _public_url(url: str) -> bool:
+    u = urllib.parse.urlsplit(url)
+    return u.scheme in ("http", "https") and _host_allowed(u.hostname)
+
+
+class _PublicRedirects(urllib.request.HTTPRedirectHandler):
+    """Every redirect hop is checked again: a public URL cannot bounce the export to localhost."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not _public_url(newurl):
+            raise urllib.error.URLError(f"redirect to a non-public address refused: {newurl}")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_PublicRedirects)
 
 
 def _mime(name: str) -> str:

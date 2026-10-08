@@ -71,7 +71,8 @@ def cdn(tmp_path):
     srv.shutdown()
 
 
-def test_remote_files_only_when_asked(ws, cdn):
+def test_remote_files_only_when_asked(ws, cdn, monkeypatch):
+    monkeypatch.setattr(ex, "_host_allowed", lambda host: True)   # the test CDN is on 127.0.0.1
     html = f'<script src="{cdn}/lib.js" integrity="sha384-x" crossorigin="anonymous"></script><link rel="stylesheet" href="{cdn}/f.css">'
     out, rep = run(ws, html)
     assert out == html and rep["remote"] == [f"{cdn}/lib.js", f"{cdn}/f.css"]   # listed, not fetched
@@ -86,3 +87,53 @@ def test_export_api_uses_the_documents_folder(tmp_path):
     (tmp_path / "d" / "x.html").write_text("<p>x</p>", encoding="utf-8")
     res = ed.export_html(tmp_path / "d" / "x.html", '<img src="p.png">', tmp_path.resolve(), fetch_remote=False)
     assert res["html"].startswith('<img src="data:image/png;base64,') and res["embedded"] == 1
+
+
+def test_only_web_assets_are_embedded_from_the_workspace(ws):
+    (ws / "deck" / "credentials.txt").write_text("password=hunter2", encoding="utf-8")
+    (ws / "deck" / "data.json").write_text('{"k": 1}', encoding="utf-8")
+    html = '<img src="credentials.txt"><link rel="stylesheet" href="data.json"><img src="img/a.png">'
+    out, rep = run(ws, html)
+    assert "hunter2" not in out and base64.b64encode(b"password=hunter2").decode() not in out
+    assert '"k": 1' not in out and base64.b64encode(b'{"k": 1}').decode() not in out
+    assert rep["embedded"] == 1 and sorted(rep["missing"]) == ["credentials.txt", "data.json"]
+
+
+@pytest.fixture
+def redirector(tmp_path):
+    (tmp_path / "secret.js").write_text("window.secret=1", encoding="utf-8")
+
+    class H(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *a, **k):
+            super().__init__(*a, directory=str(tmp_path), **k)
+
+        def do_GET(self):
+            if self.path == "/go":
+                self.send_response(302)
+                self.send_header("Location", f"http://localhost:{self.server.server_address[1]}/secret.js")
+                self.end_headers()
+                return
+            super().do_GET()
+
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{srv.server_address[1]}"
+    srv.shutdown()
+
+
+def test_remote_export_never_reaches_local_or_private_addresses(ws, redirector, monkeypatch):
+    out, rep = run(ws, f'<script src="{redirector}/secret.js"></script>', fetch_remote=True)
+    assert "window.secret" not in out and rep["missing"] == [f"{redirector}/secret.js"]
+    for host in ("localhost", "127.0.0.1", "10.0.0.1", "192.168.1.1", "169.254.169.254", "[::1]"):
+        assert not ex._host_allowed(host.strip("[]")), host
+    # A public-looking first hop that redirects to localhost is refused at the redirect.
+    monkeypatch.setattr(ex, "_host_allowed", lambda host, real=ex._host_allowed: host == "127.0.0.1" or real(host))
+    out, rep = run(ws, f'<script src="{redirector}/go"></script>', fetch_remote=True)
+    assert "window.secret" not in out and rep["missing"] == [f"{redirector}/go"]
+
+
+def test_remote_export_has_a_total_size_budget(ws, cdn, monkeypatch):
+    monkeypatch.setattr(ex, "_host_allowed", lambda host: True)
+    monkeypatch.setattr(ex, "MAX_REMOTE_TOTAL", 20)
+    out, rep = run(ws, f'<script src="{cdn}/lib.js"></script><script src="{cdn}/lib.js?again"></script>', fetch_remote=True)
+    assert out.count("window.lib=1") == 1 and rep["missing"] == [f"{cdn}/lib.js?again"]
