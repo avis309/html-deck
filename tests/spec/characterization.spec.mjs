@@ -98,6 +98,11 @@ class Session {
       if (r.status() >= 400 || (want && !want.test(type))) this.errors.push(`asset ${u.pathname}: ${r.status()} ${type}`);
       else if (want) this.assets.add(u.pathname);
     });
+    // A request that never gets a response (connection reset, refused) has no response event.
+    this.page.on('requestfailed', q => {
+      const u = new URL(q.url());
+      if (u.pathname.startsWith('/__htmldeck/')) this.errors.push(`asset ${u.pathname}: ${q.failure()?.errorText}`);
+    });
     return this;
   }
   // Every native dialog must be announced with expectDialog(); anything else fails the run.
@@ -116,10 +121,17 @@ class Session {
   }
   get frame() { return this.page.frameLocator('#frame'); }
   async waitReady(p, prevSeq = 0) {
-    await this.page.waitForFunction(([p, seq]) => {
+    const ready = this.page.waitForFunction(([p, seq]) => {
       const b = document.body;
       return b.dataset.docState === 'ready' && b.dataset.docPath === p && +(b.dataset.docSeq || 0) > seq;
     }, [p, prevSeq], { timeout: 60000 });
+    // An editor module that fails to load leaves a blank editor: say so now, not after the timeout.
+    let timer;
+    const broken = new Promise((_, reject) => {
+      timer = setInterval(() => { const a = this.errors.find(e => e.startsWith('asset ')); if (a) reject(new Error(a)); }, 100);
+    });
+    try { await Promise.race([ready, broken]); }
+    finally { clearInterval(timer); ready.catch(() => {}); }
   }
   seq() { return this.page.evaluate(() => +(document.body.dataset.docSeq || 0)); }
   async open(p) {
@@ -190,6 +202,23 @@ async function detection(browser, url) {
     check(`${f}: no-op roundtrip byte-identical, not dirty`, c === disk(f) && !(await s.dirty()), firstDiff(c, disk(f)));
     await s.close();
   }
+}
+
+// Several editors opening at once: their module requests arrive as one burst of connections
+// (the server's listen backlog used to be 5, and the OS reset the rest: a blank editor).
+async function moduleBurst(browser, url) {
+  section('editor modules: several editors opening at once all load');
+  const failed = [];
+  for (let round = 0; round < 3; round++) {
+    await Promise.all(Array.from({ length: 4 }, async () => {
+      const s = await new Session(browser, url).start();
+      try { await s.open(wpath('deck.html')); } catch (e) { failed.push(e.message.split('\n')[0]); }
+      failed.push(...s.errors.filter(e => e.startsWith('asset ')));
+      s.errors = s.errors.filter(e => !e.startsWith('asset '));   // reported by the check below
+      await s.close();
+    }));
+  }
+  check('4 editors × 3 rounds opening at once: every module loads, every editor gets ready', failed.length === 0, [...new Set(failed)].slice(0, 3).join(' | '));
 }
 
 async function textColourHistory(browser, url) {
@@ -529,7 +558,7 @@ async function svgDiagram(browser, url) {
     (await s.content()) === original && (await s.frame.locator('#t3').textContent()) === 'Sync' && !(await s.dirty()));
 
   await field('#s2');
-  await s.page.keyboard.press('Control+a');
+  await s.page.keyboard.press('ControlOrMeta+a');
   await s.page.keyboard.type('Plans');
   await s.select('#title');   // clicking elsewhere commits it
   c = await s.content();
@@ -538,7 +567,7 @@ async function svgDiagram(browser, url) {
   await s.undo();
 
   await field('#t3');
-  await s.page.keyboard.press('Control+a');
+  await s.page.keyboard.press('ControlOrMeta+a');
   await s.page.keyboard.press('Backspace');
   await s.page.keyboard.press('Enter');
   check('emptying a text is refused: it would no longer be clickable',
@@ -1630,7 +1659,7 @@ try {
   server = await startServer(['--test-hooks']);
   browser = await chromium.launch();
   if (!args.has('--real-only')) {
-    for (const scenario of [detection, textColourHistory, modeSwitch, structural, svgDiagram, regionFeedback, feedbackAccess, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, motion, scenesSpec, remoteScriptsSpec, malformed, untrustedSpec, regressionsSpec, runtimeCssSpec]) {
+    for (const scenario of [detection, moduleBurst, textColourHistory, modeSwitch, structural, svgDiagram, regionFeedback, feedbackAccess, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, motion, scenesSpec, remoteScriptsSpec, malformed, untrustedSpec, regressionsSpec, runtimeCssSpec]) {
       try { await scenario(browser, server.url); }
       catch (e) { failures.push(`${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); console.log(`  ✖ ${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); }
     }

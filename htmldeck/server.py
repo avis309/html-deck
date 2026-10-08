@@ -770,6 +770,11 @@ class LocalServer(http.server.ThreadingHTTPServer):
     """ThreadingHTTPServer without the reverse DNS lookup (socket.getfqdn) in server_bind, which can
     stall startup for seconds on macOS; the server only ever listens on 127.0.0.1."""
 
+    # The editor's ES modules arrive as a burst of connections (more with several tabs open);
+    # socketserver's default backlog of 5 made the OS reset the extra ones (a module fails to
+    # load: blank editor). The OS caps it (somaxconn: 128 on macOS, 4096 on Linux >= 5.4).
+    request_queue_size = 128
+
     def server_bind(self):
         socketserver.TCPServer.server_bind(self)
         self.server_name, self.server_port = self.server_address[:2]

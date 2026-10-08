@@ -502,3 +502,23 @@ def test_editor_assets_have_pinned_mime_even_if_host_table_is_wrong(monkeypatch)
     assert handler.guess_type("htmldeck/web/js/app.mjs") == "text/javascript"
     assert handler.guess_type("htmldeck/web/css/editor.css") == "text/css"
     assert handler.guess_type("output/x/pic.svg") == "image/svg+xml"
+
+
+
+def test_server_listen_backlog_holds_a_burst_of_module_requests():
+    # The editor is ~40 ES modules fetched at once (more with several tabs open); with
+    # socketserver's default backlog of 5 the OS reset the extra connections, a module failed
+    # to load and the editor stayed blank with no page error.
+    backlog = []
+
+    class FakeSocket:
+        def listen(self, n):
+            backlog.append(n)
+
+    srv = ed.LocalServer(("127.0.0.1", 0), ed.HTMLEditorHandler, bind_and_activate=False)
+    real, srv.socket = srv.socket, FakeSocket()
+    try:
+        srv.server_activate()
+    finally:
+        real.close()
+    assert backlog == [128]
