@@ -152,8 +152,9 @@ export function renderFxDoc() {
   const ver = script ? +script.getAttribute('data-htmldeck-fx') : 0;
   const old = script && ver !== FX_VERSION;
   // Present always runs the current runtime; the file's own copy may not know a preset it uses.
-  const known = FX_PRESETS_BY_VERSION[ver] || [];
-  const stale = old && [...S.model.querySelectorAll('[data-fx]')].some(n => !known.includes(n.getAttribute('data-fx')));
+  // Only presets an update would actually make playable count (not typos).
+  const known = FX_PRESETS_BY_VERSION[ver] || [], current = FX_PRESETS_BY_VERSION[FX_VERSION];
+  const stale = old && [...S.model.querySelectorAll('[data-fx]')].some(n => { const p = n.getAttribute('data-fx'); return current.includes(p) && !known.includes(p); });
   $('#fx-doc-state').textContent = t(!script ? 'fx_doc_off' : stale ? 'fx_doc_stale' : old ? 'fx_doc_old' : 'fx_doc_on');
   const b = $('#fx-doc-btn');
   b.textContent = t(!script ? 'fx_enable' : old ? 'fx_update' : 'fx_disable');

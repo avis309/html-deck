@@ -1561,6 +1561,16 @@ async function effects(browser, url) {
 
 // FX modules: version mismatch hint, picker by category, "Animate this slide".
 async function fxModules(browser, url) {
+  section('FX modules: a preset no version knows does not claim Update FX fixes it');
+  {
+    const t = await new Session(browser, url).start();
+    await t.open(wpath('fx-typo.html'));
+    await t.frame.locator('#t1').click({ modifiers: ['Alt'] });
+    await t.page.click('#tb-fx');
+    const st = await t.page.textContent('#fx-doc-state');
+    check('unknown preset in a v2 file: "older FX", not "needs Update FX"', !/Update FX to play/.test(st) && /older/.test(st), st);
+    await t.close();
+  }
   section('FX modules: v2 runtime + v3 preset hint');
   const f = 'fx-modules.html';
   const s = await new Session(browser, url).start();
