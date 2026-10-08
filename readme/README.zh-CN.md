@@ -12,7 +12,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](../LICENSE)
 
-[🇬🇧 English](../README.md) • [🇻🇳 Tiếng Việt](README.vi.md) • [🇨🇳 简体中文](README.zh-CN.md) • [🇹🇼 繁體中文](README.zh-TW.md)
+[🇬🇧 English](../README.md) • [🇻🇳 Tiếng Việt](README.vi.md) • [🇨🇳 中文](README.zh-CN.md) • [🇹🇼 繁體中文](README.zh-TW.md)
 
 <img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/edit.png" alt="在 HTML Deck 中编辑幻灯片标题" width="900">
 
@@ -39,10 +39,12 @@ AI 也要重新读一遍很大的文件，既烧 token 又费时间，还可能�
     <td align="center"><b>演示</b>，保留幻灯片自带动画</td>
   </tr>
   <tr>
-    <td colspan="2"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/svg.png" alt="在 SVG 架构图中重新输入标签"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/effects.png" alt="按类别排列动画的侧边栏"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/svg.png" alt="在 SVG 架构图中重新输入标签"></td>
   </tr>
   <tr>
-    <td colspan="2" align="center"><b>图表</b>：直接在图中重新输入标签</td>
+    <td align="center"><b>动画</b>：在侧边栏挑选，或一键为整页添加</td>
+    <td align="center"><b>图表</b>：直接在图中重新输入标签</td>
   </tr>
 </table>
 

@@ -12,7 +12,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](../LICENSE)
 
-[🇬🇧 English](../README.md) • [🇻🇳 Tiếng Việt](README.vi.md) • [🇨🇳 简体中文](README.zh-CN.md) • [🇹🇼 繁體中文](README.zh-TW.md)
+[🇬🇧 English](../README.md) • [🇻🇳 Tiếng Việt](README.vi.md) • [🇨🇳 中文](README.zh-CN.md) • [🇹🇼 繁體中文](README.zh-TW.md)
 
 <img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/edit.png" alt="在 HTML Deck 中編輯投影片標題" width="900">
 
@@ -39,10 +39,12 @@ AI 也得重新讀一遍很大的檔案，既燒 token 又花時間，還可能�
     <td align="center"><b>簡報</b>，保留投影片內建動畫</td>
   </tr>
   <tr>
-    <td colspan="2"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/svg.png" alt="在 SVG 架構圖中重新輸入標籤"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/effects.png" alt="依類別排列動畫的側邊欄"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/svg.png" alt="在 SVG 架構圖中重新輸入標籤"></td>
   </tr>
   <tr>
-    <td colspan="2" align="center"><b>圖表</b>：直接在圖中重新輸入標籤</td>
+    <td align="center"><b>動畫</b>：在側邊欄挑選，或一鍵為整頁加入</td>
+    <td align="center"><b>圖表</b>：直接在圖中重新輸入標籤</td>
   </tr>
 </table>
 

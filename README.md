@@ -44,10 +44,12 @@ tokens and time, and it may touch things you didn't ask for.
     <td align="center"><b>Present</b> with the deck's own animations</td>
   </tr>
   <tr>
-    <td colspan="2"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/svg.png" alt="Retyping a label inside an SVG architecture diagram"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/effects.png" alt="Effects side bar with effect tiles by category"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/svg.png" alt="Retyping a label inside an SVG architecture diagram"></td>
   </tr>
   <tr>
-    <td colspan="2" align="center"><b>Diagrams</b>: retype a label inside a diagram</td>
+    <td align="center"><b>Effects</b>: pick one from the side bar, or animate the whole slide</td>
+    <td align="center"><b>Diagrams</b>: retype a label inside a diagram</td>
   </tr>
 </table>
 

@@ -13,7 +13,7 @@ agent sửa hết trong một lượt.
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](../LICENSE)
 
-[🇬🇧 English](../README.md) • [🇻🇳 Tiếng Việt](README.vi.md) • [🇨🇳 简体中文](README.zh-CN.md) • [🇹🇼 繁體中文](README.zh-TW.md)
+[🇬🇧 English](../README.md) • [🇻🇳 Tiếng Việt](README.vi.md) • [🇨🇳 中文](README.zh-CN.md) • [🇹🇼 繁體中文](README.zh-TW.md)
 
 <img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/edit.png" alt="Sửa tiêu đề slide trong HTML Deck" width="900">
 
@@ -44,10 +44,12 @@ những chỗ bạn không yêu cầu.
     <td align="center"><b>Thuyết trình</b> với hiệu ứng của deck</td>
   </tr>
   <tr>
-    <td colspan="2"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/svg.png" alt="Gõ lại nhãn trong sơ đồ kiến trúc SVG"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/effects.png" alt="Thanh bên Hiệu ứng với các ô hiệu ứng theo nhóm"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/svg.png" alt="Gõ lại nhãn trong sơ đồ kiến trúc SVG"></td>
   </tr>
   <tr>
-    <td colspan="2" align="center"><b>Sơ đồ</b>: gõ lại nhãn ngay trong sơ đồ</td>
+    <td align="center"><b>Hiệu ứng</b>: chọn ở thanh bên, hoặc tạo cho cả slide</td>
+    <td align="center"><b>Sơ đồ</b>: gõ lại nhãn ngay trong sơ đồ</td>
   </tr>
 </table>
 
