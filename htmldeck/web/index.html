@@ -163,25 +163,34 @@
           <div class="hint" style="margin-top:10px" data-i18n-html="layers_hint_bottom">Drag a row to reorder: drop on <b>orange line</b> for above/below, drop into middle to place <b>inside</b>. Esc to cancel.</div>
         </div>
         <div class="panel-body" data-view="effects" hidden>
-          <div id="fx-sel" hidden>
-            <div class="box-target" id="fx-target"></div>
-            <input type="hidden" id="fx-preset">
+          <div class="seg fx-tabs" id="fx-tabs"><button data-tab="effects" class="on" data-i18n="fx_tab_effects">Effects</button><button data-tab="timeline" data-i18n="fx_tab_timeline">Slide timeline</button></div>
+          <div id="fx-tab-effects">
+            <div class="fx-pick-hint" id="fx-nosel" data-i18n="fx_pick_block">Click a block on the slide to give it an effect.</div>
+            <div class="box-target" id="fx-target" hidden></div>
+            <input type="hidden" id="fx-preset"><input type="hidden" id="fx-delay"><input type="hidden" id="fx-dur"><input type="hidden" id="fx-stagger">
             <div id="fx-tiles"></div>
-            <div class="sec-label" data-i18n="fx_timing">Timing</div>
-            <div class="fx-grid">
-              <label><span data-i18n="fx_delay">Delay (ms)</span><input type="number" id="fx-delay" min="0" step="50" placeholder="0"></label>
-              <label><span data-i18n="fx_dur">Duration (ms)</span><input type="number" id="fx-dur" min="50" step="50" placeholder="700"></label>
-              <label><span data-i18n="fx_stagger">Children one by one (ms)</span><input type="number" id="fx-stagger" min="0" step="50" placeholder="0"></label>
+            <div id="fx-sel" hidden>
+              <div class="sec-label" data-i18n="fx_timing">Timing</div>
+              <div class="fx-field"><span data-i18n="fx_start_after">Start after</span><output id="fx-delay-out"></output></div>
+              <div class="chips" id="fx-delay-chips"></div>
+              <input type="range" id="fx-delay-range" min="0" max="3000" step="50" value="0">
+              <div class="fx-field"><span data-i18n="fx_speed">Speed</span></div>
+              <div class="seg fx-speed" id="fx-speed"><button data-v="slow" data-i18n="fx_slow">Slow</button><button data-v="normal" data-i18n="fx_normal">Normal</button><button data-v="fast" data-i18n="fx_fast">Fast</button></div>
+              <label class="fx-switch"><input type="checkbox" id="fx-stagger-on"><span data-i18n="fx_one_by_one_toggle">One by one, for the items inside</span></label>
+              <button class="btn-soft" id="fx-preview" data-i18n="fx_preview">Preview</button>
+              <div class="fx-doc" id="fx-doc" hidden>
+                <label class="fx-switch"><input type="checkbox" id="fx-doc-on"><span data-i18n="fx_doc_switch">Play effects when the file is opened outside HTML Deck</span></label>
+                <div class="fx-doc-old" id="fx-doc-old" hidden><span id="fx-doc-state"></span><button class="btn-soft" id="fx-doc-btn" data-i18n="fx_update">Update the effects player</button></div>
+              </div>
             </div>
-            <button class="btn-soft" id="fx-preview" data-i18n="fx_preview">Preview</button>
-            <div class="fx-doc" id="fx-doc" hidden><span id="fx-doc-state"></span><button class="btn-soft" id="fx-doc-btn"></button></div>
           </div>
-          <div class="hint fx-nosel" id="fx-nosel" data-i18n="fx_pick_block">Select a block on the slide to give it an effect.</div>
-          <div class="sec-label fx-slide-h" data-i18n="fx_slide_h">Whole slide</div>
-          <div class="hint" style="margin-bottom:10px" data-i18n="fx_panel_hint">Effects run when presenting.</div>
-          <button class="btn-primary" id="fx-auto" style="width:100%;margin-bottom:8px"><span id="fx-auto-label" data-i18n="fx_auto_deck">Animate this slide</span></button>
-          <button class="btn-soft" id="fx-play-slide" style="width:100%;margin-bottom:12px"><svg class="icon sm"><use href="#i-play"/></svg><span data-i18n="fx_play_slide">Preview the whole slide</span></button>
-          <div id="fx-list"></div>
+          <div id="fx-tab-timeline" hidden>
+            <div class="hint" style="margin-bottom:10px" data-i18n="fx_panel_hint">Effects run when presenting.</div>
+            <button class="btn-primary" id="fx-auto" style="width:100%"><span id="fx-auto-label" data-i18n="fx_auto_deck">Auto-animate this slide</span></button>
+            <div class="hint fx-auto-why" id="fx-auto-why"></div>
+            <button class="btn-soft" id="fx-play-slide" style="width:100%;margin:10px 0 12px"><svg class="icon sm"><use href="#i-play"/></svg><span data-i18n="fx_play_slide">Preview the whole slide</span></button>
+            <div id="fx-list"></div>
+          </div>
         </div>
         <div class="panel-body" data-view="review" hidden>
           <div class="hint" data-i18n-html="review_hint">Select a block (or sweep several) and click <b>AI Feedback</b>. Then ask your agent to apply the feedback.</div>

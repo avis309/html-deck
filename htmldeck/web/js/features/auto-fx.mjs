@@ -1,6 +1,7 @@
 // "Animate this slide": assigns effects to the current slide's blocks (or the page's) as one
 // undoable batch of data-fx attributes. Conservative: no loops, no grow; never touches blocks
 // that already have an effect, scenes, or blocks the editor refuses effects on.
+import { $ } from '../core/utils.mjs';
 import { S } from '../editor/state.mjs';
 import { setAttrs } from '../core/operations.mjs';
 import { flushPending } from '../editor/edits.mjs';
@@ -64,6 +65,15 @@ export function planAutoFx(scope) {
     if (fx['data-fx'] !== 'count-up') covered.push(n);
   }
   return plan;
+}
+// The auto-animate button says whether it has anything to do, and why not.
+export function renderAutoState() {
+  const btn = $('#fx-auto'), why = $('#fx-auto-why');
+  if (!btn || !S.doc) return;
+  const reason = S.readOnly ? t(S.readOnly) : planAutoFx(fxScope()).length ? '' : t('fx_auto_full');
+  btn.disabled = !!reason;
+  why.textContent = reason || t('fx_auto_desc');
+  why.classList.toggle('off', !!reason);
 }
 export function animateScope() {
   if (!S.doc) return;

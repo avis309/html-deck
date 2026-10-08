@@ -195,6 +195,11 @@ class Session {
   // The present iframe runs on the preview origin: read it as its own frame, never through the parent.
   async presentFrame() { return (await this.page.waitForSelector('.present-frame')).contentFrame(); }
   async undo() { await this.page.click('#btn-undo'); }
+  // The Effects side bar, on its "slide timeline" tab (the slide's effects, auto-animate).
+  async fxTimeline() {
+    if (await this.page.isHidden('#fx-tabs')) await this.page.click('.rail-item[data-panel="effects"]');
+    await this.page.click('#fx-tabs [data-tab="timeline"]');
+  }
   async redo() { await this.page.click('#btn-redo'); }
   async saveKey() { await this.page.keyboard.press('Control+s'); }
   async waitSaved() {
@@ -1449,9 +1454,9 @@ async function reveal(browser, url) {
   await s2.page.keyboard.type('Z');
   c = await s2.content();
   check('Reveal ESM: typing edits nothing, file intact', c === disk(m) && !(await s2.dirty()), firstDiff(c, disk(m)));
-  await s2.page.click('.rail-item[data-panel="effects"]');
-  await s2.page.click('#fx-auto');
-  check('Reveal ESM: Animate this slide says read-only, changes nothing', /read-only/.test(await s2.page.textContent('#toast')) && (await s2.content()) === disk(m), await s2.page.textContent('#toast'));
+  await s2.fxTimeline();
+  check('Reveal ESM: auto-animate is off and says the file is read-only, nothing changed',
+    await s2.page.$eval('#fx-auto', b => b.disabled) && /read-only/.test(await s2.page.textContent('#fx-auto-why')) && (await s2.content()) === disk(m), await s2.page.textContent('#fx-auto-why'));
   await s2.page.click('.rail-item[data-panel="effects"]');
   await s2.page.click('#btn-present');
   await s2.page.waitForFunction(() => document.body.dataset.presentState === 'active', null, { timeout: 15000 }).catch(() => {});
@@ -1472,10 +1477,11 @@ async function effects(browser, url) {
     await s.frame.locator(sel).click({ modifiers: ['Alt'], position });
     if (await s.page.isHidden('#fx-tiles')) await s.page.click('#tb-fx');
     await s.page.click(`.fx-tile[data-preset="${preset}"]`);
-    for (const [k, v] of Object.entries(extra)) { await s.page.fill(k, v); await s.page.locator(k).dispatchEvent('change'); }
+    if (extra.delay) await s.page.click(`#fx-delay-chips [data-v="${extra.delay}"]`);
+    if (extra.oneByOne) await s.page.click('#fx-stagger-on');
   };
   await s.page.click('#sb-next');
-  await setFx('#f2', 'fade-up', { '#fx-delay': '200' });
+  await setFx('#f2', 'fade-up', { delay: '200' });
   let want = original.replace('<p id="f2" class="moved">', '<p id="f2" class="moved" data-fx="fade-up" data-fx-delay="200">');
   let c = await s.content();
   check('assign fade-up + delay: only data-fx* added', c === want, firstDiff(c, want));
@@ -1500,16 +1506,20 @@ async function effects(browser, url) {
   await setFx('#num', 'count-up');
   await s.page.click('#fx-preview');
   check('count-up preview: writes no text (previews as a fade)', (await s.frame.locator('#num').textContent()) === '1.250,5 ₫' && (await frameAnims()) > 0);
-  await setFx('#list', 'fade-in', { '#fx-stagger': '120' }, { x: 8, y: 6 });   // the list's padding, not an item
+  await setFx('#list', 'fade-in', { oneByOne: true }, { x: 8, y: 6 });   // the list's padding, not an item
   want = want.replace('<p id="num">', '<p id="num" data-fx="count-up">').replace('<ul id="list">', '<ul id="list" data-fx="fade-in" data-fx-stagger="120">');
   c = await s.content();
   check('count-up + stagger: right attributes', c === want, firstDiff(c, want));
 
+  await s.fxTimeline();
   const items = await s.page.locator('#fx-list .fx-item').count();
   check('effects panel: lists the slide\'s 3 effects', items === 3, String(items));
+  const listText = await s.page.textContent('#fx-list');
+  check('slide timeline: effects by name and timing in words (Rise · after 0.2 s, one by one)', /Rise/.test(listText) && /after 0\.2 s/.test(listText) && /one by one/.test(listText), listText);
+  await s.page.click('#fx-tabs [data-tab="effects"]');
 
   // Enable FX in the file: one script block, inert in the edit frame.
-  await s.page.click('#fx-doc-btn');
+  await s.page.click('#fx-doc-on');
   await s.page.click('#fx-modal-ok');
   const withFx = await s.content();
   const block = withFx.match(/<script data-htmldeck-fx="\d+">[\s\S]*?<\/script>/);
@@ -1559,7 +1569,7 @@ async function effects(browser, url) {
   await s.select('#f2');
   await s.frame.locator('#f2').press('Escape');
   await s.page.click('#tb-fx');
-  await s.page.click('#fx-doc-btn');
+  await s.page.click('#fx-doc-on');
   c = await s.content();
   check('disable FX: removes exactly the block added', c === want, firstDiff(c, want));
   await s.close();
@@ -1581,17 +1591,15 @@ async function fxModules(browser, url) {
   for (const ff of ['fx-auto-scope.html', 'fx-auto-scene.html']) {
     const t = await new Session(browser, url).start();
     await t.open(wpath(ff));
-    await t.page.click('.rail-item[data-panel="effects"]');
-    await t.page.click('#fx-auto');
-    const cc = await t.content();
-    check(`${ff}: nothing assigned, says so`, cc === disk(ff) && /Nothing/.test(await t.page.textContent('#toast')), firstDiff(cc, disk(ff)));
+    await t.fxTimeline();
+    check(`${ff}: auto-animate is off, says every block already moves`, await t.page.$eval('#fx-auto', b => b.disabled) && /already/.test(await t.page.textContent('#fx-auto-why')) && (await t.content()) === disk(ff), await t.page.textContent('#fx-auto-why'));
     await t.close();
   }
   section('FX modules: Animate this page restarts delays in every part revealed on its own');
   {
     const t = await new Session(browser, url).start();
     await t.open(wpath('fx-auto-page.html'));
-    await t.page.click('.rail-item[data-panel="effects"]');
+    await t.fxTimeline();
     await t.page.click('#fx-auto');
     const pc = await t.content();
     const tag = id => pc.match(new RegExp(`<[a-z0-9]+ id="${id}"[^>]*>`))?.[0] || '';
@@ -1605,12 +1613,16 @@ async function fxModules(browser, url) {
   const f = 'fx-modules.html';
   const s = await new Session(browser, url).start();
   await s.open(wpath(f));
+  await s.page.click('.rail-item[data-panel="effects"]');
+  check('Effects opened with nothing selected: the effect tiles are there, with a hint', await s.page.isVisible('#fx-tiles') && await s.page.isVisible('#fx-nosel'));
+  await s.page.click('.fx-tile[data-preset="fade-up"]');
+  check('a tile clicked with nothing selected: the hint flashes, nothing changes', await s.page.$eval('#fx-nosel', n => n.classList.contains('flash')) && (await s.content()) === disk(f));
   await s.frame.locator('#m-done').click({ modifiers: ['Alt'] });
   await s.page.click('#tb-fx');
   check('▶ on the toolbar opens the Effects side bar (not a popover)', await s.page.evaluate(() => { const p = document.querySelector('#panel'); return p.classList.contains('open') && p.dataset.view === 'effects'; }) && await s.page.isVisible('#fx-tiles'));
   check('the side bar marks the block\'s current effect', await s.page.$eval('.fx-tile[data-preset="pop"]', t => t.classList.contains('on')));
   const state = await s.page.textContent('#fx-doc-state');
-  check('v2 runtime in the file, v3 preset used: the popover asks for Update FX', /Update FX/.test(state), state);
+  check('v2 runtime in the file, v3 preset used: the side bar asks to update the effects player', /updated effects player/i.test(state), state);
   await s.page.keyboard.press('Escape');
   section('FX modules: picker grouped by category, presets that cannot apply are disabled with the reason');
   const groups = await s.page.$$eval('#fx-tiles .fx-group', gs => gs.map(g => [g.querySelector('.sec-label').textContent, g.querySelectorAll('.fx-tile').length]));
@@ -1641,15 +1653,18 @@ async function fxModules(browser, url) {
     !(await s.page.$eval('.fx-tile[data-preset="grow-x"]', b => b.disabled)));
   await s.page.click('.fx-tile[data-preset="grow-x"]');
   check('clicking a tile previews it on the slide', (await s.frame.locator('#m-bar').evaluate(n => n.getAnimations().length)) > 0);
-  check('duration field: shows the preset\'s default (grow 900 ms)', (await s.page.getAttribute('#fx-dur', 'placeholder')) === '900', await s.page.getAttribute('#fx-dur', 'placeholder'));
+  check('speed: Normal is the effect\'s own pace', await s.page.$eval('#fx-speed [data-v="normal"]', b => b.classList.contains('on')));
   const c = await s.content();
   check('grow-x on a bar: only data-fx added', c === disk(f).replace('<span class="bar" id="m-bar">', '<span class="bar" id="m-bar" data-fx="grow-x">'), firstDiff(c, disk(f)));
+  await s.page.click('#fx-speed [data-v="fast"]');
+  check('speed Fast: a shorter duration for this effect (grow 900 → 550 ms)', (await s.content()).includes('<span class="bar" id="m-bar" data-fx="grow-x" data-fx-dur="550">'));
   await s.undo();
   await s.page.keyboard.press('Escape');
   section('FX modules: removing an effect from the slide list');
   await s.page.click('#sb-prev');
   await s.frame.locator('#m-done').click({ modifiers: ['Alt'] });
   if (await s.page.isHidden('#fx-tiles')) await s.page.click('#tb-fx');
+  await s.fxTimeline();
   await s.page.locator('#fx-list .fx-item', { hasText: 'Already animated' }).locator('.x').click();
   check('× in the list: the block\'s tile shows None again', await s.page.$eval('.fx-tile[data-preset=""]', b => b.classList.contains('on')) && !(await s.page.$eval('.fx-tile[data-preset="pop"]', b => b.classList.contains('on'))));
   await s.undo();
@@ -1657,7 +1672,7 @@ async function fxModules(browser, url) {
   await s.page.click('#sb-next');
   section('FX modules: Animate this slide');
   await s.page.click('#sb-prev');
-  if (await s.page.isHidden('#fx-auto')) await s.page.click('.rail-item[data-panel="effects"]');
+  await s.fxTimeline();
   const orig = disk(f);
   await s.page.click('#fx-auto');
   const want = orig
@@ -1671,8 +1686,7 @@ async function fxModules(browser, url) {
   let ac = await s.content();
   check('animate slide: headings, KPI grid (stagger), numbers (count-up), chart (draw), text; skips the animated block and the scene', ac === want, firstDiff(ac, want));
   check('animate slide: the panel lists the new effects', (await s.page.locator('#fx-list .fx-item').count()) >= 8);
-  await s.page.click('#fx-auto');
-  check('animate slide again: nothing new, says so', (await s.content()) === want && /Nothing/.test(await s.page.textContent('#toast')), await s.page.textContent('#toast'));
+  check('animate slide again: the button is off and says why', await s.page.$eval('#fx-auto', b => b.disabled) && /already/.test(await s.page.textContent('#fx-auto-why')) && (await s.content()) === want, await s.page.textContent('#fx-auto-why'));
   await s.undo();
   ac = await s.content();
   check('animate slide: one undo step back to the file', ac === orig, firstDiff(ac, orig));
@@ -1769,8 +1783,8 @@ async function scenesSpec(browser, url) {
   await s.page.click('#sb-next');
   await s.page.waitForTimeout(300);
   check('edit view: scene does not run', (await s.frame.locator('html').evaluate(() => window.__ticks)) === 0 && (await s.frame.locator('#tick').textContent()) === '0');
-  await s.page.click('.rail-item[data-panel="effects"]');
-  check('effects panel: lists the slide\'s scene', /scene: ticker/.test(await s.page.textContent('#fx-list')), await s.page.textContent('#fx-list'));
+  await s.fxTimeline();
+  check('effects panel: lists the slide\'s own animation (scene)', /Own animation: ticker/.test(await s.page.textContent('#fx-list')), await s.page.textContent('#fx-list'));
   await s.page.click('.rail-item[data-panel="effects"]');
 
   await s.page.click('#btn-present');
@@ -1964,9 +1978,9 @@ async function realFiles(browser) {
       // Its charts animate (anime.js) through scenes registered from its own script: the effects
       // panel lists them, even with the CDN script off in the edit view.
       await s.page.click('#filmstrip .thumb >> nth=5');
-      await s.page.click('.rail-item[data-panel="effects"]');
+      await s.fxTimeline();
       const list = await s.page.textContent('#fx-list');
-      check(`${f}: effects panel shows slide 6's chart scene (remote scripts off)`, /scene: line/.test(list) && /presenting/.test(list), list.slice(0, 160));
+      check(`${f}: effects panel shows slide 6's chart scene (remote scripts off)`, /Own animation: line/.test(list) && /presenting/.test(list), list.slice(0, 160));
       await s.page.click('.rail-item[data-panel="effects"]');
       await s.page.click('#filmstrip .thumb >> nth=0');
       // The deck animates only while presenting: none of it may reach the edit side.

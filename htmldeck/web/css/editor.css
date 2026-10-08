@@ -487,14 +487,26 @@ details.more[open] summary::before { content: '▾ '; }
 @keyframes fxi-spin { to { transform: rotate(360deg); } }
 @keyframes fxi-float { to { transform: translateY(-5px); } }
 @keyframes fxi-pulse { to { transform: scale(1.3); } }
-.fx-grid { display: grid; gap: 8px; margin: 8px 0 10px; }
-.fx-grid label { display: flex; flex-direction: column; gap: 4px; margin: 0; font-size: 12px; color: var(--ink-2); }
-.fx-grid input { width: 100%; height: 30px; border: 1px solid var(--line); border-radius: 7px; padding: 0 8px; font: 500 12.5px var(--ui); background: #fff; }
+.fx-tabs { margin-bottom: 14px; }
+.fx-tabs button { flex: 1; }
+.fx-pick-hint { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--accent-50); color: var(--accent); font-size: 12.5px; font-weight: 600; line-height: 1.35; }
+.fx-pick-hint.flash { animation: fx-flash .45s ease-in-out 3; }
+@keyframes fx-flash { 50% { background: var(--accent); color: #fff; } }
+.fx-field { display: flex; justify-content: space-between; align-items: baseline; margin: 12px 0 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.fx-field output { font-weight: 700; color: var(--ink); }
+#fx-delay-chips { margin-bottom: 4px; }
+#fx-delay-range { width: 100%; accent-color: var(--accent); }
+.fx-speed button { flex: 1; }
+.fx-switch { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0; font-size: 12.5px; color: var(--ink-2); line-height: 1.35; cursor: pointer; }
+.fx-switch input { margin-top: 2px; accent-color: var(--accent); }
 #fx-preview { width: 100%; height: 30px; }
+#fx-sel button:disabled, #fx-sel input:disabled { opacity: .45; cursor: not-allowed; }
+.fx-doc-old { display: grid; gap: 6px; }
+.fx-auto-why { margin: 6px 2px 0; }
+.fx-auto-why.off { color: var(--accent); }
+#fx-auto:disabled { opacity: .45; cursor: not-allowed; }
 #fx-sel .fx-doc { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line-2); display: grid; gap: 6px; font-size: 12px; color: var(--ink-2); }
 #fx-sel .fx-doc button { height: 30px; }
-.fx-nosel { margin: 4px 0 6px; }
-.fx-slide-h { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line-2); }
 @media (prefers-reduced-motion: reduce) { .fx-tile:hover .fx-ico .m { animation: none !important; } }
 .fx-diff { max-height: 200px; overflow: auto; margin: 10px 0 0; padding: 10px; border-radius: 8px; background: #f3f6f4; font: 500 11.5px/1.5 'JetBrains Mono', monospace; white-space: pre-wrap; word-break: break-all; color: #1f6f3a; }
 

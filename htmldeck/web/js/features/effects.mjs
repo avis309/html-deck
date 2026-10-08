@@ -8,7 +8,7 @@ import { flushPending } from '../editor/edits.mjs';
 import { formatBlock, structureBlock } from '../policy/edit-policy.mjs';
 import { isOriginal, liveEl, markOriginals, modelEl, provenanceOf } from '../editor/live-document.mjs';
 import { slideTitle } from '../editor/slide-info.mjs';
-import { t } from '../shared/lang.mjs';
+import { curLang, t } from '../shared/lang.mjs';
 import { toast } from '../shared/toast.mjs';
 import { hooks } from '../shared/hooks.mjs';
 import { lockedHint } from '../editor/guards.mjs';
@@ -30,7 +30,8 @@ const FX_GROUPS = [
 // Runtime refusal → the i18n key that explains it.
 export const FX_WHY = { count: 'fx_count_bad', draw: 'fx_bad_draw', inline: 'fx_bad_inline', filter: 'fx_bad_filter', transform: 'fx_bad_transform', reveal: 'fx_bad_reveal' };
 // Each tile's drawing (Canva-like): `m` is the part that moves on hover (editor.css).
-const L = '#ddd6fe', M = '#c4b5fd', D = '#8b5cf6';
+// The tool's own orange (--accent and lighter tints), so the tiles match the rest of the UI.
+const L = '#ffe0d3', M = '#ffb393', D = '#ff5a1f';
 const SQ = (x, y, fill, cls = '') => `<rect${cls ? ` class="${cls}"` : ''} x="${x}" y="${y}" width="16" height="16" rx="4" fill="${fill}"/>`;
 const ARROW = { up: 'M42 30V12M38 16l4-4 4 4', down: 'M42 10v18M38 24l4 4 4-4', right: 'M14 35h20M30 31l4 4-4 4', left: 'M34 35H14M18 31l-4 4 4 4' };
 const arrow = d => `<path d="${ARROW[d]}" fill="none" stroke="${D}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -88,11 +89,58 @@ export function renderFxPresets() {
     for (const n of names.filter(n => known.has(n))) g.lastChild.appendChild(fxTile(n));
     box.appendChild(g);
   }
+  const chips = $('#fx-delay-chips');
+  chips.replaceChildren(...FX_DELAYS.map(ms => {
+    const b = document.createElement('button');
+    b.dataset.v = String(ms);
+    b.textContent = ms ? fmtSec(ms) : t('fx_now');
+    b.addEventListener('click', () => setFxTiming('#fx-delay', ms ? String(ms) : ''));
+    return b;
+  }));
   if (effectsVisible()) renderFxSel();
+}
+// Timing in words: seconds, the way people say them ("0.2 s", "0,2 giây").
+const FX_DELAYS = [0, 200, 500, 1000];
+export function fmtSec(ms) {
+  const v = String(+(ms / 1000).toFixed(2));
+  return t('fx_sec').replace('{s}', curLang() === 'vi' ? v.replace('.', ',') : v);
+}
+const FX_SPEED = { slow: 1.6, fast: 0.6 };
+const fxDefaultDur = name => (fxCatalog || []).find(p => p.name === name)?.dur || 700;
+const speedDur = (name, speed) => speed === 'normal' ? '' : String(Math.max(50, Math.round(fxDefaultDur(name) * FX_SPEED[speed] / 50) * 50));
+// A timing control changed: the hidden field takes the value, then the block gets it.
+export function setFxTiming(sel, value) {
+  if (!S.sel) return;
+  $(sel).value = value;
+  applyFx();
+}
+export function setFxSpeed(speed) {
+  const name = $('#fx-preset').value;
+  if (name) setFxTiming('#fx-dur', speedDur(name, speed));
+}
+export function setFxOneByOne(on) {
+  setFxTiming('#fx-stagger', on ? ($('#fx-stagger').value || '120') : '');
+}
+// The two tabs of the side bar: the effects of the selected block, or the slide's timeline.
+export function showFxTab(tab) {
+  for (const b of $$('#fx-tabs button')) b.classList.toggle('on', b.dataset.tab === tab);
+  $('#fx-tab-effects').hidden = tab !== 'effects';
+  $('#fx-tab-timeline').hidden = tab !== 'timeline';
+  if (tab === 'timeline') renderFxList();
+  else renderFxSel();
 }
 // A tile clicked: the block gets that effect (or none), and it plays once on the slide.
 export function pickFx(name) {
-  if (!S.sel) return;
+  if (!S.sel || S.multi) {
+    // Nothing to give it to: point at what to do instead of doing nothing.
+    const hint = $('#fx-nosel');
+    hint.classList.remove('flash');
+    void hint.offsetWidth;
+    hint.classList.add('flash');
+    clearTimeout(pickFx.timer);
+    pickFx.timer = setTimeout(() => hint.classList.remove('flash'), 1400);
+    return;
+  }
   $('#fx-preset').value = name;
   applyFx();   // re-renders the side bar before the preview moves the block
   if (name && modelEl(S.sel.dataset.edId)?.getAttribute('data-fx') === name) previewFx();
@@ -113,15 +161,19 @@ function fxRefusals(node) {
 export function renderFxSel() {
   const node = S.multi ? null : S.sel;
   $('#fx-sel').hidden = !node;
+  $('#fx-target').hidden = !node;
   $('#fx-nosel').hidden = !!node;
-  if (!node) return;
+  if (!node) {
+    // The tiles stay, to browse; none is marked or refused without a block.
+    for (const b of $$('#fx-tiles .fx-tile')) { b.classList.remove('on'); b.disabled = false; b.title = ''; }
+    return;
+  }
   const m = modelEl(node.dataset.edId);
   const snippet = (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 48);
   $('#fx-target').textContent = node.localName + (snippet ? ': ' + snippet : '');
   $('#fx-preset').value = m?.getAttribute('data-fx') || '';
-  for (const [sel, attr] of [['#fx-delay', 'data-fx-delay'], ['#fx-dur', 'data-fx-dur'], ['#fx-stagger', 'data-fx-stagger']]) {
-    if (document.activeElement !== $(sel)) $(sel).value = m?.getAttribute(attr) || '';
-  }
+  for (const [sel, attr] of [['#fx-delay', 'data-fx-delay'], ['#fx-dur', 'data-fx-dur'], ['#fx-stagger', 'data-fx-stagger']]) $(sel).value = m?.getAttribute(attr) || '';
+  renderFxTiming();
   // Effects that cannot run on this block stay shown, disabled, with the reason as title.
   const cur = $('#fx-preset').value, refusals = fxRefusals(node);
   for (const b of $$('#fx-tiles .fx-tile')) {
@@ -130,13 +182,23 @@ export function renderFxSel() {
     b.disabled = !!why && b.dataset.preset !== cur;
     b.title = why ? t(FX_WHY[why] || 'fx_bad_draw') : '';
   }
-  syncFxDur();
+  renderFxTiming();
   renderFxDoc();
 }
-// The duration field shows the chosen preset's own default (a loop's is seconds, not 700 ms).
-export function syncFxDur() {
-  const p = (fxCatalog || []).find(x => x.name === $('#fx-preset').value);
-  $('#fx-dur').placeholder = String(p?.dur || 700);
+// The timing controls show the block's values: start delay, speed, one by one.
+export function renderFxTiming() {
+  const name = $('#fx-preset').value, delay = +$('#fx-delay').value || 0, dur = $('#fx-dur').value;
+  $('#fx-delay-out').textContent = delay ? fmtSec(delay) : t('fx_now');
+  if (document.activeElement !== $('#fx-delay-range')) $('#fx-delay-range').value = String(delay);
+  for (const b of $$('#fx-delay-chips button')) b.classList.toggle('on', +b.dataset.v === delay);
+  for (const b of $$('#fx-speed button')) {
+    const d = name ? speedDur(name, b.dataset.v) : '';
+    b.classList.toggle('on', !!name && d === dur);
+    b.title = name ? fmtSec(+d || fxDefaultDur(name)) : '';
+  }
+  $('#fx-stagger-on').checked = +$('#fx-stagger').value > 0;
+  for (const n of ['#fx-delay-range', '#fx-stagger-on', '#fx-preview']) $(n).disabled = !name;
+  for (const b of $$('#fx-delay-chips button, #fx-speed button')) b.disabled = !name;
 }
 export function fxBlock(node, preset) {
   const block = S.readOnly || structureBlock(provenanceOf(node)) || formatBlock('fx', formatFlags(node));
@@ -148,7 +210,7 @@ export function fxBlock(node, preset) {
 // ▶ on the toolbar: the Effects side bar, on the selected block.
 export function openFxPanel() {
   hooks.openPanel('effects', true);
-  renderFxSel();
+  showFxTab('effects');
 }
 export function applyFx() {
   const node = S.sel;
@@ -167,7 +229,7 @@ export function applyFx() {
   setAttrs(m, after);
   setAttrs(node, after);
   pushOp({ type: 'attrs', id, before, after, key: 'fx:' + id, label: 'Effect' });
-  syncFxDur();
+  renderFxTiming();
   renderFxDoc();
   if (effectsVisible()) { renderFxList(); renderFxSel(); }
 }
@@ -204,24 +266,27 @@ export function renderFxList() {
   const sel = ['[data-fx]', '[data-fx-scene]', ...registeredScenes().map(d => d.selector)];
   const hits = n => sel.some(q => { try { return n.matches(q); } catch { return false; } });
   const items = [scope, ...scope.querySelectorAll('*')].filter(n => isOriginal(n) && hits(n));
-  if (!items.length) { list.innerHTML = `<div class="hint">${t('fx_list_empty')}</div>`; return; }
+  if (!items.length) { list.innerHTML = `<div class="hint">${t('fx_list_empty')}</div>`; hooks.renderAutoState?.(); return; }
   if (items.some(n => sceneNamesFor(n).length)) list.insertAdjacentHTML('beforeend', `<div class="hint" style="margin:0 2px 8px">${t('fx_scene_hint')}</div>`);
   for (const n of items) {
     const b = document.createElement('div');
     b.className = 'fx-item';
     b.setAttribute('role', 'button');
     const fx = n.getAttribute('data-fx'), scene = sceneNamesFor(n).join(', ');
-    const extra = [n.getAttribute('data-fx-delay') && `+${n.getAttribute('data-fx-delay')}ms`, n.getAttribute('data-fx-stagger') && `⇉${n.getAttribute('data-fx-stagger')}ms`].filter(Boolean).join(' ');
+    const delay = +n.getAttribute('data-fx-delay') || 0;
+    const extra = [delay && t('fx_after').replace('{s}', fmtSec(delay)), +n.getAttribute('data-fx-stagger') > 0 && t('fx_one_by_one')].filter(Boolean).join(' · ');
     b.innerHTML = `<span class="k"></span><span class="t"></span>${fx ? `<button class="x" title="${escapeHTML(t('fx_remove'))}">×</button>` : ''}`;
-    b.querySelector('.k').textContent = fx || `${t('fx_scene')}: ${scene}`;
-    const what = !fx && n === scope && S.mode === 'deck' ? slideTitle(n, S.cur) : (n.textContent || n.localName).replace(/\s+/g, ' ').trim().slice(0, 60);
+    b.querySelector('.k').textContent = fx ? fxName(fx) : `${t('fx_scene')}: ${scene}`;
+    const what = !fx && n === scope && S.mode === 'deck' ? slideTitle(n, S.cur) : (n.innerText || n.textContent || n.localName).replace(/\s+/g, ' ').trim().slice(0, 60);
     b.querySelector('.t').textContent = `${extra ? extra + ' · ' : ''}${what}`;
     b.addEventListener('click', e => {
       if (e.target.closest('.x')) { select(n, { edit: false }); $('#fx-preset').value = ''; applyFx(); renderFxList(); return; }
-      if (n !== fxScope()) select(n, { edit: false });
+      // Clicking an effect in the timeline takes you to it, on the Effects tab.
+      if (n !== fxScope()) { select(n, { edit: false }); showFxTab('effects'); }
     });
     list.appendChild(b);
   }
+  hooks.renderAutoState?.();
 }
 export function previewSlideFx() {
   const scope = fxScope();
@@ -243,15 +308,14 @@ export function renderFxDoc() {
   // Only presets an update would actually make playable count (not typos).
   const known = FX_PRESETS_BY_VERSION[ver] || [], current = FX_PRESETS_BY_VERSION[FX_VERSION];
   const stale = old && [...S.model.querySelectorAll('[data-fx]')].some(n => { const p = n.getAttribute('data-fx'); return current.includes(p) && !known.includes(p); });
-  $('#fx-doc-state').textContent = t(!script ? 'fx_doc_off' : stale ? 'fx_doc_stale' : old ? 'fx_doc_old' : 'fx_doc_on');
-  const b = $('#fx-doc-btn');
-  b.textContent = t(!script ? 'fx_enable' : old ? 'fx_update' : 'fx_disable');
-  b.dataset.act = !script ? 'enable' : old ? 'update' : 'disable';
+  $('#fx-doc-on').checked = !!script;
+  $('#fx-doc-old').hidden = !old;
+  $('#fx-doc-state').textContent = old ? t(stale ? 'fx_doc_stale' : 'fx_doc_old') : '';
 }
-export function fxDocAction() {
+// act: 'enable' (the switch turned on), 'disable' (off), 'update' (the old player's button).
+export function fxDocAction(act) {
   if (!S.model) return;
-  if (S.readOnly) return lockedHint(S.readOnly);
-  const act = $('#fx-doc-btn').dataset.act;
+  if (S.readOnly) { renderFxDoc(); return lockedHint(S.readOnly); }
   if (act === 'disable') return removeFxScript();
   const src = fxScriptSource(), modal = $('#modal-fx');
   $('#fx-modal-h').textContent = t(act === 'update' ? 'fx_update_h' : 'fx_enable_h');
@@ -264,6 +328,7 @@ export function fxDocAction() {
     if (!a && e.target !== modal) return;
     modal.classList.remove('show');
     if (a === 'ok') act === 'update' ? updateFxScript(src) : insertFxScript(src);
+    else renderFxDoc();   // cancelled: the switch goes back
   };
 }
 // The live copy is created inert: a script inserted into a document runs, and the edit frame

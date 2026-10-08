@@ -6,7 +6,7 @@ import { addNoteFromPop, feedbackMulti, openNotePop } from '../features/feedback
 import { applyAlt, enterCrop, exitCrop, flipImage, normalizeImageURL, openAltPop, openImagePop, replaceImage, replaceWithFile, resetImage, selectedImg, setFit, startCropDrag } from '../features/images.mjs';
 import { applyFont, cycleAlign, setFontSize, toggleCase, toggleStyle } from '../features/formatting.mjs';
 import { animateScope } from '../features/auto-fx.mjs';
-import { applyFx, fxDocAction, openFxPanel, previewFx, previewSlideFx, renderFxPresets } from '../features/effects.mjs';
+import { fxDocAction, openFxPanel, previewFx, previewSlideFx, renderFxPresets, setFxOneByOne, setFxSpeed, setFxTiming, showFxTab } from '../features/effects.mjs';
 import { applyLink, openLinkPop, removeLink } from '../features/links.mjs';
 import { bindBoxPanel } from './panels/box.mjs';
 import { bindFind } from '../features/find.mjs';
@@ -140,10 +140,15 @@ export function bindUI() {
   $('#tb-opacity').addEventListener('click', e => togglePop('#pop-opacity', e.currentTarget));
   $('#tb-fx').addEventListener('click', openFxPanel);
   renderFxPresets();
-  for (const id of ['#fx-delay', '#fx-dur', '#fx-stagger']) $(id).addEventListener('change', applyFx);
-  for (const id of ['#fx-delay', '#fx-dur', '#fx-stagger']) $(id).addEventListener('keydown', e => e.stopPropagation());
+  $$('#fx-tabs button').forEach(b => b.addEventListener('click', () => showFxTab(b.dataset.tab)));
+  $('#fx-delay-range').addEventListener('input', e => { $('#fx-delay-out').textContent = e.target.value; });
+  $('#fx-delay-range').addEventListener('change', e => setFxTiming('#fx-delay', +e.target.value ? e.target.value : ''));
+  $('#fx-delay-range').addEventListener('keydown', e => e.stopPropagation());
+  $$('#fx-speed button').forEach(b => b.addEventListener('click', () => setFxSpeed(b.dataset.v)));
+  $('#fx-stagger-on').addEventListener('change', e => setFxOneByOne(e.target.checked));
+  $('#fx-doc-on').addEventListener('change', e => fxDocAction(e.target.checked ? 'enable' : 'disable'));
   $('#fx-preview').addEventListener('click', previewFx);
-  $('#fx-doc-btn').addEventListener('click', fxDocAction);
+  $('#fx-doc-btn').addEventListener('click', () => fxDocAction('update'));
   $('#fx-play-slide').addEventListener('click', previewSlideFx);
   $('#fx-auto').addEventListener('click', animateScope);
   $('#sb-ws-trust').addEventListener('click', trustWorkspace);
