@@ -2,10 +2,10 @@
 
 # HTML Deck
 
-**Edit HTML slides, reports and pages yourself, without burning tokens.**
+**A visual editor for the HTML slides, reports and pages your AI makes.**
 
-Fix a typo, change a color or move a block right in the browser, no AI needed. Leave notes for
-the changes that need the agent.
+Edit what you see, right in the browser. Or mark every spot that needs work with **AI Feedback**
+and let your agent fix them all in one go.
 
 [![CI](https://github.com/avis309/html-deck/actions/workflows/ci.yml/badge.svg)](https://github.com/avis309/html-deck/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/htmldeck?label=pypi)](https://pypi.org/project/htmldeck/)
@@ -13,7 +13,7 @@ the changes that need the agent.
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-[🇬🇧 English](README.md) • [🇻🇳 Tiếng Việt](readme/README.vi.md) • [🇨🇳 简体中文](readme/README.zh-CN.md) • [🇹🇼 繁體中文](readme/README.zh-TW.md)
+[🇬🇧 English](README.md) • [🇻🇳 Tiếng Việt](readme/README.vi.md) • [🇨🇳 中文](readme/README.zh-CN.md) • [🇹🇼 繁體中文](readme/README.zh-TW.md)
 
 <img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/edit.png" alt="Editing a slide title in HTML Deck" width="900">
 
@@ -25,10 +25,11 @@ AI assistants like Claude Code and Codex are great at making slides and pages in
 them is another story: even a one-word fix sends the AI back through a large file, which burns
 tokens and time, and it may touch things you didn't ask for.
 
-- **Edit it yourself.** Click to change text, colors, fonts, images, layout and effects. No agent
-  needed.
-- **Point the agent to the exact spot.** For bigger changes, pin an **AI Feedback** note on a block
-  or an area ("make this shorter"). The agent knows what to change and where.
+- **Edit what you see.** Click on the page to change text, colors, fonts, images, layout and
+  effects, WYSIWYG. A small fix takes seconds and no tokens.
+- **AI Feedback, in bulk.** Select a block or sweep across an area and say what should change
+  ("make this shorter"). Do it everywhere you need, then hand the whole list to your agent at once:
+  it knows exactly what to change and where.
 - **Your file stays clean.** Saving updates only the parts you edited, so the rest of the file is
   left as it was. If a full rewrite is ever needed, you are asked first.
 - **Present it.** Show the deck full screen with its own animations.
@@ -39,7 +40,7 @@ tokens and time, and it may touch things you didn't ask for.
     <td width="50%"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/present.png" alt="Presenting a deck"></td>
   </tr>
   <tr>
-    <td align="center"><b>AI Feedback</b>: notes for your agent</td>
+    <td align="center"><b>AI Feedback</b>: every change, one list for your agent</td>
     <td align="center"><b>Present</b> with the deck's own animations</td>
   </tr>
   <tr>
@@ -67,7 +68,7 @@ Needs Python 3.11+ (the npm package also needs Node.js 18+). Linux, macOS and Wi
 **With Claude Code or Codex:**
 
 1. Say *"open my deck in HTML Deck"* (or type `/htmldeck:open [file]` in Claude Code).
-2. Edit what you can. Pin **AI Feedback** notes for the rest.
+2. Edit directly, or leave **AI Feedback** wherever you want the agent to change something.
 3. Say *"apply my HTML Deck notes"*. The agent makes the changes and marks the notes done.
    HTML Deck shows the new version as soon as the file changes.
 

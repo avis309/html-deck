@@ -2,9 +2,9 @@
 
 # HTML Deck
 
-**自己动手修改 HTML 幻灯片、报告和网页，不再烧 token。**
+**为 AI 生成的 HTML 幻灯片、报告和网页打造的可视化编辑器。**
 
-在浏览器里直接改错字、换颜色、移动区块，不用找 AI。需要 agent 处理的改动，留下备注即可。
+在浏览器里所见即所得地直接修改；或者用 **AI Feedback** 标出所有要改的地方，让 agent 一次全部改好。
 
 [![CI](https://github.com/avis309/html-deck/actions/workflows/ci.yml/badge.svg)](https://github.com/avis309/html-deck/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/htmldeck?label=pypi)](https://pypi.org/project/htmldeck/)
@@ -23,9 +23,9 @@
 Claude Code、Codex 这样的 AI 助手很擅长用 HTML 做幻灯片和网页。修改却是另一回事：哪怕只改一个字，
 AI 也要重新读一遍很大的文件，既烧 token 又费时间，还可能动到你没要求改的地方。
 
-- **自己改。** 点击即可修改文字、颜色、字体、图片、布局和动效，不需要 agent。
-- **告诉 agent 改哪里。** 较大的改动，在区块或区域上钉一条 **AI Feedback** 备注（"写短一点"）。
-  agent 就知道改什么、在哪里改。
+- **所见即所得。** 直接在页面上点击，修改文字、颜色、字体、图片、布局和动效。小改动几秒搞定，不耗 token。
+- **批量 AI Feedback。** 选中一个区块或框选一片区域，写下要改什么（"写短一点"）。所有要改的地方都标好后，
+  把整份清单一次交给 agent：它清楚知道改什么、在哪里改。
 - **文件保持干净。** 保存时只更新你改过的部分，其余内容原样保留。如需整体重写，会先征求你的同意。
 - **演示。** 全屏放映，保留幻灯片自带的动画。
 
@@ -35,7 +35,7 @@ AI 也要重新读一遍很大的文件，既烧 token 又费时间，还可能�
     <td width="50%"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/present.png" alt="演示幻灯片"></td>
   </tr>
   <tr>
-    <td align="center"><b>AI Feedback</b>：给 agent 的备注</td>
+    <td align="center"><b>AI Feedback</b>：所有改动，一份清单交给 agent</td>
     <td align="center"><b>演示</b>，保留幻灯片自带动画</td>
   </tr>
   <tr>
@@ -63,7 +63,7 @@ AI 也要重新读一遍很大的文件，既烧 token 又费时间，还可能�
 **配合 Claude Code 或 Codex：**
 
 1. 说 *"在 HTML Deck 中打开我的幻灯片"*（或在 Claude Code 中输入 `/htmldeck:open [file]`）。
-2. 能改的自己改，其余的钉上 **AI Feedback** 备注。
+2. 直接修改，或在所有想让 agent 改的地方留下 **AI Feedback**。
 3. 说 *"处理我的 HTML Deck 备注"*。agent 会修改文件并把备注标记为完成。HTML Deck 会在文件变更后立即显示新版本。
 
 **单独使用**，在存放文件的文件夹中：

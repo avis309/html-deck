@@ -2,9 +2,9 @@
 
 # HTML Deck
 
-**自己動手修改 HTML 投影片、報告和網頁，不再燒 token。**
+**為 AI 產生的 HTML 投影片、報告和網頁打造的視覺化編輯器。**
 
-在瀏覽器裡直接改錯字、換顏色、移動區塊，不用找 AI。需要 agent 處理的修改，留下備註即可。
+在瀏覽器裡所見即所得地直接修改；或者用 **AI Feedback** 標出所有要改的地方，讓 agent 一次全部改好。
 
 [![CI](https://github.com/avis309/html-deck/actions/workflows/ci.yml/badge.svg)](https://github.com/avis309/html-deck/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/htmldeck?label=pypi)](https://pypi.org/project/htmldeck/)
@@ -23,9 +23,9 @@
 Claude Code、Codex 這類 AI 助理很擅長用 HTML 製作投影片和網頁。修改卻是另一回事：就算只改一個字，
 AI 也得重新讀一遍很大的檔案，既燒 token 又花時間，還可能動到你沒要求改的地方。
 
-- **自己改。** 點一下就能修改文字、顏色、字型、圖片、版面和效果，不需要 agent。
-- **告訴 agent 改哪裡。** 較大的修改，在區塊或區域上釘一則 **AI Feedback** 備註（「寫短一點」）。
-  agent 就知道要改什麼、在哪裡改。
+- **所見即所得。** 直接在頁面上點擊，修改文字、顏色、字型、圖片、版面和效果。小修改幾秒完成，不耗 token。
+- **批次 AI Feedback。** 選取一個區塊或框選一片區域，寫下要改什麼（「寫短一點」）。所有要改的地方都標好後，
+  把整份清單一次交給 agent：它清楚知道要改什麼、在哪裡改。
 - **檔案保持乾淨。** 儲存時只更新你改過的部分，其餘內容維持原樣。若需要整份重寫，會先徵詢你的同意。
 - **簡報。** 全螢幕放映，保留投影片內建的動畫。
 
@@ -35,7 +35,7 @@ AI 也得重新讀一遍很大的檔案，既燒 token 又花時間，還可能�
     <td width="50%"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/present.png" alt="放映投影片"></td>
   </tr>
   <tr>
-    <td align="center"><b>AI Feedback</b>：給 agent 的備註</td>
+    <td align="center"><b>AI Feedback</b>：所有修改，一份清單交給 agent</td>
     <td align="center"><b>簡報</b>，保留投影片內建動畫</td>
   </tr>
   <tr>
@@ -63,7 +63,7 @@ AI 也得重新讀一遍很大的檔案，既燒 token 又花時間，還可能�
 **搭配 Claude Code 或 Codex：**
 
 1. 說「在 HTML Deck 中開啟我的投影片」（或在 Claude Code 中輸入 `/htmldeck:open [file]`）。
-2. 能改的自己改，其餘的釘上 **AI Feedback** 備註。
+2. 直接修改，或在所有想讓 agent 改的地方留下 **AI Feedback**。
 3. 說「處理我的 HTML Deck 備註」。agent 會修改檔案並把備註標記為完成。HTML Deck 會在檔案變更後立即顯示新版本。
 
 **單獨使用**，在存放檔案的資料夾中：

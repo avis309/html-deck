@@ -2,10 +2,10 @@
 
 # HTML Deck
 
-**Tự sửa slide, báo cáo và trang HTML, không đốt token.**
+**Editor trực quan cho slide, báo cáo và trang HTML do AI làm ra.**
 
-Sửa lỗi chính tả, đổi màu hay di chuyển một khối ngay trên trình duyệt, không cần AI. Để lại ghi
-chú cho những thay đổi cần đến agent.
+Thấy gì sửa nấy, ngay trên trình duyệt. Hoặc đánh dấu mọi chỗ cần sửa bằng **AI Feedback** rồi để
+agent sửa hết trong một lượt.
 
 [![CI](https://github.com/avis309/html-deck/actions/workflows/ci.yml/badge.svg)](https://github.com/avis309/html-deck/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/htmldeck?label=pypi)](https://pypi.org/project/htmldeck/)
@@ -25,9 +25,11 @@ Các trợ lý AI như Claude Code và Codex làm slide và trang HTML rất gi�
 đổi một chữ cũng khiến AI phải đọc lại cả một file lớn, tốn token và thời gian, và có thể đụng vào
 những chỗ bạn không yêu cầu.
 
-- **Tự sửa.** Bấm để đổi chữ, màu, font, ảnh, bố cục và hiệu ứng. Không cần agent.
-- **Chỉ đúng chỗ cho agent.** Với thay đổi lớn hơn, ghim một ghi chú **AI Feedback** lên một khối
-  hoặc một vùng ("viết ngắn lại"). Agent biết cần sửa gì và ở đâu.
+- **Thấy gì sửa nấy.** Bấm thẳng lên trang để đổi chữ, màu, font, ảnh, bố cục và hiệu ứng
+  (WYSIWYG). Sửa nhỏ chỉ mất vài giây, không tốn token.
+- **AI Feedback hàng loạt.** Chọn một khối hoặc quét cả một vùng rồi ghi điều cần đổi ("viết ngắn
+  lại"). Làm vậy ở mọi chỗ cần sửa, rồi giao cả danh sách cho agent một lần: agent biết chính xác
+  sửa gì, ở đâu.
 - **File vẫn sạch.** Khi lưu, chỉ phần bạn sửa được cập nhật, phần còn lại giữ nguyên. Nếu cần
   viết lại cả file, editor sẽ hỏi bạn trước.
 - **Thuyết trình.** Trình chiếu toàn màn hình với hiệu ứng sẵn có của deck.
@@ -38,7 +40,7 @@ những chỗ bạn không yêu cầu.
     <td width="50%"><img src="https://raw.githubusercontent.com/avis309/html-deck/main/.github/assets/present.png" alt="Trình chiếu một deck"></td>
   </tr>
   <tr>
-    <td align="center"><b>AI Feedback</b>: ghi chú cho agent</td>
+    <td align="center"><b>AI Feedback</b>: mọi chỗ cần sửa, một danh sách cho agent</td>
     <td align="center"><b>Thuyết trình</b> với hiệu ứng của deck</td>
   </tr>
   <tr>
@@ -66,7 +68,7 @@ Cần Python 3.11+ (bản npm cần thêm Node.js 18+). Chạy trên Linux, macO
 **Với Claude Code hoặc Codex:**
 
 1. Nói *"mở deck của tôi trong HTML Deck"* (hoặc gõ `/htmldeck:open [file]` trong Claude Code).
-2. Tự sửa những gì bạn sửa được. Ghim ghi chú **AI Feedback** cho phần còn lại.
+2. Sửa trực tiếp, hoặc để lại **AI Feedback** ở mọi chỗ bạn muốn agent sửa.
 3. Nói *"áp dụng các ghi chú HTML Deck của tôi"*. Agent sửa file và đánh dấu ghi chú đã xong.
    HTML Deck hiện bản mới ngay khi file thay đổi.
 
