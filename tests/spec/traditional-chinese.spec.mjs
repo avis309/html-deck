@@ -17,8 +17,10 @@ for (const [locale, expected] of [['zh-TW', 'zh-Hant'], ['zh-HK', 'zh-Hant'], ['
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'htmldeck-hant-'));
 fs.copyFileSync('tests/fixtures/deck.html', path.join(root, 'deck.html'));
-const py = fs.existsSync('.venv/bin/python') ? '.venv/bin/python' : 'python3';
+// Same choice as characterization.spec.mjs: the PYTHON variable (CI), else .venv, else python3.
+const py = process.env.PYTHON || (fs.existsSync('.venv/bin/python') ? '.venv/bin/python' : 'python3');
 const proc = spawn(py, ['-u', '-m', 'htmldeck', '--root', root, '--no-browser', '--port', '0']);
+proc.on('error', e => { console.error(`cannot start ${py}: ${e.message}`); process.exit(1); });
 let browser;
 try {
   const url = await new Promise((resolve, reject) => {

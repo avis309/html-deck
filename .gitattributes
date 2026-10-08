@@ -1,2 +1,4 @@
 *.cmd text eol=crlf
 scripts/htmldeck-run text eol=lf
+# Test fixtures are compared byte for byte: no line-ending conversion on any OS (crlf.html is CRLF on purpose).
+tests/fixtures/** -text
