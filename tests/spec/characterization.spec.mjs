@@ -1599,6 +1599,27 @@ async function fxModules(browser, url) {
   check('grow-x on a bar: only data-fx added', c === disk(f).replace('<span class="bar" id="m-bar">', '<span class="bar" id="m-bar" data-fx="grow-x">'), firstDiff(c, disk(f)));
   await s.undo();
   await s.page.keyboard.press('Escape');
+  section('FX modules: Animate this slide');
+  await s.page.click('#sb-prev');
+  await s.page.click('.rail-item[data-panel="effects"]');
+  const orig = disk(f);
+  await s.page.click('#fx-auto');
+  const want = orig
+    .replace('<h1 id="m-title">', '<h1 id="m-title" data-fx="fade-up">')
+    .replace('<div class="kpis" id="m-kpis">', '<div class="kpis" id="m-kpis" data-fx="fade-up" data-fx-delay="120" data-fx-stagger="90">')
+    .replace('<p id="m-n1">', '<p id="m-n1" data-fx="count-up" data-fx-delay="240">')
+    .replace('<p id="m-n2">', '<p id="m-n2" data-fx="count-up" data-fx-delay="360">')
+    .replace('<p id="m-n3">', '<p id="m-n3" data-fx="count-up" data-fx-delay="480">')
+    .replace('<svg id="m-chart" width="300" height="120" viewBox="0 0 300 120">', '<svg id="m-chart" width="300" height="120" viewBox="0 0 300 120" data-fx="draw" data-fx-delay="600" data-fx-stagger="90">')
+    .replace('<p id="m-text">', '<p id="m-text" data-fx="fade-up" data-fx-delay="720">');
+  let ac = await s.content();
+  check('animate slide: headings, KPI grid (stagger), numbers (count-up), chart (draw), text; skips the animated block and the scene', ac === want, firstDiff(ac, want));
+  check('animate slide: the panel lists the new effects', (await s.page.locator('#fx-list .fx-item').count()) >= 8);
+  await s.page.click('#fx-auto');
+  check('animate slide again: nothing new, says so', (await s.content()) === want && /Nothing/.test(await s.page.textContent('#toast')), await s.page.textContent('#toast'));
+  await s.undo();
+  ac = await s.content();
+  check('animate slide: one undo step back to the file', ac === orig, firstDiff(ac, orig));
   await s.close();
 }
 

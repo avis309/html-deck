@@ -5,6 +5,7 @@ import { PAGE_W_KEY, applyPageWidth } from './chrome.mjs';
 import { addNoteFromPop, feedbackMulti, openNotePop } from '../features/feedback/notes.mjs';
 import { applyAlt, enterCrop, exitCrop, flipImage, normalizeImageURL, openAltPop, openImagePop, replaceImage, replaceWithFile, resetImage, selectedImg, setFit, startCropDrag } from '../features/images.mjs';
 import { applyFont, cycleAlign, setFontSize, toggleCase, toggleStyle } from '../features/formatting.mjs';
+import { animateScope } from '../features/auto-fx.mjs';
 import { applyFx, fxDocAction, openFxPop, previewFx, previewSlideFx, renderFxPresets } from '../features/effects.mjs';
 import { applyLink, openLinkPop, removeLink } from '../features/links.mjs';
 import { bindBoxPanel } from './panels/box.mjs';
@@ -144,6 +145,7 @@ export function bindUI() {
   $('#fx-preview').addEventListener('click', previewFx);
   $('#fx-doc-btn').addEventListener('click', fxDocAction);
   $('#fx-play-slide').addEventListener('click', previewSlideFx);
+  $('#fx-auto').addEventListener('click', animateScope);
   $('#sb-trust').addEventListener('click', () => {
     if (S.mountedTrust) setTrust(false);
     else if (confirm(t('trust_confirm'))) setTrust(true);
