@@ -116,7 +116,7 @@ def test_plugin_tree_holds_what_the_plugin_runs_and_no_dev_tooling(tmp_path):
     assert not any(f.startswith(("tests/", "tools/", ".github/workflows/", "packaging/", "samples/")) for f in files)
     for rel in (".claude-plugin/plugin.json", ".claude-plugin/icon.png", ".codex-plugin/plugin.json", "skills/open/SKILL.md",
                 "scripts/htmldeck-run", "scripts/htmldeck-run.cmd", "scripts/launcher.py", "htmldeck/server.py",
-                "htmldeck/web/index.html", "LICENSE", ".gitattributes"):
+                "htmldeck/web/index.html", "LICENSE", "PRIVACY.md", ".gitattributes"):
         assert (out / rel).is_file(), rel
     # The directory's limits: at most 512 files, each code/text file under 256 KiB.
     assert len(files) <= 512

@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 # Tracked files under these paths make the plugin; everything else stays on main.
 KEEP = ("htmldeck/", "scripts/", "skills/", ".claude-plugin/plugin.json", ".claude-plugin/icon.png",
-        ".codex-plugin/", "LICENSE", "README.md", "readme/", ".github/assets/",
+        ".codex-plugin/", "LICENSE", "PRIVACY.md", "README.md", "readme/", ".github/assets/",
         ".gitattributes")   # keeps scripts/htmldeck-run LF on a Windows checkout (sh refuses CRLF)
 # Never in a plugin tree: an install would run npm, or they are dev-only.
 FORBIDDEN = ("package.json", "package-lock.json", "npm-shrinkwrap.json", "bun.lock", "node_modules", "tests")
