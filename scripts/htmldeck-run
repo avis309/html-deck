@@ -1,0 +1,10 @@
+#!/bin/sh
+# HtmlDeck from this plugin's own copy: htmldeck-run [notes] [args...]
+case "$0" in */*) here=${0%/*} ;; *) here=. ;; esac
+for py in python3 python; do
+  if command -v "$py" >/dev/null 2>&1 && "$py" -c 'import sys; sys.exit(sys.version_info < (3, 11))' >/dev/null 2>&1; then
+    exec "$py" "$here/launcher.py" "$@"
+  fi
+done
+echo "htmldeck: needs Python >= 3.11 — install it from https://www.python.org/downloads/ or run: uv python install 3.12" >&2
+exit 127

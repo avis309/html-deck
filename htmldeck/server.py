@@ -1,0 +1,1265 @@
+"""HtmlDeck — local Canva-style editor for the HTML documents of a workspace.
+
+Author: Avis (hunganh.freeze@gmail.com). Feedback about the tool goes to that address.
+
+The workspace is the folder HtmlDeck is started in (or ``--root``): every document path is
+relative to it. The editor UI ships with this package and is served under ``/__htmldeck/``.
+Serves the editor UI plus a small JSON API bound to 127.0.0.1:
+
+Every API call needs this run's session key (from the printed link), so another program on the
+machine cannot call it either:
+
+- ``GET  /api/config``    default document to open
+- ``GET  /api/list_html`` HTML files in the workspace
+- ``GET  /api/load``      document source + mtime and revision (for conflict detection)
+- ``GET  /api/watch``     server-sent events when the document or its notes change on disk
+- ``POST /api/preview``   stage the editor's render of a document next to its source,
+  so relative assets and the page's own scripts resolve exactly as they do on disk
+- ``POST /api/save``      atomic write with a timestamped backup
+- ``POST /api/export``    the editor's text as one self-contained file (images, styles, scripts
+                          embedded; files on the web only when asked)
+- ``GET/POST /api/notes`` review notes pinned to elements, stored beside the document in
+  ``.htmldeck_notes/<name>.json`` (never inside the HTML) so an agent can pick them up with
+  ``htmldeck-notes`` (``python -m htmldeck.notes``)
+
+Only ``.html``/``.htm`` files inside the workspace (or the file passed with ``--file``)
+can be read or written, dot-directories are never served, and requests must carry a
+local Host header — so a web page open in the same browser cannot read or overwrite
+files through this server.
+
+Run (in the workspace): htmldeck [--file PATH] [--root DIR] [--port 6789]
+     or python -m htmldeck ...
+"""
+
+from __future__ import annotations
+
+import argparse
+import contextlib
+import errno
+import hashlib
+import hmac
+import http.server
+import json
+import math
+import os
+import re
+import secrets
+import select
+import shlex
+import shutil
+import stat
+import socket
+import socketserver
+import sys
+import threading
+import time
+import urllib.parse
+import webbrowser
+from collections import OrderedDict
+from pathlib import Path
+
+_WINDOWS = os.name == "nt"
+if _WINDOWS:
+    import msvcrt
+else:
+    import fcntl
+
+# The editor UI ships inside the package; the workspace is chosen at start (default: cwd).
+WEB_DIR = Path(__file__).resolve().parent / "web"
+EDITOR_HTML = WEB_DIR / "index.html"
+EDITOR_PREFIX = "/__htmldeck/"
+EDITOR_ENTRY = ("/", "/index.html", EDITOR_PREFIX + "index.html")
+# The session key of a run: printed in the link (?key=), handed to the editor in the address
+# fragment, then sent by it with every API call. Not a cookie: a browser sends a cookie of
+# 127.0.0.1 to every port, so any other local server the browser calls would get the key.
+SESSION_HEADER = "X-HtmlDeck-Key"
+SESSION_ERROR = "This tab has no valid HTML Deck session key (htmldeck was restarted, or the address was typed): open the link htmldeck printed"
+SESSION_LOCKED_HTML = (
+    "<!doctype html><meta charset=utf-8><title>HTML Deck</title>"
+    "<body style=\"font:16px system-ui;max-width:36em;margin:4em auto;padding:0 1em\">"
+    "<h1>Open the link HTML Deck printed</h1>"
+    "<p>This link has no valid session key. Use the link <code>htmldeck</code> printed when it "
+    "started (the line <code>HTMLDECK_URL=…</code>), or start it again.</p>"
+).encode("utf-8")
+
+HTML_SUFFIXES = {".html", ".htm"}
+LIST_SKIP_PARTS = {"tmp", "node_modules", "venv", "__pycache__", "site-packages"}
+LIST_MAX_FILES = 5000   # a huge folder opened as the workspace must not stall the file list
+BACKUP_DIR_NAME = ".htmldeck_bak"
+BACKUPS_KEPT = 5
+SAVE_LOCK = threading.Lock()
+NOTES_DIR_NAME = ".htmldeck_notes"
+NOTE_FIELDS = {"id": str, "note": str, "status": str, "created": str, "selector": str, "tag": str, "text": str}
+NOTE_STATUSES = {"open", "done"}
+MAX_NOTES = 500
+MAX_NOTE_TARGETS = 12
+MAX_BODY_BYTES = 64 * 1024 * 1024
+PREVIEW_PREFIX = "__edpreview-"
+# Content-Security-Policy, enforced by the browser (the document's own CSP cannot loosen it):
+# - the edit preview runs only scripts from this origin (inline, workspace files) unless the
+#   user trusted the file's remote scripts; never service workers or plugins;
+# - a workspace HTML file opened directly on the editor origin is sandboxed (opaque origin),
+#   so its scripts can never call the editor API;
+# - documents on the preview origin (presenting) run freely there, without workers.
+# connect-src too: a local loader could otherwise fetch remote code and eval it.
+EDIT_CSP = "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:; connect-src 'self' blob: data:; worker-src 'none'; object-src 'none'"
+EDIT_CSP_TRUSTED = "script-src * 'unsafe-inline' 'unsafe-eval' blob: data:; worker-src 'none'; object-src 'none'"
+RAW_HTML_CSP = "sandbox allow-scripts allow-popups allow-forms allow-modals allow-downloads; worker-src 'none'; object-src 'none'"
+PREVIEW_ORIGIN_CSP = "worker-src 'none'; object-src 'none'"
+# A document from outside the workspace (no path) runs none of its own code anywhere: only the
+# editor's scripts, which carry the nonce the editor sends, or no script at all (a print copy).
+# Inline event handlers and javascript: URLs are then blocked by the browser, whatever route
+# (render, duplicate, undo) brought them into the page.
+NONCE_RE = re.compile(r"[A-Za-z0-9]{16,64}")
+PREVIEWS_KEPT = 4
+
+
+class EditorError(Exception):
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+
+
+def resolve_html_path(req_path: str | None, root: Path, extra_allowed: frozenset[Path] = frozenset()) -> Path:
+    """Map a client-supplied path to an HTML file the editor is allowed to touch."""
+    if not req_path:
+        raise EditorError(400, "Missing path parameter")
+    path = Path(req_path)
+    if not path.is_absolute():
+        path = root / path
+    path = path.resolve()
+    if path in extra_allowed:
+        return path
+    if not path.is_relative_to(root):
+        raise EditorError(403, "Only files inside the workspace can be opened")
+    if any(part.startswith(".") for part in path.relative_to(root).parts):
+        raise EditorError(403, "Files in hidden folders are not opened")
+    if path.suffix.lower() not in HTML_SUFFIXES:
+        raise EditorError(400, "Only .html / .htm files are supported")
+    return path
+
+
+def display_path(path: Path, root: Path) -> str:
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def list_html_files(root: Path) -> list[dict]:
+    """HTML documents anywhere in the workspace (hidden and tooling folders skipped)."""
+    files = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if not d.startswith(".") and d not in LIST_SKIP_PARTS)
+        for fname in filenames:
+            p = Path(dirpath) / fname
+            if fname.startswith(".") or fname.startswith(PREVIEW_PREFIX) or p.suffix.lower() not in HTML_SUFFIXES:
+                continue
+            stat = p.stat()
+            files.append({"path": p.relative_to(root).as_posix(), "size": stat.st_size, "mtime": int(stat.st_mtime)})
+            if len(files) >= LIST_MAX_FILES:
+                break
+        if len(files) >= LIST_MAX_FILES:
+            break
+    files.sort(key=lambda f: f["path"])
+    return files
+
+
+def revision(raw: bytes) -> str:
+    """What the editor and the watcher call a version of a file: a digest of its bytes."""
+    return hashlib.sha256(raw).hexdigest()[:16]
+
+
+def _snapshot(target: Path) -> tuple[bytes, os.stat_result]:
+    """The file's bytes with the stat of that same version (an agent may be writing it)."""
+    for _ in range(5):
+        before = target.stat()
+        raw = target.read_bytes()
+        after = target.stat()
+        if (before.st_mtime_ns, before.st_size) == (after.st_mtime_ns, after.st_size) == (after.st_mtime_ns, len(raw)):
+            return raw, after
+        time.sleep(0.05)
+    return raw, after
+
+
+def load_html(target: Path, root: Path) -> dict:
+    if not target.is_file():
+        raise EditorError(404, f"File not found: {display_path(target, root)}")
+    raw, st = _snapshot(target)
+    try:
+        content = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise EditorError(415, "File is not UTF-8") from exc
+    return {
+        "path": display_path(target, root),
+        "filename": target.name,
+        "size": len(raw),
+        "mtime_ns": str(st.st_mtime_ns),
+        "rev": revision(raw),
+        "content": content,
+    }
+
+
+# On POSIX every sidecar file operation goes through a handle on the folder opened without
+# following links (dir_fd), so a folder swapped for a link after the checks is never followed.
+_DIR_FD = (not _WINDOWS and os.open in os.supports_dir_fd and os.rename in os.supports_dir_fd
+           and hasattr(os, "O_DIRECTORY") and hasattr(os, "O_NOFOLLOW"))
+_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+
+
+def _is_link(path: Path) -> bool:
+    """A symlink, or on Windows any reparse point (a junction is not a symlink to is_symlink())."""
+    try:
+        st = os.lstat(path)
+    except FileNotFoundError:
+        return False
+    return stat.S_ISLNK(st.st_mode) or bool(getattr(st, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
+
+
+def _sidecar_dir(target: Path, name: str, create: bool) -> Path:
+    """A sidecar folder beside the document (backups, notes). Never a link: a link planted in
+    the workspace would make HTML Deck read or write wherever it points."""
+    folder = target.parent / name
+    refuse = EditorError(403, f"{name} beside the document is not a plain folder; HTML Deck does not follow it")
+    if _is_link(folder) or (folder.exists() and not folder.is_dir()):
+        raise refuse
+    if create:
+        folder.mkdir(exist_ok=True)
+    # Whatever kind of redirect it is, the folder must still be itself.
+    if folder.exists() and (_is_link(folder) or folder.resolve() != target.parent.resolve() / name):
+        raise refuse
+    return folder
+
+
+def _no_link(path: Path) -> Path:
+    if _is_link(path):
+        raise EditorError(403, f"{path.name} is a symlink; HTML Deck does not follow it")
+    return path
+
+
+def _sidecar_opened(folder: Path) -> None:
+    """Test seam: called right after a sidecar folder was checked and opened."""
+
+
+class _Sidecar:
+    """A checked sidecar folder; file operations by name inside it, through its dir_fd on POSIX."""
+
+    def __init__(self, target: Path, name: str, create: bool):
+        self.path = _sidecar_dir(target, name, create)
+        self.fd = None
+        # Absent when checked: stays absent for this operation, whatever appears there later.
+        self.absent = not self.path.exists()
+        if _DIR_FD and not self.absent:
+            try:
+                self.fd = os.open(self.path, os.O_RDONLY | os.O_DIRECTORY | _NOFOLLOW)
+            except OSError as exc:
+                if exc.errno in (errno.ELOOP, errno.ENOTDIR):   # swapped for a link or a file
+                    raise EditorError(403, f"{name} beside the document is not a plain folder; HTML Deck does not follow it") from exc
+                raise
+        _sidecar_opened(self.path)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        if self.fd is not None:
+            os.close(self.fd)
+
+    def open(self, name: str, flags: int, mode: int = 0o644) -> int:
+        flags |= _NOFOLLOW | getattr(os, "O_BINARY", 0)
+        try:
+            if self.fd is not None:
+                return os.open(name, flags, mode, dir_fd=self.fd)
+            return os.open(_no_link(self.path / name), flags, mode)
+        except OSError as exc:
+            if exc.errno == errno.ELOOP:   # O_NOFOLLOW met a symlink
+                raise EditorError(403, f"{name} is a symlink; HTML Deck does not follow it") from exc
+            raise
+
+    def exists(self, name: str) -> bool:
+        try:
+            os.stat(name, dir_fd=self.fd, follow_symlinks=False) if self.fd is not None else os.lstat(self.path / name)
+            return True
+        except FileNotFoundError:
+            return False
+
+    def names(self) -> list[str]:
+        return os.listdir(self.fd if self.fd is not None else self.path)
+
+    def replace(self, src: str, dst: str) -> None:
+        if self.fd is not None:
+            os.replace(src, dst, src_dir_fd=self.fd, dst_dir_fd=self.fd)
+        else:
+            _replace(self.path / src, _no_link(self.path / dst))
+
+    def unlink(self, name: str) -> None:
+        try:
+            os.unlink(name, dir_fd=self.fd) if self.fd is not None else (self.path / name).unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _backup(target: Path, stamp: str) -> Path:
+    with _Sidecar(target, BACKUP_DIR_NAME, create=True) as side:
+        name = f"{target.name}.{stamp}.bak"
+        st = target.stat()
+        # Created with the document's permissions (a private document keeps a private backup).
+        with open(target, "rb") as src, os.fdopen(side.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, st.st_mode & 0o777), "wb") as dst:
+            shutil.copyfileobj(src, dst)
+            dst.flush()
+            if hasattr(os, "fchmod"):
+                os.fchmod(dst.fileno(), st.st_mode & 0o777)
+            if os.utime in os.supports_fd:
+                os.utime(dst.fileno(), ns=(st.st_atime_ns, st.st_mtime_ns))
+        if os.utime not in os.supports_fd:
+            os.utime(side.path / name, ns=(st.st_atime_ns, st.st_mtime_ns))
+        old = sorted(n for n in side.names() if n.startswith(f"{target.name}.") and n.endswith(".bak"))
+        for stale in old[:-BACKUPS_KEPT]:
+            side.unlink(stale)
+        return side.path / name
+
+
+def save_html(target: Path, content: object, expected_mtime_ns: str | None, force: bool, root: Path,
+              expected_rev: str | None = None) -> dict:
+    """Atomically overwrite an existing HTML file, refusing if it changed since load."""
+    if not isinstance(content, str) or not content.strip():
+        raise EditorError(400, "Content is empty or invalid")
+    # The check, backup and replace must be one step, or two tabs can both pass the check.
+    with SAVE_LOCK:
+        return _save_locked(target, content, expected_mtime_ns, force, root, expected_rev)
+
+
+def _save_locked(target: Path, content: str, expected_mtime_ns: str | None, force: bool, root: Path,
+                 expected_rev: str | None = None) -> dict:
+    if not target.is_file():
+        raise EditorError(404, "Target file does not exist (the editor does not create files)")
+    # The revision catches a change that kept the mtime (a coarse clock, a copied file); the
+    # mtime is what an older editor sends.
+    if expected_rev and not force:
+        if revision(target.read_bytes()) != str(expected_rev):
+            raise EditorError(409, "The file was changed outside the editor since it was opened")
+    elif expected_mtime_ns and not force and str(target.stat().st_mtime_ns) != str(expected_mtime_ns):
+        raise EditorError(409, "The file was changed outside the editor since it was opened")
+
+    stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{time.time_ns() % 1_000_000:06d}"
+    backup = _backup(target, stamp)
+    tmp = target.with_name(f".{target.name}.tmp.{os.getpid()}.{secrets.token_hex(4)}")
+    # load_html hands the text over without its BOM: a file that had one keeps it.
+    with open(target, "rb") as fh:
+        bom = fh.read(3) == b"\xef\xbb\xbf"
+    data = (b"\xef\xbb\xbf" + content.removeprefix("\ufeff").encode("utf-8")) if bom else content.encode("utf-8")
+    try:
+        with open(tmp, "wb") as fh:
+            fh.write(data)
+        shutil.copymode(target, tmp)
+        _replace(tmp, target)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    # The revision of what this save wrote, not of the file read back: an agent writing right
+    # after would otherwise have its version taken for the editor's own.
+    return {
+        "success": True,
+        "file": display_path(target, root),
+        "backup": display_path(backup, root),
+        "bytes_written": len(data),
+        "mtime_ns": str(target.stat().st_mtime_ns),
+        "rev": revision(data),
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
+def export_html(target: Path, content: object, root: Path, fetch_remote: bool) -> dict:
+    """The editor's current text of `target` as one self-contained file (see htmldeck.export)."""
+    from htmldeck.export import single_file
+    if not isinstance(content, str) or not content:
+        raise EditorError(400, "Missing content")
+    html, report = single_file(content, target, root, fetch_remote)
+    return {"success": True, "html": html, **report}
+
+
+def notes_path(target: Path) -> Path:
+    return target.parent / NOTES_DIR_NAME / f"{target.name}.json"
+
+
+def _ps_quote(value: str) -> str:
+    """Single-quoted for PowerShell: only quote marks are special, and each doubles. PowerShell
+    reads the curly ones (‘ ’ ‚ ‛) as single quotes too, as in a name like Bob’s deck.html."""
+    return "'" + re.sub("(['\u2018\u2019\u201a\u201b])", r"\1\1", value) + "'"
+
+
+def notes_command(target: Path, root: Path, shell: str = "posix") -> str:
+    """The command an agent runs to read this document's notes (append ``--done ID`` to resolve one).
+
+    It names this interpreter and this copy of notes.py by absolute path, with the workspace,
+    so it works from any folder whether HtmlDeck came from pip, npm, uvx or a plugin, none of
+    which is sure to put ``htmldeck-notes`` on PATH. ``shell`` is "posix" (sh, bash, Git Bash:
+    backslashes are literal inside its single quotes) or "powershell".
+    """
+    quote = _ps_quote if shell == "powershell" else shlex.quote
+    py, script = quote(sys.executable), quote(str(Path(__file__).resolve().with_name("notes.py")))
+    doc = display_path(target, root)
+    doc = "./" + doc if doc.startswith("-") else doc   # never read as an option
+    cmd = f"{py} {script} --root {quote(str(root))} --file {quote(doc)}"
+    return "& " + cmd if shell == "powershell" else cmd
+
+
+def notes_commands(target: Path, root: Path, windows: bool = _WINDOWS) -> list[dict]:
+    """``notes_command`` for each shell an agent may run on this machine: on Windows, PowerShell
+    (Codex, a terminal) and Git Bash (Claude Code's Bash tool) cannot share one syntax."""
+    if not windows:
+        return [{"shell": "", "command": notes_command(target, root)}]
+    return [{"shell": "PowerShell", "command": notes_command(target, root, "powershell")},
+            {"shell": "Git Bash", "command": notes_command(target, root, "posix")}]
+
+
+def read_notes(target: Path) -> list[dict]:
+    with _Sidecar(target, NOTES_DIR_NAME, create=False) as side:
+        return _read_notes_in(side, target)
+
+
+def _read_notes_in(side: "_Sidecar", target: Path) -> list[dict]:
+    name = notes_path(target).name
+    if side.absent or not side.exists(name):
+        return []
+    with os.fdopen(side.open(name, os.O_RDONLY), "rb") as fh:
+        data = json.loads(fh.read().decode("utf-8"))
+    return data.get("notes", []) if isinstance(data, dict) else []
+
+
+def _clean_note(raw: object) -> dict:
+    if not isinstance(raw, dict):
+        raise EditorError(400, "A note must be an object")
+    note = {}
+    for key, kind in NOTE_FIELDS.items():
+        value = raw.get(key, "")
+        if not isinstance(value, kind):
+            raise EditorError(400, f"Invalid field: {key}")
+        note[key] = value[:4000]
+    if not note["id"] or not note["note"].strip():
+        raise EditorError(400, "A note needs an id and text")
+    if note["status"] not in NOTE_STATUSES:
+        raise EditorError(400, "status must be open or done")
+    for key in ("line", "slide"):
+        note[key] = _line(raw.get(key))
+    # A region note: one request about an area drawn on a slide. The top-level anchor is the
+    # slide (so older readers still see a whole-slide note); the area and the elements found
+    # in it ride along. Element notes carry none of these keys.
+    if "kind" in raw:
+        if raw["kind"] != "region":
+            raise EditorError(400, "kind must be region")
+        note["kind"] = "region"
+        note["region"] = _box(raw.get("region"), ("x", "y", "width", "height"))
+        note["canvas"] = _box(raw.get("canvas"), ("width", "height"))
+        targets = raw.get("targets", [])
+        if not isinstance(targets, list) or len(targets) > MAX_NOTE_TARGETS:
+            raise EditorError(400, "Invalid targets")
+        note["targets"] = [_clean_target(t) for t in targets]
+    return note
+
+
+def _line(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
+def _box(raw: object, keys: tuple[str, ...]) -> dict:
+    """Finite numbers in CSS pixels; width and height must be positive."""
+    if not isinstance(raw, dict):
+        raise EditorError(400, "Missing region coordinates")
+    box = {}
+    for key in keys:
+        value = raw.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise EditorError(400, f"Invalid coordinate: {key}")
+        if key in ("width", "height") and value <= 0:
+            raise EditorError(400, f"{key} must be greater than 0")
+        box[key] = round(value, 2)
+    return box
+
+
+def _clean_target(raw: object) -> dict:
+    if not isinstance(raw, dict):
+        raise EditorError(400, "A target must be an object")
+    target = {}
+    for key in ("selector", "tag", "text"):
+        value = raw.get(key, "")
+        if not isinstance(value, str):
+            raise EditorError(400, f"Invalid field: target.{key}")
+        target[key] = value[:4000]
+    target["line"] = _line(raw.get("line"))
+    return target
+
+
+def _replace(src: Path, dst: Path) -> None:
+    """os.replace, retried briefly on Windows, which refuses while another process reads ``dst``."""
+    for _ in range(50 if _WINDOWS else 0):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            time.sleep(0.02)
+    os.replace(src, dst)
+
+
+@contextlib.contextmanager
+def _file_lock(lock: Path | int):
+    """Exclusive lock on a file (a path, or an fd already open) shared with other processes:
+    flock on POSIX, a one-byte lock on Windows."""
+    fd = lock if isinstance(lock, int) else os.open(lock, os.O_RDWR | os.O_CREAT | _NOFOLLOW, 0o644)
+    with os.fdopen(fd, "a+") as fh:
+        if _WINDOWS:
+            fh.seek(0)
+            while True:
+                try:
+                    msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
+                    break
+                except OSError as exc:   # LK_LOCK gives up after ~10 s; keep waiting, as flock does
+                    if exc.errno != errno.EDEADLOCK:
+                        raise
+            try:
+                yield
+            finally:
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(fh, fcntl.LOCK_UN)
+
+
+@contextlib.contextmanager
+def _notes_lock(target: Path):
+    """Cross-process lock: the editor and htmldeck-notes may both edit the same sidecar. Yields
+    the checked notes folder, for the write made under the lock."""
+    with SAVE_LOCK, _Sidecar(target, NOTES_DIR_NAME, create=True) as side, _file_lock(side.open(".lock", os.O_RDWR | os.O_CREAT)):
+        yield side
+
+
+def _write_notes_file(side: _Sidecar, target: Path, notes: list[dict], root: Path) -> None:
+    name = notes_path(target).name
+    tmp = f".{name}.tmp.{secrets.token_hex(4)}"
+    try:
+        with os.fdopen(side.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL), "wb") as fh:
+            fh.write(json.dumps({"file": display_path(target, root), "notes": notes}, ensure_ascii=False, indent=2).encode("utf-8"))
+        side.replace(tmp, name)
+    finally:
+        side.unlink(tmp)
+
+
+def write_notes(target: Path, notes: object, root: Path) -> dict:
+    """Replace the review notes of a document (atomic, validated)."""
+    if not isinstance(notes, list) or len(notes) > MAX_NOTES:
+        raise EditorError(400, "Invalid note list")
+    if not target.is_file():
+        raise EditorError(404, "Target file does not exist")
+    cleaned = [_clean_note(n) for n in notes]
+    with _notes_lock(target) as side:
+        _write_notes_file(side, target, cleaned, root)
+    return {"success": True, "count": len(cleaned), "notes_file": display_path(notes_path(target), root)}
+
+
+# The drawn region is a capture snapshot: re-anchoring after a save moves the anchors
+# (selector, line, targets), never the area.
+NOTE_PATCH_FIELDS = {"status", "note", "selector", "line", "text", "tag", "targets"}
+
+
+def apply_note_ops(target: Path, ops: object, root: Path) -> dict:
+    """Apply add/update/delete operations against the sidecar as it is on disk right now,
+    so a stale copy in one client can never undo another client's change."""
+    if not isinstance(ops, list) or not ops:
+        raise EditorError(400, "Missing list of operations")
+    if not target.is_file():
+        raise EditorError(404, "Target file does not exist")
+    with _notes_lock(target) as side:
+        notes = _read_notes_in(side, target)
+        by_id = {n.get("id"): n for n in notes}
+        for op in ops:
+            kind = op.get("op") if isinstance(op, dict) else None
+            if kind == "add":
+                note = _clean_note(op.get("note"))
+                if note["id"] in by_id:
+                    raise EditorError(409, "Duplicate note id")
+                notes.append(note)
+                by_id[note["id"]] = note
+            elif kind == "update":
+                current = by_id.get(op.get("id"))
+                if current is None:
+                    continue
+                patch = {k: v for k, v in (op.get("patch") or {}).items() if k in NOTE_PATCH_FIELDS}
+                merged = _clean_note({**current, **patch})
+                current.clear()
+                current.update(merged)
+            elif kind == "delete":
+                notes = [n for n in notes if n.get("id") != op.get("id")]
+                by_id.pop(op.get("id"), None)
+            else:
+                raise EditorError(400, "Invalid note operation")
+        if len(notes) > MAX_NOTES:
+            raise EditorError(400, "Too many notes")
+        _write_notes_file(side, target, notes, root)
+    return {"success": True, "notes": notes, "notes_file": display_path(notes_path(target), root)}
+
+
+WATCH_POLL_S = 0.5
+WATCH_SETTLE_S = 0.4      # a file still being written keeps changing: report it once it rests
+WATCH_PING_S = 15.0
+WATCH_MAX = 32
+WATCH_SLOTS = threading.BoundedSemaphore(WATCH_MAX)
+
+
+def _signature(path: Path) -> tuple[int, int] | None:
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return st.st_mtime_ns, st.st_size
+
+
+class DocWatch:
+    """Changes on disk of one document and its notes sidecar, for one editor tab.
+
+    poll() returns the events due now: {"type": "doc", "rev", "mtime_ns"} once a changed
+    document has rested WATCH_SETTLE_S and its bytes differ from the revision the tab has
+    (its own save included), {"type": "notes"} likewise for the sidecar. A document that is
+    briefly missing (written as delete + create) is waited for, not reported."""
+
+    def __init__(self, target: Path, rev: str | None, clock=time.monotonic):
+        self.target, self.notes, self.rev, self.clock = target, notes_path(target), rev or None, clock
+        self.doc_sig, self.notes_sig = _signature(target), _signature(self.notes)
+        self.doc_since = self.notes_since = None
+        self.check_now = True   # the tab's revision may be stale already
+
+    def poll(self) -> list[dict]:
+        now, events = self.clock(), []
+        sig = _signature(self.target)
+        if sig != self.doc_sig:
+            self.doc_sig, self.doc_since = sig, now
+        elif sig and (self.check_now or (self.doc_since is not None and now - self.doc_since >= WATCH_SETTLE_S)):
+            try:
+                raw, st = _snapshot(self.target)
+            except OSError:
+                raw = None   # locked for a moment (Windows sharing): tried again next poll
+            if raw is not None:
+                self.doc_since, self.check_now = None, False
+                rev = revision(raw)
+                if rev != self.rev:
+                    self.rev = rev
+                    events.append({"type": "doc", "rev": rev, "mtime_ns": str(st.st_mtime_ns)})
+        nsig = _signature(self.notes)
+        if nsig != self.notes_sig:
+            self.notes_sig, self.notes_since = nsig, now
+        elif self.notes_since is not None and now - self.notes_since >= WATCH_SETTLE_S:
+            self.notes_since = None
+            events.append({"type": "notes"})
+        return events
+
+
+def preview_url(source: Path | None, root: Path) -> str:
+    """URL for a staged preview that sits in the same directory as its source file."""
+    rel_dir = ""
+    if source is not None and source.parent.is_relative_to(root):
+        rel_dir = source.parent.relative_to(root).as_posix()
+        rel_dir = "" if rel_dir == "." else rel_dir
+    name = f"{PREVIEW_PREFIX}{secrets.token_hex(8)}.html"
+    parts = [urllib.parse.quote(p) for p in rel_dir.split("/") if p] + [name]
+    return "/" + "/".join(parts)
+
+
+# ---- workspace trust. The edit view shares the editor's origin (it has to: the editor works on
+# its DOM), so a document's own scripts there could call this API. They only run once the user
+# trusted the workspace; until then the editor stages previews with a nonce CSP (its own
+# scripts only). Trusted roots are remembered in the user's config folder, outside workspaces.
+TRUST_FILE = "trusted-workspaces.json"
+
+
+def config_dir() -> Path:
+    env = os.environ.get("HTMLDECK_CONFIG_DIR")
+    if env:
+        return Path(env)
+    if _WINDOWS:
+        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "htmldeck"
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "htmldeck"
+
+
+def trusted_roots() -> set[str]:
+    try:
+        data = json.loads((config_dir() / TRUST_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    roots = data.get("roots") if isinstance(data, dict) else None
+    return {r for r in roots if isinstance(r, str)} if isinstance(roots, list) else set()
+
+
+def set_trusted(root: Path, trusted: bool) -> None:
+    roots = trusted_roots()
+    (roots.add if trusted else roots.discard)(str(root))
+    folder = config_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    tmp = folder / f".{TRUST_FILE}.tmp.{secrets.token_hex(4)}"
+    try:
+        tmp.write_text(json.dumps({"roots": sorted(roots)}, indent=2), encoding="utf-8")
+        _replace(tmp, folder / TRUST_FILE)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _script_policy(payload: dict, source_path: Path | None) -> str | None:
+    """The script-src a staged preview gets, or None for a workspace document's usual policy."""
+    if payload.get("no_scripts") is True:
+        return "script-src 'none'"
+    nonce = payload.get("nonce")
+    if isinstance(nonce, str) and NONCE_RE.fullmatch(nonce):
+        return f"script-src 'nonce-{nonce}'"
+    if nonce is not None:
+        raise EditorError(400, "Invalid script nonce")
+    if source_path is None:
+        raise EditorError(400, "A document from outside the workspace needs a script nonce")
+    return None
+
+
+class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
+    root: Path = Path.cwd()
+    target_file: Path | None = None   # --file: opened first, allowed even outside the workspace
+    explicit_file: bool = False  # --file given: open it instead of the browser's last file
+    test_hooks: bool = False  # --test-hooks: the UI honours fault-injection URL params (spec only)
+    trusted_session: bool = False  # --trust: this run trusts the workspace without remembering it
+    # Host / Origin / Sec-Fetch-Site stop web pages; this key stops other programs on the machine,
+    # which can send any header but do not know it. New for every run.
+    session_key: str = secrets.token_urlsafe(32)
+    # Keep-alive: the editor loads ~65 modules per page; one TCP connection each ran Windows out
+    # of socket buffers (net::ERR_NO_BUFFER_SPACE). Idle connections close after `timeout` s.
+    protocol_version = "HTTP/1.1"
+    timeout = 30
+
+    def handle_one_request(self):
+        # One handler serves every request of a kept-alive connection: per-request state (the
+        # CSP chosen for a workspace file) must not carry over to the next request.
+        self._csp = None
+        self._cache = None
+        super().handle_one_request()
+
+    def _trusted(self) -> bool:
+        return self.trusted_session or str(self.root) in trusted_roots()
+    editor_html: Path = EDITOR_HTML
+    previews: OrderedDict[str, tuple[bytes, str]] = OrderedDict()   # edit previews: (body, CSP)
+    present_previews: OrderedDict[str, tuple[bytes, str]] = OrderedDict()   # preview origin: (body, CSP)
+    previews_lock = threading.Lock()
+    preview_origin: str = ""
+    # Pinned, not left to the host's mime.types: a module served with any other type is
+    # refused by the browser and the editor comes up blank.
+    extensions_map = {
+        **http.server.SimpleHTTPRequestHandler.extensions_map,
+        ".mjs": "text/javascript", ".js": "text/javascript", ".css": "text/css",
+        ".html": "text/html", ".svg": "image/svg+xml", ".json": "application/json",
+    }
+
+    def guess_type(self, path):
+        ext = os.path.splitext(str(path))[1].lower()
+        # Explicit base: PreviewOriginHandler borrows this method, so a bare super() would fail there.
+        return self.extensions_map.get(ext) or http.server.SimpleHTTPRequestHandler.guess_type(self, path)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(self.root), **kwargs)
+
+    # --- request guards -------------------------------------------------
+    def _local_origins(self) -> set[str]:
+        port = self.server.server_address[1]
+        return {f"127.0.0.1:{port}", f"localhost:{port}"}
+
+    def _host_ok(self) -> bool:
+        return self.headers.get("Host", "") in self._local_origins()
+
+    def _same_origin_fetch(self) -> bool:
+        # Set by the browser, not by page scripts. The preview origin (another port) is
+        # same-site, not same-origin, so it is refused like any other site.
+        return self.headers.get("Sec-Fetch-Site") == "same-origin"
+
+    def _origin_ok(self) -> bool:
+        origin = self.headers.get("Origin")
+        if origin is None:
+            return True
+        parsed = urllib.parse.urlparse(origin)
+        return parsed.scheme == "http" and parsed.netloc in self._local_origins()
+
+    def _key_ok(self, key: str | None) -> bool:
+        return hmac.compare_digest((key or "").encode(), self.session_key.encode())
+
+    def _session_ok(self, parsed) -> bool:
+        # EventSource cannot send headers: the watch stream alone takes the key in its query.
+        if parsed.path == "/api/watch":
+            return self._key_ok(urllib.parse.parse_qs(parsed.query).get("key", [""])[0])
+        return self._key_ok(self.headers.get(SESSION_HEADER))
+
+    def _open_session(self, parsed):
+        """The printed link: the editor opens with the key in its address fragment (which the
+        editor moves to its storage), so the key is not sent again in a URL or a Referer."""
+        query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+        if not self._key_ok(next((v for k, v in query if k == "key"), "")):
+            self._send_locked()
+            return
+        rest = urllib.parse.urlencode([(k, v) for k, v in query if k != "key"])
+        self.send_response(302)
+        self.send_header("Location", EDITOR_PREFIX + "index.html" + ("?" + rest if rest else "") + "#key=" + self.session_key)
+        self._cache = "no-store"   # it holds the key
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _send_locked(self):
+        self.send_response(403)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(SESSION_LOCKED_HTML)))
+        self.end_headers()
+        self.wfile.write(SESSION_LOCKED_HTML)
+
+    # --- routing --------------------------------------------------------
+    def do_GET(self):
+        if not self._host_ok():
+            self._send_json({"error": "Invalid Host"}, 403)
+            return
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path in EDITOR_ENTRY and "key" in urllib.parse.parse_qs(parsed.query, keep_blank_values=True):
+            self._open_session(parsed)
+            return
+        route = {
+            "/api/config": self._api_config,
+            "/api/list_html": self._api_list_html,
+            "/api/load": self._api_load,
+            "/api/notes": self._api_notes_get,
+            "/api/watch": self._api_watch,
+        }.get(parsed.path)
+        if route:
+            if not self._session_ok(parsed):
+                self._send_json({"error": SESSION_ERROR, "session": True}, 403)
+                return
+            if not self._same_origin_fetch():
+                self._send_json({"error": "Only the editor may call the API"}, 403)
+                return
+            if route == self._api_watch:
+                self._api_watch(parsed)
+            else:
+                self._run_api(route, parsed)
+            return
+        if parsed.path in ("/", "/index.html"):
+            self.send_response(302)
+            # Keep the query so /?file=<path> still opens that file.
+            query = "?" + parsed.query if parsed.query else ""
+            self.send_header("Location", EDITOR_PREFIX + "index.html" + query)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if parsed.path.startswith(EDITOR_PREFIX):
+            self._send_editor_file(parsed.path[len(EDITOR_PREFIX):])
+            return
+        with self.previews_lock:
+            staged = self.previews.get(parsed.path)
+        if staged is not None:
+            body, csp = staged
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Security-Policy", csp)
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        rel = urllib.parse.unquote(parsed.path).lstrip("/")
+        if any(part.startswith(".") for part in Path(rel).parts):
+            self.send_error(404)
+            return
+        # A symlink must not expose files outside the workspace or inside hidden directories.
+        real = Path(self.translate_path(self.path)).resolve()
+        if not real.is_relative_to(self.root) or any(part.startswith(".") for part in real.relative_to(self.root).parts):
+            self.send_error(404)
+            return
+        # Every workspace response: a directory URL serving its index.html, an SVG or XML
+        # opened as a document must all be sandboxed (CSP is ignored on images, styles and
+        # scripts, so this costs nothing elsewhere). The editor's own files are served above.
+        self._csp = RAW_HTML_CSP
+        super().do_GET()
+
+    def _send_editor_file(self, rel: str):
+        """The editor UI, from the package's web/ folder (never from the workspace)."""
+        rel = urllib.parse.unquote(rel)
+        target = (self.editor_html.parent / rel).resolve()
+        web = self.editor_html.parent.resolve()
+        if not target.is_relative_to(web) or any(p.startswith(".") for p in target.relative_to(web).parts) or not target.is_file():
+            self.send_error(404)
+            return
+        body = target.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", self.guess_type(str(target)))
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_HEAD(self):
+        self.send_error(405)
+
+    def do_POST(self):
+        # Its body may go unread (a refused or unknown request): never reuse this connection.
+        self.close_connection = True
+        if not self._host_ok() or not self._origin_ok() or not self._same_origin_fetch():
+            self._send_json({"error": "Invalid Origin"}, 403)
+            return
+        parsed = urllib.parse.urlparse(self.path)
+        if not self._session_ok(parsed):
+            self._send_json({"error": SESSION_ERROR, "session": True}, 403)
+            return
+        route = {"/api/save": self._api_save, "/api/preview": self._api_preview, "/api/notes": self._api_notes_post,
+                 "/api/export": self._api_export, "/api/trust": self._api_trust}.get(parsed.path)
+        if route is None:
+            self.send_error(404, "Endpoint not found")
+            return
+        if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
+            self._send_json({"error": "Content-Type must be application/json"}, 415)
+            return
+        self._run_api(route, parsed)
+
+    def list_directory(self, path):
+        self.send_error(404)
+        return None
+
+    # --- API ------------------------------------------------------------
+    def _run_api(self, handler, parsed):
+        try:
+            self._send_json(handler(parsed))
+        except EditorError as exc:
+            self._send_json({"error": str(exc)}, exc.status)
+        except Exception as exc:  # noqa: BLE001 - surface any failure to the UI
+            self._send_json({"error": f"{type(exc).__name__}: {exc}"}, 500)
+
+    def _allowed_extra(self) -> frozenset[Path]:
+        return frozenset({self.target_file}) if self.target_file else frozenset()
+
+    def _api_config(self, parsed):
+        return {
+            "default_path": display_path(self.target_file, self.root) if self.target_file else None,
+            "explicit": self.explicit_file,
+            "test_hooks": self.test_hooks,
+            "preview_origin": self.preview_origin,
+            "trusted": self._trusted(),
+        }
+
+    def _api_trust(self, parsed):
+        payload = self._read_json()
+        if not isinstance(payload.get("trusted"), bool):
+            raise EditorError(400, "trusted must be true or false")
+        set_trusted(self.root, payload["trusted"])
+        return {"trusted": self._trusted()}
+
+    def _api_list_html(self, parsed):
+        return {"files": list_html_files(self.root)}
+
+    def _api_load(self, parsed):
+        req_path = urllib.parse.parse_qs(parsed.query).get("path", [None])[0]
+        target = resolve_html_path(req_path, self.root, self._allowed_extra())
+        return load_html(target, self.root)
+
+    def _api_watch(self, parsed):
+        """Server-sent events while the tab keeps the stream open (see DocWatch)."""
+        query = urllib.parse.parse_qs(parsed.query)
+        try:
+            target = resolve_html_path(query.get("path", [None])[0], self.root, self._allowed_extra())
+        except EditorError as exc:
+            self._send_json({"error": str(exc)}, exc.status)
+            return
+        if not WATCH_SLOTS.acquire(blocking=False):
+            self._send_json({"error": "Too many open editor tabs"}, 503)
+            return
+        try:
+            # A stream has no length: it ends when the connection does.
+            self.close_connection = True
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(b"retry: 2000\n\n")
+            self.wfile.flush()
+            watch, pinged = DocWatch(target, query.get("rev", [None])[0]), time.monotonic()
+            while True:
+                for ev in watch.poll():
+                    kind = ev.pop("type")
+                    self.wfile.write(f"event: {kind}\ndata: {json.dumps(ev)}\n\n".encode())
+                    self.wfile.flush()
+                if time.monotonic() - pinged >= WATCH_PING_S:
+                    pinged = time.monotonic()
+                    self.wfile.write(b": ping\n\n")
+                    self.wfile.flush()
+                if self._watch_closed():
+                    break
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass
+        finally:
+            WATCH_SLOTS.release()
+
+    def _watch_closed(self) -> bool:
+        """Wait one poll interval; True once the tab has gone. The tab never sends anything on
+        this stream, so the socket turns readable only when it closes: the thread and its socket
+        are released at once, not at the next ping (Windows runs out of socket buffers when
+        streams of closed tabs pile up)."""
+        try:
+            readable, _, _ = select.select([self.connection], [], [], WATCH_POLL_S)
+            return bool(readable) and not self.connection.recv(1, socket.MSG_PEEK)
+        except OSError:
+            return True
+
+    def _read_json(self) -> dict:
+        length = int(self.headers.get("Content-Length", 0))
+        if length <= 0 or length > MAX_BODY_BYTES:
+            raise EditorError(413, "Invalid body size")
+        payload = json.loads(self.rfile.read(length).decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise EditorError(400, "Body must be a JSON object")
+        return payload
+
+    def _api_preview(self, parsed):
+        payload = self._read_json()
+        content = payload.get("content")
+        if not isinstance(content, str):
+            raise EditorError(400, "Missing content")
+        source = payload.get("path")
+        source_path = resolve_html_path(source, self.root, self._allowed_extra()) if source else None
+        url = preview_url(source_path, self.root)
+        scripts = _script_policy(payload, source_path)
+        # Presenting runs the document on the preview origin, away from this API.
+        if payload.get("target") == "present":
+            if not self.preview_origin:
+                raise EditorError(503, "The presentation origin is not running")
+            csp = f"{scripts}; {PREVIEW_ORIGIN_CSP}" if scripts else PREVIEW_ORIGIN_CSP   # end_headers adds the base one too
+            with self.previews_lock:
+                self.present_previews[url] = (content.encode("utf-8"), csp)
+                while len(self.present_previews) > PREVIEWS_KEPT:
+                    self.present_previews.popitem(last=False)
+            return {"url": self.preview_origin + url}
+        if scripts:
+            csp = f"{scripts}; connect-src 'none'; worker-src 'none'; object-src 'none'"
+        elif not self._trusted():
+            raise EditorError(400, "This workspace is not trusted: its scripts do not run in the edit view (preview needs a script nonce)")
+        else:
+            csp = EDIT_CSP_TRUSTED if payload.get("trust_remote") is True else EDIT_CSP
+        with self.previews_lock:
+            self.previews[url] = (content.encode("utf-8"), csp)
+            while len(self.previews) > PREVIEWS_KEPT:
+                self.previews.popitem(last=False)
+        return {"url": url}
+
+    def _api_notes_get(self, parsed):
+        req_path = urllib.parse.parse_qs(parsed.query).get("path", [None])[0]
+        target = resolve_html_path(req_path, self.root, self._allowed_extra())
+        return {"notes": read_notes(target), "notes_file": display_path(notes_path(target), self.root),
+                "commands": notes_commands(target, self.root)}
+
+    def _api_notes_post(self, parsed):
+        payload = self._read_json()
+        target = resolve_html_path(payload.get("path"), self.root, self._allowed_extra())
+        return {**apply_note_ops(target, payload.get("ops"), self.root), "commands": notes_commands(target, self.root)}
+
+    def _api_save(self, parsed):
+        payload = self._read_json()
+        target = resolve_html_path(payload.get("path"), self.root, self._allowed_extra())
+        return save_html(target, payload.get("content"), payload.get("mtime_ns"), bool(payload.get("force")), self.root,
+                         payload.get("rev"))
+
+    def _api_export(self, parsed):
+        payload = self._read_json()
+        target = resolve_html_path(payload.get("path"), self.root, self._allowed_extra())
+        return export_html(target, payload.get("content"), self.root, bool(payload.get("remote")))
+
+    def _send_json(self, data: dict, status_code: int = 200):
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        self.send_response(status_code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        if self.close_connection:
+            self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(body)
+
+    _csp: str | None = None
+    _cache: str | None = None
+
+    def end_headers(self):
+        if not self.path.startswith("/api/"):
+            self.send_header("Cache-Control", self._cache or "no-cache")
+        if self._csp:
+            self.send_header("Content-Security-Policy", self._csp)
+        super().end_headers()
+
+    def log_message(self, format, *args):
+        # API calls only, by their path (a query may hold "/api/"), never with a key in the line.
+        parts = str(args[0]).split() if args else []
+        url = urllib.parse.urlparse(parts[1]) if len(parts) > 1 else None
+        if url and url.path.startswith("/api/"):
+            # Names compared decoded (k%65y= is key=): a key never reaches the log.
+            query = urllib.parse.urlencode([(k, v) for k, v in urllib.parse.parse_qsl(url.query, keep_blank_values=True) if k not in ("key", "token")])
+            line = " ".join([parts[0], url.path + ("?" + query if query else ""), *parts[2:]])
+            sys.stdout.write(f"[editor] {line} - {args[1]}\n")
+            sys.stdout.flush()
+
+
+class PreviewOriginHandler(http.server.SimpleHTTPRequestHandler):
+    """The preview origin: a second port that only serves workspace files and staged present
+    previews. No API, no editor UI: a document presented here cannot reach either."""
+
+    root: Path = Path.cwd()
+    extensions_map = HTMLEditorHandler.extensions_map
+    guess_type = HTMLEditorHandler.guess_type
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(self.root), **kwargs)
+
+    def do_GET(self):
+        port = self.server.server_address[1]
+        if self.headers.get("Host", "") not in {f"127.0.0.1:{port}", f"localhost:{port}"}:
+            self.send_error(403)
+            return
+        parsed = urllib.parse.urlparse(self.path)
+        with HTMLEditorHandler.previews_lock:
+            staged = HTMLEditorHandler.present_previews.get(parsed.path)
+        if staged is not None:
+            body, csp = staged
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Security-Policy", csp)
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        rel = urllib.parse.unquote(parsed.path).lstrip("/")
+        if parsed.path.startswith(EDITOR_PREFIX) or rel.startswith("api/") or any(p.startswith(".") for p in Path(rel).parts):
+            self.send_error(404)
+            return
+        real = Path(self.translate_path(self.path)).resolve()
+        if not real.is_relative_to(self.root) or any(p.startswith(".") for p in real.relative_to(self.root).parts):
+            self.send_error(404)
+            return
+        super().do_GET()
+
+    def end_headers(self):
+        self.send_header("Content-Security-Policy", PREVIEW_ORIGIN_CSP)
+        super().end_headers()
+
+    def do_HEAD(self):
+        self.send_error(405)
+
+    def do_POST(self):
+        self.send_error(405)
+
+    def list_directory(self, path):
+        self.send_error(404)
+        return None
+
+    def log_message(self, format, *args):
+        pass
+
+
+class LocalServer(http.server.ThreadingHTTPServer):
+    """ThreadingHTTPServer without the reverse DNS lookup (socket.getfqdn) in server_bind, which can
+    stall startup for seconds on macOS; the server only ever listens on 127.0.0.1."""
+
+    # The editor's ES modules arrive as a burst of connections (more with several tabs open);
+    # socketserver's default backlog of 5 made the OS reset the extra ones (a module fails to
+    # load: blank editor). The OS caps it (somaxconn: 128 on macOS, 4096 on Linux >= 5.4).
+    request_queue_size = 128
+
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
+def start_preview_origin(root: Path) -> LocalServer:
+    """Bind the preview origin on a free port and serve it in the background."""
+    handler = type("PreviewOrigin", (PreviewOriginHandler,), {"root": root})
+    srv = LocalServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    HTMLEditorHandler.preview_origin = f"http://127.0.0.1:{srv.server_address[1]}"
+    return srv
+
+
+def utf8_stdio() -> None:
+    """Print Vietnamese/Chinese messages even through a pipe in a legacy code page (Windows cp1252)."""
+    for stream in (sys.stdout, sys.stderr):
+        with contextlib.suppress(AttributeError, ValueError):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+
+def bind_server(start_port: int, attempts: int = 50) -> LocalServer:
+    for port in range(start_port, start_port + attempts):
+        try:
+            return LocalServer(("127.0.0.1", port), HTMLEditorHandler)
+        except OSError:
+            continue
+    raise SystemExit(f"No free port in {start_port}-{start_port + attempts - 1}")
+
+
+def main(argv: list[str] | None = None):
+    parser = argparse.ArgumentParser(prog="htmldeck", description="Edit and present the HTML documents of a workspace")
+    parser.add_argument("--root", help="Workspace folder (default: the current folder, or the folder of --file when it lies outside it)")
+    parser.add_argument("--file", help="HTML file to open first (relative to the workspace, or absolute)")
+    parser.add_argument("--port", type=int, default=6789, help="First port to try")
+    parser.add_argument("--no-browser", action="store_true", help="Do not open the browser")
+    parser.add_argument("--dry", action="store_true", help="Validate arguments and exit")
+    parser.add_argument("--trust", action="store_true", help="Run the workspace's own scripts in the edit view for this session (otherwise asked once per workspace)")
+    parser.add_argument("--test-hooks", action="store_true", help=argparse.SUPPRESS)
+    args = parser.parse_args(argv)
+    utf8_stdio()
+
+    root = Path(args.root or ".").expanduser().resolve()
+    if not root.is_dir():
+        print(f"Error: not a folder: {root}", file=sys.stderr)
+        sys.exit(1)
+    target = None
+    if args.file:
+        target = Path(args.file).expanduser()
+        target = (target if target.is_absolute() else root / target).resolve()
+        if not target.is_file() or target.suffix.lower() not in HTML_SUFFIXES:
+            print(f"Error: not a valid HTML file: {target}", file=sys.stderr)
+            sys.exit(1)
+        # A document's relative assets (images, CSS) are served from the workspace only, so the
+        # document has to be inside it: without --root, its own folder becomes the workspace.
+        if not target.is_relative_to(root):
+            if args.root:
+                print(f"Error: {target} is outside the workspace {root} — pass a --root that contains it, or drop --root", file=sys.stderr)
+                sys.exit(1)
+            root = target.parent
+    if not EDITOR_HTML.is_file():
+        print(f"Error: editor UI missing: {EDITOR_HTML}", file=sys.stderr)
+        sys.exit(1)
+    if args.dry:
+        print(f"[dry] root={root} file={display_path(target, root) if target else '-'} editor={EDITOR_HTML}")
+        return
+
+    HTMLEditorHandler.root = root
+    HTMLEditorHandler.target_file = target
+    HTMLEditorHandler.explicit_file = bool(args.file)
+    HTMLEditorHandler.test_hooks = args.test_hooks
+    HTMLEditorHandler.trusted_session = args.trust
+    httpd = bind_server(args.port)
+    preview = start_preview_origin(root)
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/?key={HTMLEditorHandler.session_key}"
+    print("============================================================")
+    print("  HtmlDeck · by Avis (hunganh.freeze@gmail.com)")
+    print(f"  Workspace     : {root}")
+    print(f"  Open first    : {display_path(target, root) if target else '(last file / pick from the list)'}")
+    print(f"  Editor URL    : {url}")
+    print(f"  Preview origin: {HTMLEditorHandler.preview_origin}  (presenting, no API)")
+    print("============================================================")
+    print(f"HTMLDECK_URL={url}", flush=True)   # stable, untranslated: agents read the URL from this line
+    if not args.no_browser:
+        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\nEditor server stopped.")
+    finally:
+        httpd.server_close()
+        preview.shutdown()
+        preview.server_close()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HtmlDeck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Be+Vietnam+Pro:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@600;700;800&family=JetBrains+Mono:wght@400;500&family=Lexend:wght@400;600&family=Montserrat:wght@400;700&family=Noto+Sans+TC:wght@400;500;600;700;800&family=Open+Sans:wght@400;700&family=Oswald:wght@400;600&family=Playfair+Display:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/editor.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol>
+  <symbol id="i-cloud-ok" viewBox="0 0 24 24"><path d="m17 15-5.5 5.5L9 18"/><path d="M5 17.74A7 7 0 1 1 15.71 10h1.79a4.5 4.5 0 0 1 1.5 8.74"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+  <symbol id="i-type" viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="13" height="13" x="9" y="9" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/></symbol>
+  <symbol id="i-move" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/><path d="m15 19-3 3-3-3M19 9l3 3-3 3M5 9l-3 3 3 3M9 5l3-3 3 3"/></symbol>
+  <symbol id="i-al-left" viewBox="0 0 24 24"><path d="M21 6H3M15 12H3M17 18H3"/></symbol>
+  <symbol id="i-al-center" viewBox="0 0 24 24"><path d="M21 6H3M17 12H7M19 18H5"/></symbol>
+  <symbol id="i-al-right" viewBox="0 0 24 24"><path d="M21 6H3M21 12H9M21 18H7"/></symbol>
+  <symbol id="i-al-justify" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></symbol>
+  <symbol id="i-spacing" viewBox="0 0 24 24"><path d="M3 5h4M3 19h4M5 5v14"/><path d="M11 6h10M11 12h10M11 18h10"/></symbol>
+  <symbol id="i-opacity" viewBox="0 0 24 24"><g stroke="none"><rect x="4" y="4" width="4" height="4" fill="currentColor" fill-opacity="1"/><rect x="12" y="4" width="4" height="4" fill="currentColor" fill-opacity="0.5"/><rect x="8" y="8" width="4" height="4" fill="currentColor" fill-opacity="0.75"/><rect x="16" y="8" width="4" height="4" fill="currentColor" fill-opacity="0.3"/><rect x="4" y="12" width="4" height="4" fill="currentColor" fill-opacity="1"/><rect x="12" y="12" width="4" height="4" fill="currentColor" fill-opacity="0.5"/><rect x="8" y="16" width="4" height="4" fill="currentColor" fill-opacity="0.75"/><rect x="16" y="16" width="4" height="4" fill="currentColor" fill-opacity="0.3"/></g></symbol>
+  <symbol id="i-eraser" viewBox="0 0 24 24"><path d="m7 21-4.3-4.3a2.4 2.4 0 0 1 0-3.4l9.6-9.6a2.4 2.4 0 0 1 3.4 0l5.6 5.6a2.4 2.4 0 0 1 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></symbol>
+  <symbol id="i-notes" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 24 24"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 7-5 5 5 5"/><path d="m16 7 5 5-5 5"/><path d="m14 4-4 16"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></symbol>
+  <symbol id="i-parent" viewBox="0 0 24 24"><path d="M7 17V7h10"/><path d="M17 17 7 7"/></symbol>
+  <symbol id="i-brush" viewBox="0 0 24 24"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 3.5v17l14-8.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-ai" viewBox="0 0 24 24"><path d="M14 5H3.5a2 2 0 0 0-2 2v16l4.5-3.4h12a2 2 0 0 0 2-2V11.5"/><path d="m4.6 16.9 2.7-7 2.7 7M5.6 14.6h3.4" stroke-width="1.8"/><path d="M14.2 12v4.9" stroke-width="1.8"/><circle cx="14.2" cy="9.3" r="1.05" fill="currentColor" stroke="none"/><path d="M20 .6c.45 2.1 1.4 3.05 3.5 3.5-2.1.45-3.05 1.4-3.5 3.5-.45-2.1-1.4-3.05-3.5-3.5 2.1-.45 3.05-1.4 3.5-3.5z" style="fill:var(--accent);stroke:var(--accent)" stroke-width="1"/><path d="M15.6.5c.2.9.6 1.3 1.5 1.5-.9.2-1.3.6-1.5 1.5-.2-.9-.6-1.3-1.5-1.5.9-.2 1.3-.6 1.5-1.5z" style="fill:var(--accent);stroke:var(--accent)" stroke-width=".8"/></symbol>
+  <symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></symbol>
+  <symbol id="i-flip" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="m16 7 4 5-4 5z"/><path d="m8 7-4 5 4 5z"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><rect x="7.5" y="7.5" width="9" height="9" rx="1.5" stroke-dasharray="2 2"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></symbol>
+  <symbol id="i-caret-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
+  <symbol id="i-caret-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-caret" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20M12 2a14.5 14.5 0 0 1 0 20M2 12h20"/></symbol>
+  <symbol id="i-pointer" viewBox="0 0 24 24"><path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/></symbol>
+</svg>
+
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand" data-i18n-title="brand_title" title="HtmlDeck · created by Avis (hunganh.freeze@gmail.com)">
+      <img class="brand-logo" src="assets/logo.svg" width="34" height="34" alt="" aria-hidden="true">
+      <span class="brand-word"><b>HTML</b>Deck</span>
+    </div>
+    <button class="tb-ghost" data-panel="files" data-i18n="open_file"><svg class="icon sm"><use href="#i-folder"/></svg>Open File</button>
+    <div class="tb-sep"></div>
+    <button class="tb-ghost" id="btn-undo" data-i18n-title="undo" title="Undo (Ctrl+Z)" disabled><svg class="icon"><use href="#i-undo"/></svg></button>
+    <button class="tb-ghost" id="btn-redo" data-i18n-title="redo" title="Redo (Ctrl+Shift+Z)" disabled><svg class="icon"><use href="#i-redo"/></svg></button>
+    <div class="tb-sep"></div>
+    <div class="save-state" id="save-state"><svg class="icon"><use href="#i-cloud-ok"/></svg><span data-i18n="save_no_doc">No document open</span></div>
+    <div class="spacer"></div>
+    <div class="doc-name" id="doc-name" title=""><span class="name">—</span><span class="mode-badge" id="mode-badge" hidden></span></div>
+    <button class="btn-download" id="btn-present" data-i18n="present" data-i18n-title="present_title" title="Fullscreen presentation (F)"><svg class="icon sm"><use href="#i-play"/></svg>Present</button>
+    <div class="save-split">
+      <button class="btn-save" id="btn-save" data-i18n="save" data-i18n-title="save_title" title="Save (Ctrl+S)"><span class="dot"></span><svg class="icon sm"><use href="#i-save"/></svg>Save</button>
+      <button class="btn-save save-more" id="btn-export" data-i18n-title="export_title" title="Save as HTML or PDF"><svg class="icon sm"><use href="#i-caret-down"/></svg></button>
+    </div>
+  </header>
+
+  <div class="main">
+    <nav class="rail" aria-label="Tools" data-i18n-title="rail_tools">
+      <button class="rail-item" data-panel="files" data-i18n="rail_files"><span class="ic"><svg class="icon lg"><use href="#i-folder"/></svg></span>Files</button>
+      <button class="rail-item" data-panel="text" data-i18n="rail_text"><span class="ic"><svg class="icon lg"><use href="#i-type"/></svg></span>Text</button>
+      <button class="rail-item" data-panel="box" data-i18n="rail_box"><span class="ic"><svg class="icon lg"><use href="#i-box"/></svg></span>Khung</button>
+      <button class="rail-item" data-panel="layers" data-i18n="rail_layers"><span class="ic"><svg class="icon lg"><use href="#i-layers"/></svg></span>Layers</button>
+      <button class="rail-item" data-panel="effects" data-i18n="rail_effects"><span class="ic"><svg class="icon lg"><use href="#i-play"/></svg></span>Effects</button>
+      <button class="rail-item" data-panel="review" data-i18n="rail_review"><span class="ic"><svg class="icon lg ai"><use href="#i-ai"/></svg></span>AI Feedback<span class="badge-count" id="note-count" hidden></span></button>
+      <div class="grow"></div>
+      <button class="rail-item" id="btn-lang" data-i18n-title="lang_btn_title" title="Switch language / Chuyển ngôn ngữ (VI / EN)"><span class="ic"><svg class="icon lg"><use href="#i-globe"/></svg></span><span id="lang-indicator" style="font-weight:700">VI</span></button>
+      <button class="rail-item" id="rail-keys" data-i18n="rail_keys"><span class="ic"><svg class="icon lg"><use href="#i-keyboard"/></svg></span>Shortcuts</button>
+    </nav>
+
+    <aside class="panel" id="panel">
+      <div class="panel-inner">
+        <div class="panel-head"><h2 id="panel-title">Files</h2><button class="icon-btn" id="panel-close" data-i18n-title="close" title="Close"><svg class="icon"><use href="#i-x"/></svg></button></div>
+        <div class="panel-body" data-view="files">
+          <label class="search"><svg class="icon sm"><use href="#i-search"/></svg><input id="file-search" data-i18n-placeholder="search_files" placeholder="Search files in workspace"></label>
+          <div id="file-list"><div class="hint" data-i18n="loading_list">Loading list…</div></div>
+          <!-- Secondary: a file opened from the computer can be edited, not given AI Feedback. -->
+          <div class="pick-local">
+            <button class="btn-soft" id="btn-pick" data-i18n="pick_file"><svg class="icon sm"><use href="#i-laptop"/></svg>Open file from computer</button>
+            <div class="hint" data-i18n="drag_hint">Or drag &amp; drop .html files into this window. Files opened this way can be edited, but AI Feedback needs a file from the list above.</div>
+          </div>
+        </div>
+        <div class="panel-body" data-view="text" hidden>
+          <div class="hint" style="margin-bottom:12px" id="text-hint" data-i18n-html="text_hint">Click to add a text box to the current page. Drag the block to move it.</div>
+          <button class="text-preset h" data-preset="heading" data-i18n="preset_heading">Add Heading</button>
+          <button class="text-preset s" data-preset="subheading" data-i18n="preset_subheading">Add Subheading</button>
+          <button class="text-preset b" data-preset="body" data-i18n="preset_body">Add Paragraph</button>
+          <div class="sec-label" data-i18n="color_text">Text color</div>
+          <div class="sec-label" style="margin-top:4px" data-i18n="doc_colors">Document Colors</div>
+          <div class="swatches" id="doc-colors"></div>
+          <div class="sec-label" data-i18n="default_colors">Default Colors</div>
+          <div class="swatches" id="default-colors"></div>
+          <div class="hint" style="margin-top:16px" data-i18n="color_hint">Highlight text to color only that selection; otherwise applies to the entire block.</div>
+        </div>
+        <div class="panel-body" data-view="box" hidden>
+          <div class="box-target" id="box-target"></div>
+          <div class="box-sec needs-img">
+            <div class="box-h"><span data-i18n="box_size">Dimensions</span><span class="sp"></span><button data-reset="size" data-i18n="reset_orig">Reset to original</button></div>
+            <div class="hint" data-i18n="size_hint">Drag corner or edge handles on canvas to resize.</div>
+          </div>
+          <div class="box-sec needs-img">
+            <div class="box-h"><span data-i18n="padding_label">Padding (inner spacing)</span><span class="sp"></span><button data-reset="padding" data-i18n="reset_btn">Reset</button></div>
+            <div class="chips" id="chips-padding"></div>
+            <div class="slider-row"><input type="range" min="0" max="80" id="sl-padding"><output id="out-padding"></output></div>
+            <details class="more"><summary data-i18n="sides_padding_sum">Custom per side</summary><div id="sides-padding"></div></details>
+          </div>
+          <div class="box-sec needs-img">
+            <div class="box-h"><span data-i18n="margin_label">Margin (top / bottom)</span><span class="sp"></span><button data-reset="margin" data-i18n="reset_btn">Reset</button></div>
+            <div class="chips" id="chips-margin"></div>
+            <details class="more"><summary data-i18n="sides_margin_sum">Custom top / bottom</summary><div id="sides-margin"></div></details>
+          </div>
+          <div class="box-sec needs-img" data-noimg>
+            <div class="box-h"><span data-i18n="bg_label">Background color</span><span class="sp"></span><button data-reset="bg" data-i18n="reset_btn">Reset</button></div>
+            <div class="swatches" id="box-bg-swatches"></div>
+          </div>
+          <div class="box-sec needs-img">
+            <div class="box-h"><span data-i18n="border_label">Border</span><span class="sp"></span><button data-reset="border" data-i18n="reset_btn">Reset</button></div>
+            <div class="chips" id="chips-bstyle"></div>
+            <div class="chips" id="chips-bw" style="margin-top:6px"></div>
+            <div class="swatches small" id="box-bc-swatches"></div>
+          </div>
+          <div class="box-sec needs-img">
+            <div class="box-h"><span data-i18n="radius_label">Corner radius</span><span class="sp"></span><button data-reset="radius" data-i18n="reset_btn">Reset</button></div>
+            <div class="chips" id="chips-radius"></div>
+            <div class="slider-row"><input type="range" min="0" max="60" id="sl-radius"><output id="out-radius"></output></div>
+          </div>
+          <div class="box-sec needs-img">
+            <div class="box-h"><span data-i18n="shadow_label">Box shadow</span><span class="sp"></span><button data-reset="shadow" data-i18n="reset_btn">Reset</button></div>
+            <div class="shadow-row"><button data-shadow="none" data-i18n="shadow_none">None</button><button data-shadow="soft" data-i18n="shadow_soft">Soft</button><button data-shadow="medium" data-i18n="shadow_medium">Medium</button><button data-shadow="strong" data-i18n="shadow_strong">Strong</button></div>
+          </div>
+        </div>
+        <div class="panel-body" data-view="layers" hidden>
+          <div class="hint" style="margin-bottom:10px" data-i18n="layers_hint_top">Blocks on the page, in order. Click to select, hover to preview on canvas.</div>
+          <div class="layer-scope" id="layer-scope"></div>
+          <div id="layer-tree"></div>
+          <div class="hint" style="margin-top:10px" data-i18n-html="layers_hint_bottom">Drag a row to reorder: drop on <b>orange line</b> for above/below, drop into middle to place <b>inside</b>. Esc to cancel.</div>
+        </div>
+        <div class="panel-body" data-view="effects" hidden>
+          <div class="seg fx-tabs" id="fx-tabs"><button data-tab="effects" class="on" data-i18n="fx_tab_effects">Effects</button><button data-tab="timeline" data-i18n="fx_tab_timeline">Slide timeline</button></div>
+          <div id="fx-tab-effects">
+            <div class="fx-pick-hint" id="fx-nosel" data-i18n="fx_pick_block">Click a block on the slide to give it an effect.</div>
+            <div class="fx-pick-hint fx-target" id="fx-target" hidden></div>
+            <input type="hidden" id="fx-preset"><input type="hidden" id="fx-delay"><input type="hidden" id="fx-dur"><input type="hidden" id="fx-stagger">
+            <div id="fx-tiles"></div>
+            <div id="fx-sel" hidden>
+              <div class="sec-label" data-i18n="fx_timing">Timing</div>
+              <div class="fx-field"><span data-i18n="fx_start_after">Start after</span><output id="fx-delay-out"></output></div>
+              <div class="chips" id="fx-delay-chips"></div>
+              <input type="range" id="fx-delay-range" min="0" max="3000" step="50" value="0">
+              <div class="fx-field"><span data-i18n="fx_speed">Speed</span></div>
+              <div class="seg fx-speed" id="fx-speed"><button data-v="slow" data-i18n="fx_slow">Slow</button><button data-v="normal" data-i18n="fx_normal">Normal</button><button data-v="fast" data-i18n="fx_fast">Fast</button></div>
+              <label class="fx-switch"><input type="checkbox" id="fx-stagger-on"><span data-i18n="fx_one_by_one_toggle">One by one, for the items inside</span></label>
+              <button class="btn-soft" id="fx-preview" data-i18n="fx_preview">Preview</button>
+              <div class="fx-doc" id="fx-doc" hidden>
+                <label class="fx-switch"><input type="checkbox" id="fx-doc-on"><span data-i18n="fx_doc_switch">Play effects when the file is opened outside HTML Deck</span></label>
+                <div class="fx-doc-old" id="fx-doc-old" hidden><span id="fx-doc-state"></span><button class="btn-soft" id="fx-doc-btn" data-i18n="fx_update">Update the effects player</button></div>
+              </div>
+            </div>
+          </div>
+          <div id="fx-tab-timeline" hidden>
+            <div class="hint" style="margin-bottom:10px" data-i18n="fx_panel_hint">Effects run when presenting.</div>
+            <button class="btn-primary" id="fx-auto" style="width:100%"><span id="fx-auto-label" data-i18n="fx_auto_deck">Auto-animate this slide</span></button>
+            <div class="hint fx-auto-why" id="fx-auto-why"></div>
+            <button class="btn-soft" id="fx-play-slide" style="width:100%;margin:10px 0 12px"><svg class="icon sm"><use href="#i-play"/></svg><span data-i18n="fx_play_slide">Preview the whole slide</span></button>
+            <div id="fx-list"></div>
+          </div>
+        </div>
+        <div class="panel-body" data-view="review" hidden>
+          <div class="hint" data-i18n-html="review_hint">Select a block (or sweep several) and click <b>AI Feedback</b>. Then ask your agent to apply the feedback.</div>
+          <button class="btn-soft" id="fb-slide" style="width:100%;margin-bottom:12px"><svg class="icon sm ai"><use href="#i-ai"/></svg><span id="fb-slide-label"></span></button>
+          <div class="seg fb-filter" id="fb-filter"><button data-f="open" class="on"></button><button data-f="done"></button></div>
+          <div id="note-list"></div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <main class="stage empty" id="stage">
+        <div class="ctx idle" id="ctx">
+          <div class="idle-only"><svg class="icon sm"><use href="#i-pointer"/></svg><span id="idle-text">Click text to edit · drag from the background to select several blocks · hold Alt while clicking to select parent frame (card, column…)</span></div>
+          <select class="font-select needs-sel text-only" id="tb-font" data-i18n-title="font_title" title="Font family"></select>
+          <div class="size-ctl needs-sel text-only"><button id="tb-size-dn" data-i18n-title="size_dn" title="Decrease size">−</button><input id="tb-size" inputmode="decimal" data-i18n-title="font_size" title="Font size"><button id="tb-size-up" data-i18n-title="size_up" title="Increase size">+</button></div>
+          <div class="ctx-sep needs-sel text-only"></div>
+          <button class="tbtn label needs-sel img-only" id="tb-img-replace" data-i18n-title="replace_img_title" title="Replace image"><svg class="icon"><use href="#i-image"/></svg><span data-i18n="replace_img">Replace image</span><svg class="icon sm"><use href="#i-caret-down"/></svg></button>
+          <button class="tbtn label needs-sel img-only" id="tb-img-crop" data-i18n-title="crop_img_title" title="Crop &amp; align image (or double-click image)"><svg class="icon"><use href="#i-crop"/></svg><span data-i18n="crop_img">Crop &amp; align &amp; Crop &amp; align</span></button>
+          <div class="ctx-sep needs-sel img-only"></div>
+          <div class="crop-only crop-hint" data-i18n="crop_hint"><svg class="icon sm"><use href="#i-move"/></svg>Drag image to adjust visible crop area</div>
+          <button class="tbtn label crop-only" id="crop-cover" data-i18n="crop_cover" data-i18n-title="crop_cover_title" title="Image fills frame, overflow is cropped">Fill frame</button>
+          <button class="tbtn label crop-only" id="crop-contain" data-i18n="crop_contain" data-i18n-title="crop_contain_title" title="Show entire image, letterboxing if needed">Fit frame</button>
+          <button class="tbtn label crop-only crop-done" id="crop-done" data-i18n="crop_done">Xong</button>
+          <button class="tbtn color-btn needs-sel text-only" id="tb-color" data-i18n-title="text_color" title="Text color"><span class="a">A</span><span class="bar" id="tb-color-bar"></span></button>
+          <button class="tbtn needs-sel text-only" id="tb-bold" data-i18n-title="bold_title" title="Bold (Ctrl+B)"><span class="glyph" style="font-weight:800">B</span></button>
+          <button class="tbtn needs-sel text-only" id="tb-italic" data-i18n-title="italic_title" title="Italic (Ctrl+I)"><span class="glyph" style="font-style:italic;font-family:Georgia,serif">I</span></button>
+          <button class="tbtn needs-sel text-only" id="tb-underline" data-i18n-title="underline_title" title="Underline (Ctrl+U)"><span class="glyph" style="text-decoration:underline">U</span></button>
+          <button class="tbtn needs-sel text-only" id="tb-strike" data-i18n-title="strike_title" title="Strikethrough"><span class="glyph" style="text-decoration:line-through">S</span></button>
+          <button class="tbtn needs-sel text-only" id="tb-case" data-i18n-title="case_title" title="Uppercase"><span class="glyph" style="font-size:13px">aA</span></button>
+          <button class="tbtn needs-sel text-only" id="tb-link" data-i18n-title="link_title" title="Insert / edit link (Ctrl+K)"><svg class="icon"><use href="#i-link"/></svg></button>
+          <div class="ctx-sep needs-sel"></div>
+          <button class="tbtn needs-sel text-only" id="tb-align" data-i18n-title="align_title" title="Alignment"><svg class="icon"><use href="#i-al-left"/></svg></button>
+          <button class="tbtn needs-sel text-only" id="tb-spacing" data-i18n-title="spacing_title" title="Spacing"><svg class="icon"><use href="#i-spacing"/></svg></button>
+          <button class="tbtn needs-sel" id="tb-opacity" data-i18n-title="opacity_title" title="Opacity"><svg class="icon"><use href="#i-opacity"/></svg></button>
+          <button class="tbtn needs-sel" id="tb-fx" data-i18n-title="fx_title" title="Effect (presenting)"><svg class="icon"><use href="#i-play"/></svg></button>
+          <div class="ctx-sep needs-sel"></div>
+          <button class="tbtn label needs-sel" id="tb-box" data-i18n-title="box_btn_title" title="Box styles: padding, margin, bg, border, radius, shadow"><svg class="icon"><use href="#i-box"/></svg><span data-i18n="box_btn">Khung</span></button>
+          <button class="tbtn needs-sel" id="tb-clear" data-i18n-title="clear_title" title="Clear formatting"><svg class="icon"><use href="#i-eraser"/></svg></button>
+        </div>
+        <div class="pop" id="pop-spacing" hidden>
+          <label><span data-i18n="letter_spacing">Letter spacing</span> <output id="ls-out">0</output></label>
+          <input type="range" id="ls-range" min="-100" max="500" step="5">
+          <label><span data-i18n="line_height">Line height</span> <output id="lh-out">1.2</output></label>
+          <input type="range" id="lh-range" min="0.7" max="2.6" step="0.05">
+        </div>
+        <div class="pop img-pop" id="pop-img" hidden>
+          <button class="btn-primary" id="img-upload" data-i18n="upload_img"><svg class="icon sm"><use href="#i-laptop"/></svg>Upload image from computer</button>
+          <div class="hint" style="margin:6px 0 14px" data-i18n="img_drop_hint">Or drag &amp; drop image file directly onto the image on page.</div>
+          <label data-i18n="doc_img_label">Use image from document</label>
+          <div class="img-grid" id="img-grid"></div>
+          <label style="margin-top:14px" data-i18n="paste_img_link">Paste image link</label>
+          <div class="url-row"><input id="img-url" placeholder="https://…" autocomplete="off" spellcheck="false"><button class="btn-soft" id="img-url-apply" data-i18n="use_btn">Use</button></div>
+        </div>
+        <div class="pop link-pop" id="pop-alt" hidden>
+          <label data-i18n="alt_label">Image description (alt text)</label>
+          <div class="hint" style="margin:-2px 0 8px" data-i18n="alt_hint">Text displayed when image fails to load, and read by screen readers.</div>
+          <input type="text" id="alt-input" data-i18n-placeholder="alt_placeholder" placeholder="e.g., Company logo, Q3 Revenue Chart…" autocomplete="off">
+          <div class="row"><span class="grow"></span><button class="btn-soft" id="alt-cancel" data-i18n="cancel_btn">Cancel</button><button class="btn-primary" id="alt-apply" data-i18n="apply_btn">Apply</button></div>
+        </div>
+        <div class="pop link-pop" id="pop-link" hidden>
+          <label><span data-i18n="link_label">Link URL</span> <output id="link-mode"></output></label>
+          <input type="text" id="link-url" data-i18n-placeholder="link_url_ph" placeholder="https://…, mailto:…, #page-section" autocomplete="off" spellcheck="false">
+          <label class="check"><input type="checkbox" id="link-blank"> <span data-i18n="link_blank">Open in new tab</span></label>
+          <div class="row"><button class="btn-unlink" id="link-remove" data-i18n="link_remove">Remove link</button><span class="grow"></span><button class="btn-soft" id="link-cancel" data-i18n="cancel_btn">Cancel</button><button class="btn-primary" id="link-apply" data-i18n="apply_btn">Apply</button></div>
+        </div>
+        <div class="pop note-pop" id="pop-note" hidden>
+          <label data-i18n="note_label">Feedback cho AI Agent</label>
+          <div class="target" id="note-target"></div>
+          <textarea id="note-input" data-i18n-placeholder="note_placeholder" placeholder="e.g., change metric to Q3, shorten to 1 line, replace icon…"></textarea>
+          <div class="row"><button class="btn-soft" id="note-cancel" data-i18n="cancel_btn">Cancel</button><button class="btn-primary" id="note-save" data-i18n="note_save_btn">Save feedback</button></div>
+        </div>
+        <div class="pop" id="pop-opacity" hidden>
+          <label><span data-i18n="opacity_label">Opacity</span> <output id="op-out">100</output></label>
+          <input type="range" id="op-range" min="0" max="100" step="1">
+        </div>
+
+
+        <div class="scroller" id="scroller">
+          <div class="sizer" id="sizer"><div class="sheet" id="sheet"><iframe id="frame" title="Document editing view" data-i18n-title="frame_title"></iframe></div></div>
+        </div>
+
+        <div class="pins" id="pins"></div>
+        <div class="region-box" id="region-box" hidden></div>
+        <div class="multi-boxes" id="multi-boxes"></div>
+        <div class="pill multi-pill" id="multi-pill">
+          <div class="pill-group">
+            <span class="multi-count" id="multi-count"></span>
+            <span class="sep"></span>
+            <button id="multi-del" class="danger" data-i18n-title="multi_del_title" title="Delete these blocks (Delete)"><svg class="icon"><use href="#i-trash"/></svg></button>
+          </div>
+          <div class="pill-group pill-ai"><button id="multi-note" data-i18n-title="multi_note_title" title="AI Feedback for these blocks (Ctrl+Shift+M)"><svg class="icon ai"><use href="#i-ai"/></svg></button></div>
+        </div>
+        <div class="overlay" id="overlay">
+          <div class="offset-box" id="offset-box"><i class="m"></i><i class="m"></i><i class="m"></i><i class="m"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i></div>
+          <div class="hover-box" id="hover-box"></div>
+          <div class="snap-guides" id="snap-guides"></div>
+          <div class="sel-box" id="sel-box">
+            <span class="hd nw" data-h="nw"></span><span class="hd ne" data-h="ne"></span><span class="hd sw" data-h="sw"></span><span class="hd se" data-h="se"></span>
+            <span class="hd w" data-h="w"></span><span class="hd e" data-h="e"></span>
+            <span class="size-tip" id="size-tip"></span>
+          </div>
+          <input class="svg-text" id="svg-text" type="text" spellcheck="false" autocomplete="off" hidden>
+          <div class="pill" id="pill">
+            <div class="pill-group">
+              <button class="move" data-h="move" data-i18n-title="drag_move" title="Drag to move"><svg class="icon"><use href="#i-move"/></svg></button>
+              <span class="sep"></span>
+              <button id="pill-parent" data-i18n-title="select_parent" title="Select parent frame"><svg class="icon"><use href="#i-parent"/></svg></button>
+              <button id="pill-dup" data-i18n-title="dup_title" title="Duplicate (Ctrl+D)"><svg class="icon"><use href="#i-copy"/></svg></button>
+              <button id="pill-del" class="danger" data-i18n-title="del_title" title="Delete (Delete)"><svg class="icon"><use href="#i-trash"/></svg></button>
+              <button id="pill-more" data-i18n-title="more_title" title="More options"><svg class="icon"><use href="#i-more"/></svg></button>
+            </div>
+            <div class="pill-group pill-ai"><button id="pill-note" data-i18n-title="feedback_pill_title" title="AI Feedback (Ctrl+Shift+M)"><svg class="icon ai"><use href="#i-ai"/></svg></button></div>
+          </div>
+          <div class="menu" id="pill-menu" hidden>
+            <button id="m-alt" class="img-menu" data-i18n="m_alt"><svg class="icon sm"><use href="#i-type"/></svg>Image alt text</button>
+            <button id="m-flip" class="img-menu" data-i18n="m_flip"><svg class="icon sm"><use href="#i-flip"/></svg>Flip horizontal</button>
+            <button id="m-img-reset" class="img-menu" data-i18n="m_img_reset"><svg class="icon sm"><use href="#i-undo"/></svg>Reset original image</button>
+            <button id="m-up"><svg class="icon sm"><use href="#i-caret-up"/></svg><span data-i18n="m_up">Bring forward</span><kbd>Alt+↑</kbd></button>
+            <button id="m-down"><svg class="icon sm"><use href="#i-caret-down"/></svg><span data-i18n="m_down">Send backward</span><kbd>Alt+↓</kbd></button>
+            <button id="m-copy-style"><svg class="icon sm"><use href="#i-brush"/></svg><span data-i18n="m_copy_style">Copy style</span><kbd>Ctrl+Alt+C</kbd></button>
+            <button id="m-paste-style"><svg class="icon sm"><use href="#i-brush"/></svg><span data-i18n="m_paste_style">Paste style</span><kbd>Ctrl+Alt+V</kbd></button>
+            <button id="m-clear"><svg class="icon sm"><use href="#i-eraser"/></svg><span data-i18n="m_clear">Clear formatting</span></button>
+          </div>
+        </div>
+
+        <div class="empty-state">
+          <div class="empty-card">
+            <div class="badge"><svg class="icon lg"><use href="#i-file"/></svg></div>
+            <h3 data-i18n="empty_h3">Open an HTML document</h3>
+            <p data-i18n="empty_p">Select a file from workspace, open from computer, or drag &amp; drop here.</p>
+            <button class="btn-primary" id="empty-open" data-i18n="empty_btn"><svg class="icon sm"><use href="#i-folder"/></svg>Select Document</button>
+          </div>
+        </div>
+        <div class="findbar" id="findbar" hidden>
+          <div class="find-row">
+            <input type="text" id="find-q" data-i18n-placeholder="find_ph" placeholder="Find in document" autocomplete="off" spellcheck="false">
+            <span class="find-count" id="find-count"></span>
+            <label class="find-case" data-i18n-title="find_case" title="Match case"><input type="checkbox" id="find-case">Aa</label>
+            <button class="icon-btn" id="find-prev" data-i18n-title="find_prev" title="Previous match (Shift+Enter)"><svg class="icon sm"><use href="#i-caret-up"/></svg></button>
+            <button class="icon-btn" id="find-next" data-i18n-title="find_next" title="Next match (Enter)"><svg class="icon sm"><use href="#i-caret-down"/></svg></button>
+            <button class="icon-btn" id="find-close" data-i18n-title="close" title="Close"><svg class="icon sm"><use href="#i-x"/></svg></button>
+          </div>
+          <div class="find-row">
+            <input type="text" id="find-r" data-i18n-placeholder="replace_ph" placeholder="Replace with" autocomplete="off" spellcheck="false">
+            <button class="btn-soft" id="find-rep" data-i18n="replace_one">Thay</button>
+            <button class="btn-soft" id="find-all" data-i18n="replace_all">Replace all</button>
+          </div>
+        </div>
+        <div class="loading" id="loading"><div class="spinner"></div></div>
+        <div class="present-host" id="present-host"></div>
+      </main>
+
+      <div class="filmstrip" id="filmstrip" hidden></div>
+      <div class="notes" id="notes" hidden>
+        <div class="notes-head"><span id="notes-title" data-i18n="notes_drawer_title">Speaker Notes</span><button class="icon-btn" id="notes-close" data-i18n-title="close" title="Close"><svg class="icon sm"><use href="#i-x"/></svg></button></div>
+        <textarea id="notes-text" data-i18n-placeholder="notes_drawer_placeholder" placeholder="No notes for this slide"></textarea>
+      </div>
+      <footer class="statusbar">
+        <button class="sb-btn sb-trust" id="sb-ws-trust" hidden></button>
+        <button class="sb-btn sb-trust" id="sb-trust" hidden></button>
+        <button class="sb-btn sb-stale" id="disk-stale" hidden data-i18n="disk_stale">File changed on disk — review</button>
+        <button class="sb-btn" id="sb-notes" hidden data-i18n="speaker_notes"><svg class="icon sm"><use href="#i-notes"/></svg>Speaker notes</button>
+        <select class="sb-select" id="sb-mode" data-i18n-title="sb_mode_title" title="Document display mode">
+          <option value="auto" data-i18n="sb_auto">Auto detect</option><option value="deck" data-i18n="sb_deck">Slide deck</option><option value="page" data-i18n="sb_page">Web page</option>
+        </select>
+        <select class="sb-select" id="sb-width" data-i18n-title="sb_width_title" title="Page viewport width" hidden>
+          <option value="1920">Full HD 1920</option><option value="1600" selected>Desktop 1600</option><option value="1440">Desktop 1440</option><option value="1280">Desktop 1280</option><option value="1024">Tablet 1024</option><option value="768">Tablet 768</option><option value="390">Mobile 390</option>
+        </select>
+        <button class="sb-btn" id="sb-find" data-i18n-title="find_title" title="Find &amp; replace (Ctrl+F)"><svg class="icon sm"><use href="#i-search"/></svg><span data-i18n="find_btn">Find &amp; replace & thay</span></button>
+        <button class="sb-btn warn" id="sb-overflow" hidden data-i18n-title="overflow_title" title="Text overflows its frame — click to step through"></button>
+        <div class="spacer"></div>
+        <input type="range" class="zoom" id="zoom" min="10" max="300" value="100" data-i18n-title="zoom_title" title="Zoom">
+        <button class="sb-btn zoom-pct" id="zoom-pct" data-i18n-title="zoom_pct_title" title="Fit to screen (Ctrl+0)">100%</button>
+        <button class="sb-btn" id="sb-fit" data-i18n-title="sb_fit_title" title="Fit to screen"><svg class="icon sm"><use href="#i-fit"/></svg></button>
+        <span class="sb-btn page-count" id="page-count" hidden></span>
+        <button class="sb-btn" id="sb-prev" data-i18n-title="sb_prev_title" title="Previous page" hidden><svg class="icon sm"><use href="#i-left"/></svg></button>
+        <button class="sb-btn" id="sb-next" data-i18n-title="sb_next_title" title="Trang sau" hidden><svg class="icon sm"><use href="#i-right"/></svg></button>
+        <button class="sb-btn" id="sb-full" data-i18n-title="sb_full_title" title="Fullscreen"><svg class="icon sm"><use href="#i-expand"/></svg></button>
+        <button class="sb-btn" id="sb-help" data-i18n-title="sb_help_title" title="Shortcuts"><svg class="icon sm"><use href="#i-help"/></svg></button>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<div class="shield" id="shield"></div>
+<div class="drag-ghost" id="drag-ghost" hidden></div>
+<div class="drop-veil" id="drop-veil" data-i18n="drop_veil">Drop .html file to open</div>
+<input type="file" id="file-input" accept=".html,.htm,text/html" hidden>
+<input type="file" id="img-input" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,image/avif" hidden>
+
+<div class="modal-bg" id="modal-conflict">
+  <div class="modal">
+    <div class="modal-h"><h3 data-i18n="conflict_h">File changed on disk</h3></div>
+    <div class="modal-b" data-i18n="conflict_b">Someone (or another script) modified this file after you opened it. Overwriting will lose those changes — a backup is kept in .htmldeck_bak.</div>
+    <div class="modal-f"><button class="btn-soft" data-act="cancel" data-i18n="cancel_btn">Cancel</button><button class="btn-soft" data-act="download" data-i18n="conflict_dl">Download my version</button><button class="btn-danger" data-act="force" data-i18n="conflict_force">Overwrite anyway</button></div>
+  </div>
+</div>
+<div class="modal-bg disk-bg" id="modal-disk">
+  <div class="modal disk-modal">
+    <div class="modal-h"><h3 data-i18n="disk_h">An agent just changed this file</h3></div>
+    <div class="modal-b" data-i18n="disk_b">You have unsaved edits. Taking the agent's version downloads a copy of yours first, so nothing is lost.</div>
+    <div class="disk-actions">
+      <button class="btn-primary disk-reload" data-act="reload" data-i18n="disk_reload">Load the agent's version</button>
+      <button class="btn-soft" data-act="mine" data-i18n="disk_mine">Download my version</button>
+      <button class="link-btn" data-act="later" data-i18n="disk_later">Later</button>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="modal-reformat">
+  <div class="modal">
+    <div class="modal-h"><h3 data-i18n="reformat_h">This save rewrites the whole file</h3></div>
+    <div class="modal-b" data-i18n="reformat_b">Your edits could not be patched in place, so the whole file will be rewritten. Content stays the same, but line breaks, quotes… outside your edits may change. Files opened through the server keep a backup of the old version.</div>
+    <div class="modal-f"><button class="btn-soft" data-act="cancel" data-i18n="cancel_btn">Cancel</button><button class="btn-soft" data-act="download" data-i18n="reformat_dl">Download a copy</button><button class="btn-danger" data-act="save" data-i18n="reformat_save">Save anyway</button></div>
+  </div>
+</div>
+<div class="modal-bg" id="modal-fx">
+  <div class="modal">
+    <div class="modal-h"><h3 id="fx-modal-h"></h3></div>
+    <div class="modal-b"><p id="fx-modal-b"></p><pre class="fx-diff" id="fx-diff"></pre></div>
+    <div class="modal-f"><button class="btn-soft" data-act="cancel" data-i18n="cancel_btn">Cancel</button><button class="btn-primary" data-act="ok" id="fx-modal-ok"></button></div>
+  </div>
+</div>
+<div class="modal-bg" id="modal-keys">
+  <div class="modal">
+    <div class="modal-h"><h3 data-i18n="shortcuts_h">Keyboard Shortcuts</h3><button class="icon-btn" data-act="cancel" data-i18n-title="close"><svg class="icon"><use href="#i-x"/></svg></button></div>
+    <div class="modal-b keys">
+      <span data-i18n="k_save">Save</span><kbd>Ctrl + S</kbd>
+      <span data-i18n="k_undo_redo">Undo / Redo</span><kbd>Ctrl + Z · Ctrl + Shift + Z</kbd>
+      <span data-i18n="k_esc">Exit text editing → select block</span><kbd>Esc</kbd>
+      <span data-i18n="k_enter">Edit text of selected block</span><kbd>Enter</kbd>
+      <span data-i18n="k_del_dup">Delete / Duplicate block</span><kbd>Delete · Ctrl + D</kbd>
+      <span data-i18n="k_nudge">Nudge block (1px / 10px)</span><kbd>← → ↑ ↓ · Shift</kbd>
+      <span data-i18n="k_alt_click">Select parent frame (card, column…)</span><kbd data-i18n="k_alt_click_kbd">Alt + click</kbd>
+      <span data-i18n="k_ai_note">Feedback cho AI Agent</span><kbd>Ctrl + Shift + M</kbd>
+      <span data-i18n="k_link">Insert / edit link</span><kbd>Ctrl + K</kbd>
+      <span data-i18n="k_reorder">Move block up / down</span><kbd>Alt + ↑ / ↓</kbd>
+      <span data-i18n="k_nav">Sang trang</span><kbd data-i18n="k_nav_kbd">← → when unselected</kbd>
+      <span data-i18n="k_zoom">Zoom in / out / fit</span><kbd data-i18n="k_zoom_kbd">Ctrl + / − / 0 · Ctrl + wheel</kbd>
+      <span data-i18n="k_copy_paste_style">Copy / Paste style</span><kbd>Ctrl + Alt + C / V</kbd>
+      <span data-i18n="k_format">Bold / Italic / Underline</span><kbd>Ctrl + B / I / U</kbd>
+      <span data-i18n="k_find">Find in document</span><kbd>Ctrl + F</kbd>
+      <span data-i18n="k_replace">Find &amp; replace & thay</span><kbd>Ctrl + H</kbd>
+      <span data-i18n="k_find_step">Next / previous match</span><kbd>Enter · Shift + Enter</kbd>
+    </div>
+  </div>
+</div>
+
+<button id="btn-download" hidden aria-hidden="true" tabindex="-1"></button>
+<div class="lang-menu export-menu" id="pop-export" role="menu">
+  <div class="lang-title" data-i18n="export_menu_title">Save</div>
+  <button class="lang-opt" data-x="single"><svg class="icon sm"><use href="#i-code"/></svg><span class="name"><b data-i18n="export_single">HTML</b><small data-i18n="export_single_sub">A single file with all images, styles and scripts included. Share it and open it anywhere.</small></span></button>
+  <button class="lang-opt" data-x="pdf"><svg class="icon sm"><use href="#i-file"/></svg><span class="name"><b data-i18n="export_pdf">PDF</b><small data-i18n="export_pdf_sub">Export as a PDF file.</small></span></button>
+  <label class="export-remote"><input type="checkbox" id="export-remote" checked> <span data-i18n="export_remote">Include online resources (scripts and fonts loaded from the web). Requires an internet connection.</span></label>
+</div>
+<div class="lang-menu" id="pop-lang" role="menu">
+  <div class="lang-title" data-i18n="lang_select_title">Select Language</div>
+  <button class="lang-opt" data-lang="vi">
+    <span class="flag">🇻🇳</span>
+    <span class="name">Tiếng Việt</span>
+    <svg class="icon sm check" viewBox="0 0 24 24" style="stroke-width:2.5"><path d="M20 6 9 17l-5-5"/></svg>
+  </button>
+  <button class="lang-opt" data-lang="en">
+    <span class="flag">🇬🇧</span>
+    <span class="name">English</span>
+    <svg class="icon sm check" viewBox="0 0 24 24" style="stroke-width:2.5"><path d="M20 6 9 17l-5-5"/></svg>
+  </button>
+  <button class="lang-opt" data-lang="zh">
+    <span class="flag">🇨🇳</span>
+    <span class="name">中文</span>
+    <svg class="icon sm check" viewBox="0 0 24 24" style="stroke-width:2.5"><path d="M20 6 9 17l-5-5"/></svg>
+  </button>
+  <button class="lang-opt" data-lang="zh-Hant">
+    <span class="flag">🇹🇼</span>
+    <span class="name">繁體中文</span>
+    <svg class="icon sm check" viewBox="0 0 24 24" style="stroke-width:2.5"><path d="M20 6 9 17l-5-5"/></svg>
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="js/app.mjs"></script>
+</body>
+</html>
