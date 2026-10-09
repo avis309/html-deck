@@ -42,6 +42,11 @@ def test_all_manifests_name_the_same_plugin():
     assert codex_mp["plugins"][0]["source"] == {"source": "local", "path": "./"}
 
 
+def test_both_manifests_show_the_same_display_name():
+    # The plugin directory titles the listing from displayName (else it capitalises name).
+    assert _json(".claude-plugin/plugin.json")["displayName"] == _json(".codex-plugin/plugin.json")["interface"]["displayName"] == "HTML Deck"
+
+
 def test_manifests_carry_author_and_license():
     for rel in (".claude-plugin/plugin.json", ".codex-plugin/plugin.json"):
         data = _json(rel)
