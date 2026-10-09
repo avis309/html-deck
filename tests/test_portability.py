@@ -1,6 +1,7 @@
 """Behaviour that differs by OS: file locking, console encoding, output seen through a pipe."""
 import os
 import queue
+import re
 import socket
 import subprocess
 import sys
@@ -63,7 +64,8 @@ def test_banner_url_line_is_flushed_when_piped(tmp_path):
                 continue
             if line.startswith("HTMLDECK_URL="):
                 url = line.split("=", 1)[1]
-        assert url and url.startswith("http://127.0.0.1:")
+        # The link carries this run's session key: the API answers no one without it.
+        assert url and re.fullmatch(r"http://127\.0\.0\.1:\d+/\?token=[\w-]{40,}", url), url
     finally:
         proc.terminate()
         proc.wait(timeout=10)

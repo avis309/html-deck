@@ -32,7 +32,8 @@ it prints.
    - Claude Code: Bash with `run_in_background: true`: `RUN --root "<workspace>" --file "<doc>"`
    - Other shells (macOS/Linux): `RUN --root "<workspace>" --file "<doc>" > "${TMPDIR:-/tmp}/htmldeck.log" 2>&1 &`
    - PowerShell: `Start-Process -WindowStyle Hidden -FilePath "<plugin root>/scripts/htmldeck-run.cmd" -ArgumentList '--root','"<workspace>"','--file','"<doc>"' -RedirectStandardOutput "$env:TEMP\htmldeck.log" -RedirectStandardError "$env:TEMP\htmldeck.err"` (errors land in `htmldeck.err`)
-3. Read its output until the line `HTMLDECK_URL=http://127.0.0.1:<port>` and give the user that URL.
+3. Read its output until the line `HTMLDECK_URL=http://127.0.0.1:<port>/?token=<key>` and give the user that
+   URL whole: the key is what lets the browser in (without it the page says to open the printed link).
    The browser opens by itself; add `--no-browser` when there is no desktop (SSH, container) or the
    user asked not to.
 4. If a server you started earlier in this conversation still runs for the same workspace, give

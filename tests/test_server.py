@@ -174,10 +174,20 @@ def server(root):
     httpd.server_close()
 
 
+def _local(port):
+    """What the editor sends: a local Host and this run's session key."""
+    return {"Host": f"127.0.0.1:{port}", ed.SESSION_HEADER: ed.HTMLEditorHandler.session_token}
+
+
+def _watch(path):
+    """The watch stream takes the key in its query (EventSource cannot send headers)."""
+    return f"{path}&key={ed.HTMLEditorHandler.session_token}"
+
+
 def _request(port, method, path, body=None, headers=None):
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
     # What the browser sends for the editor's own fetches (page scripts cannot set it).
-    hdrs = {"Host": f"127.0.0.1:{port}", "Sec-Fetch-Site": "same-origin"}
+    hdrs = {**_local(port), "Sec-Fetch-Site": "same-origin"}
     hdrs.update(headers or {})
     conn.request(method, path, body=body, headers=hdrs)
     res = conn.getresponse()
@@ -202,7 +212,7 @@ def test_http_config_reports_whether_file_was_explicit(server):
 
 def test_http_root_redirect_keeps_query(server):
     conn = http.client.HTTPConnection("127.0.0.1", server, timeout=5)
-    conn.request("GET", "/?file=output/deck/a.html", headers={"Host": f"127.0.0.1:{server}"})
+    conn.request("GET", "/?file=output/deck/a.html", headers={**_local(server)})
     res = conn.getresponse()
     res.read()
     conn.close()
@@ -243,7 +253,7 @@ def test_http_api_requires_same_origin_fetch(server):
     for site in ("same-site", "cross-site", "none", None):
         hdrs = {"Content-Type": "application/json", "Sec-Fetch-Site": site} if site else {"Content-Type": "application/json"}
         conn = http.client.HTTPConnection("127.0.0.1", server, timeout=5)
-        conn.request("POST", "/api/save", body=body, headers={"Host": f"127.0.0.1:{server}", **{k: v for k, v in hdrs.items()}})
+        conn.request("POST", "/api/save", body=body, headers={**_local(server), **{k: v for k, v in hdrs.items()}})
         res = conn.getresponse()
         res.read()
         conn.close()
@@ -251,9 +261,63 @@ def test_http_api_requires_same_origin_fetch(server):
     assert _request(server, "GET", "/api/config", headers={"Sec-Fetch-Site": "same-site"})[0] == 403
 
 
+def test_http_api_requires_the_session_key(server, root):
+    # Another program on the machine sends any header it likes, but not this run's key.
+    before = (root / "output/deck/a.html").read_bytes()
+    body = json.dumps({"path": "output/deck/a.html", "content": "<p>pwn</p>"})
+    token = ed.HTMLEditorHandler.session_token
+    calls = (("GET", "/api/config", None), ("GET", "/api/load?path=output/deck/a.html", None),
+             ("GET", "/api/watch?path=output/deck/a.html", None), ("POST", "/api/save", body))
+    # No key, a wrong one, a cookie (never read: a cookie goes to every port of the host), and a
+    # key in the query of anything but the watch stream.
+    for extra, query in (({}, ""), ({ed.SESSION_HEADER: "guess"}, ""), ({ed.SESSION_HEADER: token[:-1]}, ""),
+                         ({"Cookie": f"htmldeck_session={token}"}, ""), ({}, f"&key={token}")):
+        for method, path, data in calls:
+            if path.startswith("/api/watch") and query:
+                continue
+            conn = http.client.HTTPConnection("127.0.0.1", server, timeout=5)
+            url = path + (("&" if "?" in path else "?") + query[1:] if query else "")
+            conn.request(method, url, body=data, headers={"Host": f"127.0.0.1:{server}", **extra, "Sec-Fetch-Site": "same-origin", "Content-Type": "application/json"})
+            res = conn.getresponse()
+            assert res.status == 403 and json.loads(res.read()).get("session") is True, (extra, query, path)
+            conn.close()
+    assert (root / "output/deck/a.html").read_bytes() == before
+    # The watch stream: the key in its query (a wrong one refused).
+    assert _request(server, "GET", "/api/watch?path=output/deck/a.html&key=guess")[0] == 403
+
+
+def test_http_printed_link_hands_the_key_to_the_editor_in_the_fragment(server):
+    def get(path):
+        conn = http.client.HTTPConnection("127.0.0.1", server, timeout=5)
+        conn.request("GET", path, headers={"Host": f"127.0.0.1:{server}"})
+        res = conn.getresponse()
+        data = res.read()
+        conn.close()
+        return res, data
+    token = ed.HTMLEditorHandler.session_token
+    res, _ = get(f"/?token={token}&file=output%2Fdeck%2Fa.html")
+    # The key moves to the fragment (never sent to a server again); the file asked for is kept.
+    assert res.status == 302 and res.getheader("Location") == f"/__htmldeck/index.html?file=output%2Fdeck%2Fa.html#key={token}"
+    assert not res.getheader("Set-Cookie") and res.getheader("Cache-Control") == "no-store"   # it holds the key
+    assert get(f"/__htmldeck/index.html?token={token}")[0].getheader("Location") == f"/__htmldeck/index.html#key={token}"
+    # A wrong key gets a page saying which link to open.
+    for path in ("/?token=guess", "/?token=", f"/index.html?token={token}x"):
+        res, data = get(path)
+        assert res.status == 403 and b"HTMLDECK_URL" in data and not res.getheader("Location"), path
+
+
+def test_http_log_never_shows_a_session_key(server, capsys):
+    token = ed.HTMLEditorHandler.session_token
+    _request(server, "GET", _watch("/api/watch?path=../x.html"))
+    _request(server, "GET", f"/?token={token}&file=/api/x.html")
+    _request(server, "GET", f"/api/watch?path=../x.html&k%65y={token}")   # the name encoded
+    out = capsys.readouterr().out
+    assert "/api/watch?path=..%2Fx.html HTTP" in out and token not in out
+
+
 def _head(port, path):
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
-    conn.request("GET", path, headers={"Host": f"127.0.0.1:{port}"})
+    conn.request("GET", path, headers={**_local(port)})
     res = conn.getresponse()
     res.read()
     conn.close()
@@ -627,10 +691,10 @@ def test_watch_reports_the_notes_sidecar(root):
 
 
 def test_http_watch_streams_events_and_guards_the_path(server, root):
-    assert _request(server, "GET", "/api/watch?path=../x.html")[0] == 403
-    assert _request(server, "GET", "/api/watch?path=output/deck/a.html", headers={"Sec-Fetch-Site": "cross-site"})[0] == 403
+    assert _request(server, "GET", _watch("/api/watch?path=../x.html"))[0] == 403
+    assert _request(server, "GET", _watch("/api/watch?path=output/deck/a.html"), headers={"Sec-Fetch-Site": "cross-site"})[0] == 403
     conn = http.client.HTTPConnection("127.0.0.1", server, timeout=5)
-    conn.request("GET", "/api/watch?path=output/deck/a.html&rev=stale", headers={"Host": f"127.0.0.1:{server}", "Sec-Fetch-Site": "same-origin"})
+    conn.request("GET", _watch("/api/watch?path=output/deck/a.html&rev=stale"), headers={**_local(server), "Sec-Fetch-Site": "same-origin"})
     res = conn.getresponse()
     assert res.status == 200 and res.getheader("Content-Type").startswith("text/event-stream")
     seen = b""
@@ -668,7 +732,7 @@ def test_save_reports_the_revision_of_what_it_wrote(root):
 def test_http_watch_lets_go_of_a_closed_tab_at_once(server):
     free = ed.WATCH_SLOTS._value
     conn = http.client.HTTPConnection("127.0.0.1", server, timeout=5)
-    conn.request("GET", "/api/watch?path=output/deck/a.html", headers={"Host": f"127.0.0.1:{server}", "Sec-Fetch-Site": "same-origin"})
+    conn.request("GET", _watch("/api/watch?path=output/deck/a.html"), headers={**_local(server), "Sec-Fetch-Site": "same-origin"})
     res = conn.getresponse()
     res.fp.readline()
     assert ed.WATCH_SLOTS._value == free - 1
@@ -823,7 +887,7 @@ def test_editor_files_share_one_connection(server):
     # The editor loads ~65 modules per page: one TCP connection each ran Windows out of socket
     # buffers (net::ERR_NO_BUFFER_SPACE). They are kept alive on one connection now.
     conn = http.client.HTTPConnection("127.0.0.1", server, timeout=5)
-    hdrs = {"Host": f"127.0.0.1:{server}"}
+    hdrs = {**_local(server)}
     for path in ("/__htmldeck/js/app.mjs", "/__htmldeck/css/editor.css", "/", "/__htmldeck/index.html"):
         conn.request("GET", path, headers=hdrs)
         res = conn.getresponse()

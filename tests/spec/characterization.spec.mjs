@@ -5,6 +5,8 @@
  * "download" button, the file on disk, the DOM of the editor and its iframe. It never calls the
  * editor's functions or globals, so it holds whatever the code's internal structure.
  * The one signal the editor exposes for tests: <body data-doc-state data-doc-path data-doc-seq>.
+ * Each browser context holds the session key the printed link would give it (sessionKey checks
+ * the link itself), so scenarios open the editor at its plain address.
  *
  * Run: `npm run spec` or `node tests/spec/characterization.spec.mjs [--fixtures-only | --real-only]`.
  * Fixtures are copied into a temporary workspace (the system temp folder) and the server runs
@@ -60,6 +62,18 @@ function firstDiff(a, b) {
 const section = t => console.log(`\n┌─ ${t}`);
 
 // ---------------------------------------------------------------- server
+// Each run's session key, by its address: every new browser context carries all of them.
+const SESSIONS = new Map();
+function signedIn(browser) {
+  const newContext = browser.newContext.bind(browser);
+  browser.newContext = async (...a) => {
+    const ctx = await newContext(...a);
+    await ctx.addInitScript(keys => { if (keys[location.origin]) try { localStorage.setItem('htmldeck_session_key', keys[location.origin]); } catch {} }, Object.fromEntries(SESSIONS));
+    return ctx;
+  };
+  browser.anonymousContext = newContext;
+  return browser;
+}
 function startServer(extra = [], root = WORK, { trust = true } = {}) {
   return new Promise((resolve, reject) => {
     const args = ['-u', '-m', 'htmldeck', '--root', root, '--no-browser', '--port', '0', ...(trust ? ['--trust'] : []), ...extra];
@@ -70,8 +84,8 @@ function startServer(extra = [], root = WORK, { trust = true } = {}) {
     proc.on('error', fail);
     proc.stdout.on('data', d => {
       out += d;
-      const m = out.match(/Editor URL\s*:\s*(http:\/\/127\.0\.0\.1:\d+)/);
-      if (m) { clearTimeout(timer); resolve({ proc, url: m[1] }); }
+      const m = out.match(/Editor URL\s*:\s*((http:\/\/127\.0\.0\.1:\d+)\/\?token=([\w-]+))/);
+      if (m) { clearTimeout(timer); SESSIONS.set(m[2], m[3]); resolve({ proc, url: m[2], link: m[1] }); }
     });
     proc.stderr.on('data', d => { out += d; });
     proc.on('exit', code => { clearTimeout(timer); reject(new Error(`server exited (${code}): ${out}`)); });
@@ -1187,6 +1201,34 @@ async function mutating(browser, url) {
   await s.close();
 }
 
+// The printed link is the way in: a browser without its key gets a page that says so, never the
+// editor or the API; with it, the editor opens at an address that no longer shows the key.
+async function sessionKey(browser, server) {
+  section('session key: only the printed link opens the editor and its API');
+  const ctx = await browser.anonymousContext();
+  const pg = await ctx.newPage();
+  const errors = [];
+  pg.on('pageerror', e => errors.push(e.message));
+  await pg.goto(server.url + '/');
+  await pg.waitForFunction(() => /session key/.test(document.querySelector('#toast')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
+  check('no key: the editor says to open the printed link', /HTML Deck printed|htmldeck printed/.test(await pg.textContent('#toast')), await pg.textContent('#toast'));
+  const api = await pg.evaluate(() => fetch('/api/config').then(r => r.status));
+  check('no key: the API refuses', api === 403, String(api));
+  const res = await pg.goto(server.link.replace(/token=[\w-]+/, 'token=guess'));
+  check('a wrong key: a page says to open the printed link, no editor', res.status() === 403 && /HTMLDECK_URL/.test(await pg.textContent('body')) && !(await pg.locator('#frame').count()));
+  await pg.goto(`${server.link}&file=${encodeURIComponent(wpath('deck.html'))}`);
+  await pg.waitForFunction(p => document.body.dataset.docState === 'ready' && document.body.dataset.docPath === p, wpath('deck.html'), { timeout: 30000 });
+  check('the printed link (+ ?file): the editor opens that file, the key gone from the address', !/token|key=/.test(pg.url()) && /file=/.test(pg.url()), pg.url());
+  check('the key is not a cookie (a cookie of 127.0.0.1 goes to every port)', !(await ctx.cookies()).length);
+  const pg2 = await ctx.newPage();
+  pg2.on('pageerror', e => errors.push(e.message));
+  await pg2.goto(server.url + '/');
+  await pg2.waitForFunction(() => document.body.dataset.docState === 'ready', null, { timeout: 30000 });
+  check('the plain address works afterwards in that browser (another tab too)', true);
+  check('no JS errors', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
 async function bootOrder(browser) {
   section('which file opens at start: ?file > --file > last file > default');
   const explicit = await startServer(['--file', path.join(WORK, 'deck.html')]);
@@ -1216,7 +1258,7 @@ async function bootOrder(browser) {
     await s.page.goto(plain.url + '/');
     // No --file and the last file is gone: nothing to fall back to, the file list opens.
     await s.page.waitForFunction(() => { const p = document.querySelector('#panel'); return p.classList.contains('open') && p.dataset.view === 'files'; }, null, { timeout: 15000 });
-    const cfg = await s.page.evaluate(() => fetch('/api/config').then(r => r.json()));
+    const cfg = await s.page.evaluate(() => fetch('/api/config', { headers: { 'X-HtmlDeck-Key': localStorage.getItem('htmldeck_session_key') } }).then(r => r.json()));
     check('last file gone, no --file: opens the file list', cfg.default_path === null);
     await s.close();
   } finally { await stopServer(plain); }
@@ -2045,12 +2087,14 @@ try {
   // reveal.js inside the workspace (the server never serves files outside it).
   for (const d of ['dist', 'plugin']) fs.cpSync(path.join(ROOT, 'node_modules/reveal.js', d), path.join(WORK, 'reveal', d), { recursive: true });
   server = await startServer(['--test-hooks']);
-  browser = await chromium.launch();
+  browser = signedIn(await chromium.launch());
   if (!args.has('--real-only')) {
     for (const scenario of [detection, moduleBurst, textColourHistory, modeSwitch, structural, svgDiagram, dragMove, liveSync, regionFeedback, feedbackAccess, serverDown, exportSpec, conflict, rewriteFallback, saveInFlight, failedStep, failedSingleStep, draftRestore, language, mutating, present, reveal, effects, fxModules, workspaceTrust, motion, scenesSpec, remoteScriptsSpec, malformed, untrustedSpec, regressionsSpec, runtimeCssSpec]) {
       try { await scenario(browser, server.url); }
       catch (e) { failures.push(`${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); console.log(`  ✖ ${scenario.name} stopped half way: ${e.message.split('\n')[0]}`); }
     }
+    try { await sessionKey(browser, server); }
+    catch (e) { failures.push(`sessionKey stopped half way: ${e.message.split('\n')[0]}`); console.log(`  ✖ sessionKey: ${e.message.split('\n')[0]}`); }
     try { await bootOrder(browser); }
     catch (e) { failures.push(`bootOrder stopped half way: ${e.message.split('\n')[0]}`); console.log(`  ✖ bootOrder: ${e.message.split('\n')[0]}`); }
   }

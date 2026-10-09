@@ -6,6 +6,9 @@ The workspace is the folder HtmlDeck is started in (or ``--root``): every docume
 relative to it. The editor UI ships with this package and is served under ``/__htmldeck/``.
 Serves the editor UI plus a small JSON API bound to 127.0.0.1:
 
+Every API call needs this run's session key (from the printed link), so another program on the
+machine cannot call it either:
+
 - ``GET  /api/config``    default document to open
 - ``GET  /api/list_html`` HTML files in the workspace
 - ``GET  /api/load``      document source + mtime and revision (for conflict detection)
@@ -34,6 +37,7 @@ import argparse
 import contextlib
 import errno
 import hashlib
+import hmac
 import http.server
 import json
 import math
@@ -64,6 +68,19 @@ else:
 WEB_DIR = Path(__file__).resolve().parent / "web"
 EDITOR_HTML = WEB_DIR / "index.html"
 EDITOR_PREFIX = "/__htmldeck/"
+EDITOR_ENTRY = ("/", "/index.html", EDITOR_PREFIX + "index.html")
+# The session key of a run: printed in the link (?token=), handed to the editor in the address
+# fragment, then sent by it with every API call. Not a cookie: a browser sends a cookie of
+# 127.0.0.1 to every port, so any other local server the browser calls would get the key.
+SESSION_HEADER = "X-HtmlDeck-Key"
+SESSION_ERROR = "This tab has no valid HTML Deck session key (htmldeck was restarted, or the address was typed): open the link htmldeck printed"
+SESSION_LOCKED_HTML = (
+    "<!doctype html><meta charset=utf-8><title>HTML Deck</title>"
+    "<body style=\"font:16px system-ui;max-width:36em;margin:4em auto;padding:0 1em\">"
+    "<h1>Open the link HTML Deck printed</h1>"
+    "<p>This link has no valid session key. Use the link <code>htmldeck</code> printed when it "
+    "started (the line <code>HTMLDECK_URL=…</code>), or start it again.</p>"
+).encode("utf-8")
 
 HTML_SUFFIXES = {".html", ".htm"}
 LIST_SKIP_PARTS = {"tmp", "node_modules", "venv", "__pycache__", "site-packages"}
@@ -708,6 +725,9 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
     explicit_file: bool = False  # --file given: open it instead of the browser's last file
     test_hooks: bool = False  # --test-hooks: the UI honours fault-injection URL params (spec only)
     trusted_session: bool = False  # --trust: this run trusts the workspace without remembering it
+    # Host / Origin / Sec-Fetch-Site stop web pages; this key stops other programs on the machine,
+    # which can send any header but do not know it. New for every run.
+    session_token: str = secrets.token_urlsafe(32)
     # Keep-alive: the editor loads ~65 modules per page; one TCP connection each ran Windows out
     # of socket buffers (net::ERR_NO_BUFFER_SPACE). Idle connections close after `timeout` s.
     protocol_version = "HTTP/1.1"
@@ -717,6 +737,7 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
         # One handler serves every request of a kept-alive connection: per-request state (the
         # CSP chosen for a workspace file) must not carry over to the next request.
         self._csp = None
+        self._cache = None
         super().handle_one_request()
 
     def _trusted(self) -> bool:
@@ -762,12 +783,45 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(origin)
         return parsed.scheme == "http" and parsed.netloc in self._local_origins()
 
+    def _key_ok(self, key: str | None) -> bool:
+        return hmac.compare_digest((key or "").encode(), self.session_token.encode())
+
+    def _session_ok(self, parsed) -> bool:
+        # EventSource cannot send headers: the watch stream alone takes the key in its query.
+        if parsed.path == "/api/watch":
+            return self._key_ok(urllib.parse.parse_qs(parsed.query).get("key", [""])[0])
+        return self._key_ok(self.headers.get(SESSION_HEADER))
+
+    def _open_session(self, parsed):
+        """The printed link: the editor opens with the key in its address fragment (which the
+        editor moves to its storage), so the key is not sent again in a URL or a Referer."""
+        query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+        if not self._key_ok(next((v for k, v in query if k == "token"), "")):
+            self._send_locked()
+            return
+        rest = urllib.parse.urlencode([(k, v) for k, v in query if k != "token"])
+        self.send_response(302)
+        self.send_header("Location", EDITOR_PREFIX + "index.html" + ("?" + rest if rest else "") + "#key=" + self.session_token)
+        self._cache = "no-store"   # it holds the key
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _send_locked(self):
+        self.send_response(403)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(SESSION_LOCKED_HTML)))
+        self.end_headers()
+        self.wfile.write(SESSION_LOCKED_HTML)
+
     # --- routing --------------------------------------------------------
     def do_GET(self):
         if not self._host_ok():
             self._send_json({"error": "Invalid Host"}, 403)
             return
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path in EDITOR_ENTRY and "token" in urllib.parse.parse_qs(parsed.query, keep_blank_values=True):
+            self._open_session(parsed)
+            return
         route = {
             "/api/config": self._api_config,
             "/api/list_html": self._api_list_html,
@@ -776,6 +830,9 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
             "/api/watch": self._api_watch,
         }.get(parsed.path)
         if route:
+            if not self._session_ok(parsed):
+                self._send_json({"error": SESSION_ERROR, "session": True}, 403)
+                return
             if not self._same_origin_fetch():
                 self._send_json({"error": "Only the editor may call the API"}, 403)
                 return
@@ -846,6 +903,9 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"error": "Invalid Origin"}, 403)
             return
         parsed = urllib.parse.urlparse(self.path)
+        if not self._session_ok(parsed):
+            self._send_json({"error": SESSION_ERROR, "session": True}, 403)
+            return
         route = {"/api/save": self._api_save, "/api/preview": self._api_preview, "/api/notes": self._api_notes_post,
                  "/api/export": self._api_export, "/api/trust": self._api_trust}.get(parsed.path)
         if route is None:
@@ -1019,17 +1079,24 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     _csp: str | None = None
+    _cache: str | None = None
 
     def end_headers(self):
         if not self.path.startswith("/api/"):
-            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Cache-Control", self._cache or "no-cache")
         if self._csp:
             self.send_header("Content-Security-Policy", self._csp)
         super().end_headers()
 
     def log_message(self, format, *args):
-        if args and "/api/" in str(args[0]):
-            sys.stdout.write(f"[editor] {args[0]} - {args[1]}\n")
+        # API calls only, by their path (a query may hold "/api/"), never with a key in the line.
+        parts = str(args[0]).split() if args else []
+        url = urllib.parse.urlparse(parts[1]) if len(parts) > 1 else None
+        if url and url.path.startswith("/api/"):
+            # Names compared decoded (k%65y= is key=): a key never reaches the log.
+            query = urllib.parse.urlencode([(k, v) for k, v in urllib.parse.parse_qsl(url.query, keep_blank_values=True) if k not in ("key", "token")])
+            line = " ".join([parts[0], url.path + ("?" + query if query else ""), *parts[2:]])
+            sys.stdout.write(f"[editor] {line} - {args[1]}\n")
             sys.stdout.flush()
 
 
@@ -1173,7 +1240,7 @@ def main(argv: list[str] | None = None):
     HTMLEditorHandler.trusted_session = args.trust
     httpd = bind_server(args.port)
     preview = start_preview_origin(root)
-    url = f"http://127.0.0.1:{httpd.server_address[1]}"
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/?token={HTMLEditorHandler.session_token}"
     print("============================================================")
     print("  HtmlDeck · by Avis (hunganh.freeze@gmail.com)")
     print(f"  Workspace     : {root}")

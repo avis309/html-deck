@@ -40,7 +40,11 @@ async function boot() {
   updateChrome();
   let cfg = {};
   try { cfg = await api('/api/config'); }
-  catch (e) { if (e.status === 404) toast('Server is running an older version — please restart htmldeck', { err: true, ms: 10000 }); }
+  catch (e) {
+    if (e.status === 404) toast('Server is running an older version — please restart htmldeck', { err: true, ms: 10000 });
+    // Opened without this run's key (an old tab, a typed address): nothing works until the printed link is.
+    if (e.session) return toast(e.message, { err: true, ms: 24 * 3600e3 });
+  }
   // Presenting runs on this second origin (no API there); the editor's own origin otherwise.
   S.previewOrigin = cfg.preview_origin || location.origin;
   // The workspace's own scripts run in the edit view only once the user trusted the workspace.

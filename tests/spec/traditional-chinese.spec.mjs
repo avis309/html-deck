@@ -28,7 +28,7 @@ try {
     const timer = setTimeout(() => reject(new Error(output || 'Server startup timed out')), 15000);
     proc.stdout.on('data', data => {
       output += data;
-      const match = output.match(/Editor URL\s*:\s*(http:\/\/127\.0\.0\.1:\d+)/);
+      const match = output.match(/Editor URL\s*:\s*(http:\/\/127\.0\.0\.1:\d+\/\?token=[\w-]+)/);
       if (match) { clearTimeout(timer); resolve(match[1]); }
     });
     proc.stderr.on('data', data => { output += data; });
@@ -42,7 +42,7 @@ try {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(`${url}/?file=deck.html`);
+    await page.goto(`${url}&file=deck.html`);   // the printed link (with its session key)
     await page.waitForFunction(() => document.body.dataset.docState === 'ready');
     assert.equal(await page.getAttribute('html', 'lang'), 'zh-Hant');
     assert.equal((await page.locator('#btn-save').textContent()).trim(), '儲存');

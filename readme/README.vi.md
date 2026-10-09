@@ -82,7 +82,8 @@ htmldeck --file <file>.html       # mở tài liệu đó trước
 htmldeck --root <folder> --port 6789 --no-browser
 ```
 
-HTML Deck chạy trên máy của bạn (`127.0.0.1`). **Lưu** giữ một bản sao lưu cho mỗi phiên bản trong
+HTML Deck chạy trên máy của bạn (`127.0.0.1`) và mở bằng đường link nó in ra: link đó mang một
+khóa riêng cho lần chạy, nên chương trình khác trên máy không dùng được editor. **Lưu** giữ một bản sao lưu cho mỗi phiên bản trong
 `.htmldeck_bak/`. **Lưu ▾** còn cho bạn một bản để chia sẻ: một file HTML đã gói sẵn ảnh, style và
 font, hoặc một file PDF. Editor mở theo ngôn ngữ của trình duyệt; đổi ngôn ngữ trong menu ngôn ngữ.
 

@@ -3,6 +3,7 @@
 // scroll, zoom and selection; with unsaved edits it asks (#modal-disk) and never drops either
 // side silently. A change of the notes sidecar only refreshes the feedback list.
 import { $ } from '../core/utils.mjs';
+import { withKey } from './api.mjs';
 import { S, el } from '../editor/state.mjs';
 import { openSeq, openServerFile } from '../editor/document.mjs';
 import { flushPending } from '../editor/edits.mjs';
@@ -26,7 +27,7 @@ export function watchSource(again = false) {
   stopWatch();
   const src = S.source;
   if (src?.kind !== 'server' || !window.EventSource) return;
-  const es = stream = new EventSource(`/api/watch?path=${encodeURIComponent(src.path)}&rev=${encodeURIComponent(src.rev || '')}`);
+  const es = stream = new EventSource(withKey(`/api/watch?path=${encodeURIComponent(src.path)}&rev=${encodeURIComponent(src.rev || '')}`));
   es.addEventListener('doc', e => { if (S.source === src) { pending = { src, seq: openSeq, ...JSON.parse(e.data) }; settle(); } });
   es.addEventListener('notes', () => { if (S.source === src) refreshNotes(); });
   es.onerror = () => {

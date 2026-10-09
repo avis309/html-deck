@@ -82,7 +82,8 @@ htmldeck --file <file>.html       # open that document first
 htmldeck --root <folder> --port 6789 --no-browser
 ```
 
-It runs on your computer (`127.0.0.1`). **Save** keeps a backup of each version in `.htmldeck_bak/`.
+It runs on your computer (`127.0.0.1`), opened by the link it prints: that link carries a key
+for the run, so other programs on the machine cannot use the editor. **Save** keeps a backup of each version in `.htmldeck_bak/`.
 **Save ▾** also gives you a copy to share: one HTML file with its images, styles and fonts built in,
 or a PDF. The editor starts in your browser's language; change it from the language menu.
 
