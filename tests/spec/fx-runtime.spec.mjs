@@ -4,7 +4,7 @@
  * Run: `node tests/spec/fx-runtime.spec.mjs` (part of `npm run spec`).
  */
 import { chromium } from 'playwright';
-import { fxRuntime } from '../../htmldeck/web/js/fx/runtime.mjs';
+import { FX_PRESETS_BY_VERSION, fxRuntime } from '../../htmldeck/web/js/fx/runtime.mjs';
 
 const failures = [];
 let passed = 0;
@@ -291,9 +291,86 @@ async function reviewFixes(browser) {
   await o.ctx.close();
 }
 
+async function v4(browser) {
+  section('runtime v4: wipe, baseline, zoom-blur, tumble, stomp, scrapbook, flicker, wiggle, blink');
+  const body = `<section id="s">
+    <p id="wi" data-fx="wipe">a</p><p id="wr" data-fx="wipe" dir="rtl">b</p><p id="ba" data-fx="baseline">c</p>
+    <p id="zb" data-fx="zoom-blur">d</p><p id="tu" data-fx="tumble">e</p><p id="st" data-fx="stomp" style="opacity:.5">f</p>
+    <p id="sc" data-fx="scrapbook">g</p><p id="fl" data-fx="flicker" style="opacity:.5">h</p>
+    <p id="wg" data-fx="wiggle">i</p><p id="bk" data-fx="blink" style="opacity:.8">j</p>
+    <p id="wc" data-fx="wipe" style="clip-path:circle(40%)">k</p><p id="zf" data-fx="zoom-blur" style="filter:grayscale(1)">l</p>
+    <p>x <span id="in" data-fx="tumble">inline</span></p>
+    <svg width="80" height="40"><rect id="sv" data-fx="wipe" width="80" height="40"/></svg></section>`;
+  const { pg, ctx, errs } = await open(browser, body);
+  const before = await markup(pg);
+  const ck = (sel, name) => pg.evaluate(([s, n]) => window.__htmldeckFx.check(document.querySelector(s), n), [sel, name]);
+  check('loops are not hidden, entrances are', await pg.evaluate(() => !document.querySelector('#wg').classList.contains('fx-wait') && !document.querySelector('#bk').classList.contains('fx-wait') && document.querySelector('#wi').classList.contains('fx-wait')));
+  await show(pg, '#s');
+  const by = async sel => anims(pg, sel);
+  const wi = await by('#wi'), wr = await by('#wr');
+  check('wipe: clip-path opens from the left to inset(0), no fade', wi.length === 1 && wi[0].frames[0].clipPath === 'inset(0px 100% 0px 0px)' && /^inset\(0px\)$|^inset\(0px 0px 0px 0px\)$/.test(wi[0].frames[1].clipPath) && !('opacity' in wi[0].frames[0]), JSON.stringify(wi));
+  check('wipe in a right-to-left block: from the right', wr[0].frames[0].clipPath === 'inset(0px 0px 0px 100%)', JSON.stringify(wr));
+  const ba = await by('#ba');
+  check('baseline: opens from the bottom while translateY(24px) is added', ba.length === 2 && ba[0].frames[0].clipPath === 'inset(100% 0px 0px)' && ba[1].frames[0].transform === 'translateY(24px)' && ba[1].composite === 'add', JSON.stringify(ba));
+  const zb = await by('#zb');
+  check('zoom-blur: blur(12px) and opacity 0 → authored, scale(0.85) added, 800 ms', zb[0].frames[0].filter === 'blur(12px)' && zb[0].frames[1].filter === 'none' && zb[0].frames[0].opacity === '0' && zb[1].frames[0].transform === 'scale(0.85)' && zb[0].duration === 800, JSON.stringify(zb));
+  const tu = await by('#tu');
+  check('tumble: rotate(-18deg) from above, added, 750 ms', /rotate\(-18deg\)/.test(tu[1].frames[0].transform) && tu[1].composite === 'add' && tu[0].duration === 750, JSON.stringify(tu));
+  const st = await by('#st');
+  const stOp = st.find(a => 'opacity' in a.frames[0]), stTf = st.find(a => 'transform' in a.frames[0]);
+  check('stomp: scale 1.8 → 0.94 → 1.03 → none, opacity reaches the authored .5 at 20 %', stTf.frames.map(f => f.transform).join() === 'scale(1.8),scale(0.94),scale(1.03),none' && stOp.frames.map(f => parseFloat(f.opacity)).join() === '0,0.5,0.5' && stTf.duration === 600, JSON.stringify(st));
+  const sc = await by('#sc');
+  check('scrapbook: tilted and large, past straight, then none', sc[1].frames.length === 3 && /rotate\(-8deg\) scale\(1.25\)/.test(sc[1].frames[0].transform) && sc[1].frames[2].transform === 'none', JSON.stringify(sc));
+  // Timing metadata (offsets, per-keyframe easing), which anims() leaves out.
+  const timing = sel => pg.evaluate(s => document.querySelector(s).getAnimations().map(a => a.effect.getKeyframes().map(k => [k.offset, k.easing])), sel);
+  const stT = await timing('#st'), scT = await timing('#sc'), flT = await timing('#fl'), wgT = await timing('#wg');
+  check('stomp: opacity full at 20 %, landing legs at 65 % / 82 %, each with its own easing',
+    JSON.stringify(stT.find(k => k.length === 3).map(k => k[0])) === '[0,0.2,1]' &&
+    JSON.stringify(stT.find(k => k.length === 4)) === JSON.stringify([[null, 'cubic-bezier(0.55, 0, 1, 0.45)'], [0.65, 'ease-out'], [0.82, 'ease-in-out'], [null, 'linear']]), JSON.stringify(stT));
+  check('scrapbook / flicker / wiggle: their keyframe offsets', JSON.stringify(scT[scT.length - 1].map(k => k[0])) === '[null,0.72,null]' &&
+    JSON.stringify(flT[0].map(k => k[0])) === '[0,0.2,0.35,0.55,0.7,1]' && JSON.stringify(wgT[0].map(k => k[0])) === '[null,0.15,0.3,0.45,0.6,null]', JSON.stringify({ scT, flT, wgT }));
+  const fl = await by('#fl');
+  const flOp = fl[0].frames.map(f => parseFloat(f.opacity));
+  check('flicker: opacity flickers up to the authored .5, linear', fl.length === 1 && flOp.length === 6 && flOp[0] === 0 && Math.max(...flOp) === 0.5 && flOp[5] === 0.5 && fl[0].easing === 'linear', JSON.stringify(fl));
+  const wg = await by('#wg');
+  check('wiggle: ±3° rotations, infinite, added, 1200 ms', wg[0].frames.length === 6 && wg[0].frames[1].transform === 'rotate(-3deg)' && wg[0].iterations === Infinity && wg[0].composite === 'add' && wg[0].duration === 1200, JSON.stringify(wg));
+  const bk = await by('#bk');
+  check('blink: authored .8 ↔ a quarter of it, infinite, replace (not added)', bk[0].frames.map(f => parseFloat(f.opacity)).join() === '0.8,0.2,0.8' && bk[0].iterations === Infinity && bk[0].composite === 'replace', JSON.stringify(bk));
+  const refused = { wc: await ck('#wc', 'wipe'), zf: await ck('#zf', 'zoom-blur'), in: await ck('#in', 'tumble'), sv: await ck('#sv', 'wipe'), inWipe: await ck('#in', 'wipe'), inStomp: await ck('#in', 'stomp'), inWiggle: await ck('#in', 'wiggle'), inBlink: await ck('#in', 'blink'), inFlicker: await ck('#in', 'flicker') };
+  check('refused: wipe over an authored clip-path, inline text or an SVG shape ("clip"), zoom-blur over a filter ("filter")', refused.wc === 'clip' && refused.sv === 'clip' && refused.inWipe === 'clip' && refused.zf === 'filter', JSON.stringify(refused));
+  check('refused on inline text ("inline"); blink and flicker (opacity only) allowed there', refused.in === 'inline' && refused.inStomp === 'inline' && refused.inWiggle === 'inline' && refused.inBlink === null && refused.inFlicker === null, JSON.stringify(refused));
+  check('refused blocks: not animated, not hidden', await pg.evaluate(() => ['#wc', '#zf', '#in', '#sv'].every(s => !document.querySelector(s).getAnimations().length && !document.querySelector(s).classList.contains('fx-wait'))));
+  await leave(pg);
+  check('leave + settle: no animation, authored DOM back', (await pg.evaluate(() => document.getAnimations().length)) === 0 && (await markup(pg)) === before.replace(/ class="fx-wait"/g, ''), await markup(pg));
+  await pg.evaluate(() => window.__htmldeckFx.preview(document.querySelector('#bk')));
+  const pv = await by('#bk');
+  check('blink preview: 2 iterations', pv[0]?.iterations === 2, JSON.stringify(pv));
+  await pg.evaluate(() => window.__htmldeckFx.stopPreview());
+  const cat = await pg.evaluate(() => window.__htmldeckFx.catalog());
+  const kind = n => cat.find(p => p.name === n)?.category;
+  check('catalog: stomp is emphasis, wiggle and blink loop, the rest enter', kind('stomp') === 'emphasis' && kind('wiggle') === 'loop' && kind('blink') === 'loop' && ['wipe', 'baseline', 'zoom-blur', 'tumble', 'scrapbook', 'flicker'].every(n => kind(n) === 'enter'), JSON.stringify(cat));
+  check('catalog = the presets v4 declares (in any order)', JSON.stringify(cat.map(p => p.name).sort()) === JSON.stringify([...FX_PRESETS_BY_VERSION[4]].sort()) && (await pg.evaluate(() => window.__htmldeckFx.version)) === 4);
+  check('no errors', !errs.length, errs.join(' | '));
+  await ctx.close();
+
+  // Played to the end: exactly as authored (clip none, authored opacity / filter / transform).
+  const end = await open(browser, `<section id="s"><p id="w" data-fx="wipe" data-fx-dur="60" style="transform:translateX(5px)">a</p><p id="t" data-fx="stomp" data-fx-dur="60" style="opacity:.5;transform:rotate(3deg)">b</p><p id="f" data-fx="flicker" data-fx-dur="60" style="opacity:.7">c</p></section>`);
+  const authored = await end.pg.evaluate(() => getComputedStyle(document.querySelector('#t')).transform);
+  await show(end.pg, '#s');
+  await end.pg.waitForTimeout(400);
+  const cs = await end.pg.evaluate(() => ['#w', '#t', '#f'].map(s => { const c = getComputedStyle(document.querySelector(s)); return [c.clipPath, c.opacity, c.transform, document.querySelector(s).getAnimations().length]; }));
+  check('ended: clip-path none, authored opacity and transform, nothing running', JSON.stringify(cs) === JSON.stringify([['none', '1', 'matrix(1, 0, 0, 1, 5, 0)', 0], ['none', '0.5', authored, 0], ['none', '0.7', 'none', 0]]) && /^matrix\(0\.99/.test(authored), JSON.stringify({ cs, authored }));
+  await end.ctx.close();
+
+  const rm = await open(browser, body, { reducedMotion: 'reduce' });
+  await show(rm.pg, '#s');
+  check('reduced motion: none of them animate, nothing hidden', (await rm.pg.evaluate(() => document.getAnimations().length + document.querySelectorAll('.fx-wait').length)) === 0);
+  await rm.ctx.close();
+}
+
 const browser = await chromium.launch();
 try {
-  for (const scenario of [legacy, api, isolation, nesting, entrances, grow, draw, loops, reviewFixes]) {
+  for (const scenario of [legacy, api, isolation, nesting, entrances, grow, draw, loops, reviewFixes, v4]) {
     try { await scenario(browser); } catch (e) { failures.push(`${scenario.name}: ${e.message}`); console.log(`  ✖ ${scenario.name} crashed: ${e.stack}`); }
   }
 } finally { await browser.close(); }

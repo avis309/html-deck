@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "htmldeck",
-      "source": "./",
+      "source": { "source": "github", "repo": "avis309/html-deck", "ref": "plugin" },
       "description": "Edit and present workspace HTML decks, reports and pages; act on review notes."
     }
   ]

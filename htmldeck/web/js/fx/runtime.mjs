@@ -9,13 +9,15 @@
 // `fx-on` on <html>, `fx-wait` on targets waiting to play, and count-up text while it counts —
 // all undone by settle()/dispose(). It never runs in the editor's edit frame.
 
-export const FX_VERSION = 3;
+export const FX_VERSION = 4;
 // Presets each runtime version knows: a file carrying an older runtime ignores newer ones (the
 // element then simply shows as authored).
 var V2 = ['fade-in', 'fade-up', 'zoom-in', 'slide-left', 'count-up'];
+var V3 = V2.concat(['fade-down', 'slide-right', 'zoom-out', 'blur-in', 'pop', 'grow-x', 'grow-y', 'draw', 'spin', 'float', 'pulse']);
 export const FX_PRESETS_BY_VERSION = {
   2: V2,
-  3: V2.concat(['fade-down', 'slide-right', 'zoom-out', 'blur-in', 'pop', 'grow-x', 'grow-y', 'draw', 'spin', 'float', 'pulse']),
+  3: V3,
+  4: V3.concat(['wipe', 'baseline', 'zoom-blur', 'tumble', 'stomp', 'scrapbook', 'flicker', 'wiggle', 'blink']),
 };
 
 export function fxRuntime(win, opts) {
@@ -23,7 +25,9 @@ export function fxRuntime(win, opts) {
   var doc = win.document, root = doc.documentElement;
   var EASE = 'cubic-bezier(.16,1,.3,1)';
   // ---- modules: data-fx value → { category, waits (hidden until played), dur (default ms),
-  // from / opacity / filter / ease (entrances), single (never staggers its children),
+  // from (a transform, or transform keyframes ending at none) / opacity / fade ([fraction of the
+  // author's opacity, offset] keyframes) / filter / clip(el) (the clip-path it opens from) / ease
+  // (entrances), single (never staggers its children),
   // previewAs (preset its editor preview plays), why + applies(el) (where it can run),
   // targets(el, c) (what animates), play(target, i, c, run) }. Every module plays through `run`.
   var MODULES = {};
@@ -83,7 +87,7 @@ export function fxRuntime(win, opts) {
   mod('slide-right', entrance('translateX(-60px)'));
   mod('zoom-out', entrance('scale(1.15)'));
   // Only where the author set no filter: the blur would replace it while it plays.
-  mod('blur-in', entrance(null, { dur: 800, filter: 'blur(12px)', why: 'filter', applies: function (el) { return win.getComputedStyle(el).filter === 'none'; } }));
+  mod('blur-in', entrance(null, { dur: 800, filter: 'blur(12px)', why: 'filter', applies: function (el) { return unfiltered(el); } }));
   mod('pop', entrance('scale(0.6)', { category: 'emphasis', dur: 600, ease: 'cubic-bezier(.34,1.56,.64,1)' }));
   mod('grow-x', { category: 'data', waits: true, dur: 900, why: growWhy, applies: growable, play: playGrow('x') });
   mod('grow-y', { category: 'data', waits: true, dur: 900, why: growWhy, applies: growable, play: playGrow('y') });
@@ -91,6 +95,26 @@ export function fxRuntime(win, opts) {
   mod('spin', loop([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], 'linear', false, 20000));
   mod('float', loop([{ transform: 'translateY(0px)' }, { transform: 'translateY(-8px)' }], 'ease-in-out', true, 3000));
   mod('pulse', loop([{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }], 'ease-in-out', true, 1200));
+  // v4. Wipe opens the way the block reads (from the right in a right-to-left block); baseline
+  // rises while it opens from the bottom (the clip moves with the block: no fixed line).
+  mod('wipe', entrance(null, { opacity: false, why: 'clip', applies: clippable, clip: function (el) { return win.getComputedStyle(el).direction === 'rtl' ? 'inset(0 0 0 100%)' : 'inset(0 100% 0 0)'; } }));
+  mod('baseline', entrance('translateY(24px)', { opacity: false, why: 'clip', applies: clippable, clip: function () { return 'inset(100% 0 0 0)'; } }));
+  mod('zoom-blur', entrance('scale(0.85)', { dur: 800, filter: 'blur(12px)', why: function (el) { return transformable(el) ? 'filter' : 'inline'; }, applies: function (el) { return transformable(el) && unfiltered(el); } }));
+  mod('tumble', entrance([{ transform: 'translateY(-32px) rotate(-18deg)' }, { transform: 'none' }], { dur: 750, why: 'inline', applies: transformable }));
+  // Stomp lands hard: big, then a squash and a small rebound, each leg with its own easing.
+  mod('stomp', entrance([{ transform: 'scale(1.8)', easing: 'cubic-bezier(.55,0,1,.45)' }, { transform: 'scale(0.94)', offset: 0.65, easing: 'ease-out' },
+    { transform: 'scale(1.03)', offset: 0.82, easing: 'ease-in-out' }, { transform: 'none' }],
+  { category: 'emphasis', dur: 600, ease: 'linear', fade: [[0, 0], [1, 0.2], [1, 1]], why: 'inline', applies: transformable }));
+  mod('scrapbook', entrance([{ transform: 'translateY(-16px) rotate(-8deg) scale(1.25)' }, { transform: 'rotate(2deg) scale(0.98)', offset: 0.72 }, { transform: 'none' }],
+    { dur: 650, why: 'inline', applies: transformable }));
+  mod('flicker', entrance(null, { dur: 900, ease: 'linear', fade: [[0, 0], [0.85, 0.2], [0.25, 0.35], [1, 0.55], [0.6, 0.7], [1, 1]] }));
+  mod('wiggle', loop([{ transform: 'rotate(0deg)' }, { transform: 'rotate(-3deg)', offset: 0.15 }, { transform: 'rotate(3deg)', offset: 0.3 },
+    { transform: 'rotate(-2deg)', offset: 0.45 }, { transform: 'rotate(2deg)', offset: 0.6 }, { transform: 'rotate(0deg)' }], 'ease-in-out', false, 1200));
+  // A gentle blink (never a hard flash), between the author's opacity and a quarter of it.
+  mod('blink', { category: 'loop', waits: false, dur: 1600, play: function (target, i, c, run) {
+    var o = parseFloat(win.getComputedStyle(target).opacity);
+    run.animate(target, [{ opacity: o }, { opacity: o * 0.25 }, { opacity: o }], loopTiming(c, i, 'ease-in-out', false));
+  } });
   function num(v, d) { var n = parseFloat(v); return isFinite(n) && n >= 0 ? n : d; }
   function config(el) {
     var m = MODULES[el.getAttribute('data-fx')];
@@ -202,16 +226,22 @@ export function fxRuntime(win, opts) {
   }
 
   // Entrances: shown first, then measured, so the author's opacity / filter (not the waiting
-  // state's) is the end value; same task as animate(), so nothing is painted in between.
+  // state's) is the end value; same task as animate(), so nothing is painted in between. A clip
+  // ends fully open (inset 0), the author having none: the animation then ends and leaves none.
   function playEnter(target, i, c, run) {
-    var m = c.m, delay = c.delay + i * c.stagger, ease = m.ease || EASE, cs;
+    var m = c.m, o = { duration: c.dur, delay: c.delay + i * c.stagger, easing: m.ease || EASE, fill: 'backwards' }, cs;
     run.show(target);
     var frames = [{}, {}];
     if (m.opacity || m.filter) cs = win.getComputedStyle(target);
-    if (m.opacity) { frames[0].opacity = 0; frames[1].opacity = cs.opacity; }
+    if (m.opacity && m.fade) {
+      var op = parseFloat(cs.opacity);
+      run.animate(target, m.fade.map(function (f) { return { opacity: f[0] * op, offset: f[1] }; }), o);
+    } else if (m.opacity) { frames[0].opacity = 0; frames[1].opacity = cs.opacity; }
     if (m.filter) { frames[0].filter = m.filter; frames[1].filter = cs.filter; }
-    run.animate(target, frames, { duration: c.dur, delay: delay, easing: ease, fill: 'backwards' });
-    if (m.from) run.animate(target, [{ transform: m.from }, { transform: 'none' }], { duration: c.dur, delay: delay, easing: ease, fill: 'backwards', composite: 'add' });
+    if (m.clip) { frames[0].clipPath = m.clip(target); frames[1].clipPath = 'inset(0 0 0 0)'; }
+    if (Object.keys(frames[0]).length) run.animate(target, frames, o);
+    if (m.from) run.animate(target, typeof m.from === 'string' ? [{ transform: m.from }, { transform: 'none' }] : m.from,
+      { duration: o.duration, delay: o.delay, easing: o.easing, fill: o.fill, composite: 'add' });
   }
   function playCount(target, i, c, run) {
     var node = countNode(target);
@@ -258,6 +288,9 @@ export function fxRuntime(win, opts) {
     for (var i = 0; i < id.length; i++) if (id[i] !== null && v[i] !== id[i]) return false;
     return true;
   }
+  function unfiltered(el) { return win.getComputedStyle(el).filter === 'none'; }
+  // A clip-path replaces the author's own, and clips an HTML box (not an SVG shape or a run of text).
+  function clippable(el) { var cs = win.getComputedStyle(el); return !svgShape(el) && cs.display !== 'inline' && cs.clipPath === 'none'; }
   function growable(el) { return (svgShape(el) || win.getComputedStyle(el).display !== 'inline') && plainTransform(el); }
   function growWhy(el) { return svgShape(el) || win.getComputedStyle(el).display !== 'inline' ? 'transform' : 'inline'; }
   // Strokes of the SVG shapes inside an element (or the shape itself), drawn in document order.
@@ -291,12 +324,16 @@ export function fxRuntime(win, opts) {
     return {
       category: 'loop', waits: false, dur: dur, why: 'inline', applies: transformable,
       play: function (target, i, c, run) {
-        run.animate(target, frames, {
-          duration: c.preview ? Math.min(c.dur, 2000) : c.dur, delay: c.delay + i * c.stagger, easing: easing,
-          iterations: c.preview ? 2 : Infinity, direction: alternate ? 'alternate' : 'normal', composite: 'add',
-        });
+        var o = loopTiming(c, i, easing, alternate);
+        o.composite = 'add';
+        run.animate(target, frames, o);
       },
     };
+  }
+  // An editor preview plays 2 short iterations, never forever.
+  function loopTiming(c, i, easing, alternate) {
+    return { duration: c.preview ? Math.min(c.dur, 2000) : c.dur, delay: c.delay + i * c.stagger, easing: easing,
+      iterations: c.preview ? 2 : Infinity, direction: alternate ? 'alternate' : 'normal' };
   }
   // Play el's effect inside `scope` under run token t. A module that throws leaves its target
   // visible as authored; the rest of the scope keeps playing.
@@ -387,7 +424,7 @@ export function fxRuntime(win, opts) {
     return { m: m, delay: c.delay, dur: c.dur, stagger: c.m.previewAs ? 0 : c.stagger, preview: true };
   }
   var api = {
-    version: 3,
+    version: 4,
     parseCount: parseCount,
     presets: Object.keys(MODULES),
     // Editor: why preset `name` cannot run on el (null when it can), and the module list.

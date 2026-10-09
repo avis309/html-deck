@@ -84,7 +84,7 @@ function startServer(extra = [], root = WORK, { trust = true } = {}) {
     proc.on('error', fail);
     proc.stdout.on('data', d => {
       out += d;
-      const m = out.match(/Editor URL\s*:\s*((http:\/\/127\.0\.0\.1:\d+)\/\?token=([\w-]+))/);
+      const m = out.match(/Editor URL\s*:\s*((http:\/\/127\.0\.0\.1:\d+)\/\?key=([\w-]+))/);
       if (m) { clearTimeout(timer); SESSIONS.set(m[2], m[3]); resolve({ proc, url: m[2], link: m[1] }); }
     });
     proc.stderr.on('data', d => { out += d; });
@@ -1214,11 +1214,11 @@ async function sessionKey(browser, server) {
   check('no key: the editor says to open the printed link', /HTML Deck printed|htmldeck printed/.test(await pg.textContent('#toast')), await pg.textContent('#toast'));
   const api = await pg.evaluate(() => fetch('/api/config').then(r => r.status));
   check('no key: the API refuses', api === 403, String(api));
-  const res = await pg.goto(server.link.replace(/token=[\w-]+/, 'token=guess'));
+  const res = await pg.goto(server.link.replace(/key=[\w-]+/, 'key=guess'));
   check('a wrong key: a page says to open the printed link, no editor', res.status() === 403 && /HTMLDECK_URL/.test(await pg.textContent('body')) && !(await pg.locator('#frame').count()));
   await pg.goto(`${server.link}&file=${encodeURIComponent(wpath('deck.html'))}`);
   await pg.waitForFunction(p => document.body.dataset.docState === 'ready' && document.body.dataset.docPath === p, wpath('deck.html'), { timeout: 30000 });
-  check('the printed link (+ ?file): the editor opens that file, the key gone from the address', !/token|key=/.test(pg.url()) && /file=/.test(pg.url()), pg.url());
+  check('the printed link (+ ?file): the editor opens that file, the key gone from the address', !/key=/.test(pg.url()) && /file=/.test(pg.url()), pg.url());
   check('the key is not a cookie (a cookie of 127.0.0.1 goes to every port)', !(await ctx.cookies()).length);
   const pg2 = await ctx.newPage();
   pg2.on('pageerror', e => errors.push(e.message));
@@ -1634,6 +1634,21 @@ async function fxModules(browser, url) {
     check('unknown preset in a v2 file: "older FX", not "needs Update FX"', !/Update FX to play/.test(st) && /older/.test(st), st);
     await t.close();
   }
+  section('FX modules: a v3 file using a v4 preset asks for the update; refusals of the v4 presets');
+  {
+    const t = await new Session(browser, url).start();
+    await t.open(wpath('fx-v3.html'));
+    await t.frame.locator('#v-wipe').click({ modifiers: ['Alt'] });
+    await t.page.click('#tb-fx');
+    const st = await t.page.textContent('#fx-doc-state');
+    check('v3 runtime in the file, wipe (v4) used: the side bar asks to update the effects player', /updated effects player/i.test(st), st);
+    await t.frame.locator('#v-clip').click({ modifiers: ['Alt'] });
+    if (await t.page.isHidden('#fx-tiles')) await t.page.click('#tb-fx');
+    const tile = v => t.page.$eval(`.fx-tile[data-preset="${v}"]`, o => ({ disabled: o.disabled, title: o.title }));
+    const w = await tile('wipe'), b = await tile('baseline'), tu = await tile('tumble');
+    check('a block with its own clip-path: wipe and baseline disabled with the reason, tumble offered', w.disabled && /clip-path/.test(w.title) && b.disabled && !tu.disabled, JSON.stringify({ w, b, tu }));
+    await t.close();
+  }
   section('FX modules: Animate this slide leaves slides that already move (own effect, scene on an ancestor) alone');
   for (const ff of ['fx-auto-scope.html', 'fx-auto-scene.html']) {
     const t = await new Session(browser, url).start();
@@ -1680,8 +1695,12 @@ async function fxModules(browser, url) {
   await s.page.keyboard.press('Escape');
   section('FX modules: picker grouped by category, presets that cannot apply are disabled with the reason');
   const groups = await s.page.$$eval('#fx-tiles .fx-group', gs => gs.map(g => [g.querySelector('.sec-label').textContent, g.querySelectorAll('.fx-tile').length]));
-  check('side bar: Canva-like groups (Basic 9, Data & charts 4, Extra 3)',
-    JSON.stringify(groups) === JSON.stringify([['Basic effects', 9], ['Data & charts', 4], ['Extra effects', 3]]), JSON.stringify(groups));
+  check('side bar: Canva-like groups (Basic 16, Data & charts 4, Extra 5)',
+    JSON.stringify(groups) === JSON.stringify([['Basic effects', 16], ['Data & charts', 4], ['Extra effects', 5]]), JSON.stringify(groups));
+  const names = await s.page.$$eval('.fx-tile', ts => Object.fromEntries(ts.map(b => [b.dataset.preset, b.querySelector('.n').textContent])));
+  check('v4 tiles: named (Stomp is the new effect; zoom-out is called Zoom out), each with a drawing',
+    names.stomp === 'Stomp' && names['zoom-out'] === 'Zoom out' && names.wipe === 'Wipe' && names['zoom-blur'] === 'Zoom & blur' && names.blink === 'Blink' &&
+    (await s.page.$$eval('.fx-tile .fx-ico svg', ss => ss.every(v => v.children.length > 0))), JSON.stringify(names));
   const tile = await s.page.$eval('.fx-tile[data-preset="fade-up"]', b => ({ name: b.querySelector('.n').textContent, svg: !!b.querySelector('.fx-ico svg') }));
   check('tiles: translated names and a drawn icon (Rise)', tile.name === 'Rise' && tile.svg, JSON.stringify(tile));
   await s.page.click('#sb-next');

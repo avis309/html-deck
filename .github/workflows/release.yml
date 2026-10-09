@@ -88,3 +88,45 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+
+  # The plugin the marketplace and the plugin directory install: only what it runs (tools/build_plugin.py),
+  # on its own branch, so the dev tooling's lockfile never makes an install run npm ci.
+  plugin-branch:
+    needs: github-release
+    runs-on: ubuntu-latest
+    # One publish at a time; an older release finishing late never replaces a newer tree (below).
+    concurrency:
+      group: plugin-branch
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Publish the plugin tree to the plugin branch
+        run: |
+          tree="$RUNNER_TEMP/plugin" branch="$RUNNER_TEMP/branch"
+          python tools/build_plugin.py --out "$tree"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin plugin >/dev/null; then
+            git fetch -q origin plugin
+            git worktree add -q --detach "$branch" origin/plugin
+          else
+            git worktree add -q --detach "$branch"
+            git -C "$branch" checkout -q --orphan plugin
+          fi
+          version() { python -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$1/.claude-plugin/plugin.json"; }
+          if [ -f "$branch/.claude-plugin/plugin.json" ] && ! python -c 'import sys; o, n = (tuple(map(int, v.split("."))) for v in sys.argv[1:]); sys.exit(n < o)' "$(version "$branch")" "$(version "$tree")"; then
+            echo "the plugin branch already holds $(version "$branch"), newer than $(version "$tree"): left as it is"
+            exit 0
+          fi
+          git -C "$branch" rm -rqf --ignore-unmatch .
+          cp -a "$tree/." "$branch/"
+          git -C "$branch" add -A
+          git -C "$branch" commit -qm "htmldeck plugin $GITHUB_REF_NAME" || echo "plugin tree unchanged"
+          git -C "$branch" push -q origin HEAD:refs/heads/plugin

@@ -69,7 +69,7 @@ WEB_DIR = Path(__file__).resolve().parent / "web"
 EDITOR_HTML = WEB_DIR / "index.html"
 EDITOR_PREFIX = "/__htmldeck/"
 EDITOR_ENTRY = ("/", "/index.html", EDITOR_PREFIX + "index.html")
-# The session key of a run: printed in the link (?token=), handed to the editor in the address
+# The session key of a run: printed in the link (?key=), handed to the editor in the address
 # fragment, then sent by it with every API call. Not a cookie: a browser sends a cookie of
 # 127.0.0.1 to every port, so any other local server the browser calls would get the key.
 SESSION_HEADER = "X-HtmlDeck-Key"
@@ -727,7 +727,7 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
     trusted_session: bool = False  # --trust: this run trusts the workspace without remembering it
     # Host / Origin / Sec-Fetch-Site stop web pages; this key stops other programs on the machine,
     # which can send any header but do not know it. New for every run.
-    session_token: str = secrets.token_urlsafe(32)
+    session_key: str = secrets.token_urlsafe(32)
     # Keep-alive: the editor loads ~65 modules per page; one TCP connection each ran Windows out
     # of socket buffers (net::ERR_NO_BUFFER_SPACE). Idle connections close after `timeout` s.
     protocol_version = "HTTP/1.1"
@@ -784,7 +784,7 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
         return parsed.scheme == "http" and parsed.netloc in self._local_origins()
 
     def _key_ok(self, key: str | None) -> bool:
-        return hmac.compare_digest((key or "").encode(), self.session_token.encode())
+        return hmac.compare_digest((key or "").encode(), self.session_key.encode())
 
     def _session_ok(self, parsed) -> bool:
         # EventSource cannot send headers: the watch stream alone takes the key in its query.
@@ -796,12 +796,12 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
         """The printed link: the editor opens with the key in its address fragment (which the
         editor moves to its storage), so the key is not sent again in a URL or a Referer."""
         query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
-        if not self._key_ok(next((v for k, v in query if k == "token"), "")):
+        if not self._key_ok(next((v for k, v in query if k == "key"), "")):
             self._send_locked()
             return
-        rest = urllib.parse.urlencode([(k, v) for k, v in query if k != "token"])
+        rest = urllib.parse.urlencode([(k, v) for k, v in query if k != "key"])
         self.send_response(302)
-        self.send_header("Location", EDITOR_PREFIX + "index.html" + ("?" + rest if rest else "") + "#key=" + self.session_token)
+        self.send_header("Location", EDITOR_PREFIX + "index.html" + ("?" + rest if rest else "") + "#key=" + self.session_key)
         self._cache = "no-store"   # it holds the key
         self.send_header("Content-Length", "0")
         self.end_headers()
@@ -819,7 +819,7 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"error": "Invalid Host"}, 403)
             return
         parsed = urllib.parse.urlparse(self.path)
-        if parsed.path in EDITOR_ENTRY and "token" in urllib.parse.parse_qs(parsed.query, keep_blank_values=True):
+        if parsed.path in EDITOR_ENTRY and "key" in urllib.parse.parse_qs(parsed.query, keep_blank_values=True):
             self._open_session(parsed)
             return
         route = {
@@ -1240,7 +1240,7 @@ def main(argv: list[str] | None = None):
     HTMLEditorHandler.trusted_session = args.trust
     httpd = bind_server(args.port)
     preview = start_preview_origin(root)
-    url = f"http://127.0.0.1:{httpd.server_address[1]}/?token={HTMLEditorHandler.session_token}"
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/?key={HTMLEditorHandler.session_key}"
     print("============================================================")
     print("  HtmlDeck · by Avis (hunganh.freeze@gmail.com)")
     print(f"  Workspace     : {root}")

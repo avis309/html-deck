@@ -1,6 +1,6 @@
 <div align="center">
 
-# HTML Deck
+<h1><img src="../htmldeck/web/assets/logo.svg" width="48" height="48" align="absmiddle" alt=""> HTML Deck</h1>
 
 **Editor trực quan cho slide, báo cáo và trang HTML do AI làm ra.**
 
@@ -97,7 +97,7 @@ Thử ngay trong bản clone của repo này: `htmldeck --root samples --file ma
 | **Reveal.js** | Deck viết tay: stack, fragment, speaker notes, background. Slide Markdown chỉ đọc. |
 | **Tailwind CSS** | Class giữ nguyên như đã viết; style của bạn được áp lên trên. |
 | **SVG** | Gõ lại nhãn `<text>` / `<tspan>` trong một `<svg>` nằm trong trang. |
-| **Hiệu ứng** | Script riêng của trang (anime.js, GSAP…) chạy khi thuyết trình một file trong workspace. Khi sửa, CSS và Web Animations tạm dừng, nội dung do script thay đổi bị khoá. Thêm hiệu ứng từ thanh công cụ, không cần code: xuất hiện, nhấn mạnh (pop), dữ liệu & biểu đồ (count-up, thanh dài ra, vẽ nét) và lặp (xoay, lơ lửng, nhịp đập). **Tạo hiệu ứng cho slide này** gán cho cả slide trong một bước hoàn tác được; **Bật FX cho file** giữ hiệu ứng chạy khi mở file độc lập. |
+| **Hiệu ứng** | Script riêng của trang (anime.js, GSAP…) chạy khi thuyết trình một file trong workspace. Khi sửa, CSS và Web Animations tạm dừng, nội dung do script thay đổi bị khoá. Thêm hiệu ứng từ thanh công cụ, không cần code: xuất hiện (hiện lên, lướt, gạt, mờ, zoom, kéo lên, nhào lộn, nhấp nháy, cắt dán), nhấn mạnh (bật ra, đập vào), dữ liệu & biểu đồ (count-up, thanh dài ra, vẽ nét) và lặp (xoay, chớp tắt, co giãn, lắc lư, lơ lửng). **Tạo hiệu ứng cho slide này** gán cho cả slide trong một bước hoàn tác được; **Bật FX cho file** giữ hiệu ứng chạy khi mở file độc lập. |
 | **An toàn** | Hoàn tác/làm lại, khôi phục bản nháp, sao lưu. Script của workspace không chạy khi sửa cho đến khi bạn tin cậy workspace (hỏi một lần, được ghi nhớ; `--trust` cho một phiên), script từ xa (CDN) còn chờ bạn tin cậy từng file. Thuyết trình chạy đầy đủ trên một origin riêng. Bản sao lưu và ghi chú không đi theo symlink; xuất HTML chỉ nhúng tài nguyên web và không tải từ địa chỉ nội bộ. |
 
 <details>

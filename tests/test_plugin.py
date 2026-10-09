@@ -6,9 +6,15 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 
-spec = importlib.util.spec_from_file_location("bump_version", REPO / "tools" / "bump_version.py")
-bump = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(bump)
+def _tool(name):
+    spec = importlib.util.spec_from_file_location(name, REPO / "tools" / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+bump = _tool("bump_version")
+build_plugin = _tool("build_plugin")
 
 
 def _json(rel):
@@ -27,7 +33,10 @@ def test_all_manifests_name_the_same_plugin():
     assert _json(".codex-plugin/plugin.json")["name"] == "htmldeck"
     assert _json("packaging/npm/package.json")["name"] == "@avis309/htmldeck"
     claude_mp = _json(".claude-plugin/marketplace.json")
-    assert claude_mp["plugins"] == [{**claude_mp["plugins"][0], "name": "htmldeck", "source": "./"}]
+    # The released plugin tree (tools/build_plugin.py), not this root: its lockfile would make an
+    # install run npm ci with the dev tooling.
+    plugin_branch = {"source": "github", "repo": "avis309/html-deck", "ref": "plugin"}
+    assert claude_mp["plugins"] == [{**claude_mp["plugins"][0], "name": "htmldeck", "source": plugin_branch}]
     codex_mp = _json(".agents/plugins/marketplace.json")
     assert codex_mp["plugins"][0]["name"] == "htmldeck"
     assert codex_mp["plugins"][0]["source"] == {"source": "local", "path": "./"}
@@ -86,3 +95,33 @@ def test_bump_check_reports_mismatch(capsys):
     assert bump.main(["--check", "99.0.0"]) == 1
     assert "expected 99.0.0" in capsys.readouterr().err
     assert bump.main(["not-a-version"]) == 2
+
+
+def test_plugin_icon_is_a_square_png_the_directory_accepts():
+    data = _json(".claude-plugin/plugin.json")
+    icon = REPO / data["icon"]
+    head = icon.read_bytes()[:24]
+    # PNG signature, then the IHDR width and height (big-endian).
+    width, height = int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+    assert head[:8] == b"\x89PNG\r\n\x1a\n" and width == height and 512 <= width <= 2048
+    assert icon.stat().st_size < 2 * 1024 * 1024
+
+
+def test_plugin_tree_holds_what_the_plugin_runs_and_no_dev_tooling(tmp_path):
+    out = tmp_path / "plugin"
+    files = build_plugin.build(out)
+    names = {p.name for p in out.rglob("*")}
+    # No npm install on plugin install, no specs screened as plugin code.
+    assert not names & {"package.json", "package-lock.json", "node_modules", "tests", "eslint.config.mjs"}
+    assert not any(f.startswith(("tests/", "tools/", ".github/workflows/", "packaging/", "samples/")) for f in files)
+    for rel in (".claude-plugin/plugin.json", ".claude-plugin/icon.png", ".codex-plugin/plugin.json", "skills/open/SKILL.md",
+                "scripts/htmldeck-run", "scripts/htmldeck-run.cmd", "scripts/launcher.py", "htmldeck/server.py",
+                "htmldeck/web/index.html", "LICENSE", ".gitattributes"):
+        assert (out / rel).is_file(), rel
+    # The directory's limits: at most 512 files, each code/text file under 256 KiB.
+    assert len(files) <= 512
+    big = [f for f in files if not f.endswith((".png", ".jpg", ".woff2")) and (out / f).stat().st_size > 256 * 1024]
+    assert not big, big
+    # Everything the skill and the manifests name is in the tree.
+    assert (out / _json(".codex-plugin/plugin.json")["skills"] / "open" / "SKILL.md").is_file()
+    assert (out / _json(".claude-plugin/plugin.json")["icon"]).is_file()

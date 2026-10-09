@@ -176,12 +176,12 @@ def server(root):
 
 def _local(port):
     """What the editor sends: a local Host and this run's session key."""
-    return {"Host": f"127.0.0.1:{port}", ed.SESSION_HEADER: ed.HTMLEditorHandler.session_token}
+    return {"Host": f"127.0.0.1:{port}", ed.SESSION_HEADER: ed.HTMLEditorHandler.session_key}
 
 
 def _watch(path):
     """The watch stream takes the key in its query (EventSource cannot send headers)."""
-    return f"{path}&key={ed.HTMLEditorHandler.session_token}"
+    return f"{path}&key={ed.HTMLEditorHandler.session_key}"
 
 
 def _request(port, method, path, body=None, headers=None):
@@ -265,13 +265,13 @@ def test_http_api_requires_the_session_key(server, root):
     # Another program on the machine sends any header it likes, but not this run's key.
     before = (root / "output/deck/a.html").read_bytes()
     body = json.dumps({"path": "output/deck/a.html", "content": "<p>pwn</p>"})
-    token = ed.HTMLEditorHandler.session_token
+    key = ed.HTMLEditorHandler.session_key
     calls = (("GET", "/api/config", None), ("GET", "/api/load?path=output/deck/a.html", None),
              ("GET", "/api/watch?path=output/deck/a.html", None), ("POST", "/api/save", body))
     # No key, a wrong one, a cookie (never read: a cookie goes to every port of the host), and a
     # key in the query of anything but the watch stream.
-    for extra, query in (({}, ""), ({ed.SESSION_HEADER: "guess"}, ""), ({ed.SESSION_HEADER: token[:-1]}, ""),
-                         ({"Cookie": f"htmldeck_session={token}"}, ""), ({}, f"&key={token}")):
+    for extra, query in (({}, ""), ({ed.SESSION_HEADER: "guess"}, ""), ({ed.SESSION_HEADER: key[:-1]}, ""),
+                         ({"Cookie": f"htmldeck_session={key}"}, ""), ({}, f"&key={key}")):
         for method, path, data in calls:
             if path.startswith("/api/watch") and query:
                 continue
@@ -294,25 +294,25 @@ def test_http_printed_link_hands_the_key_to_the_editor_in_the_fragment(server):
         data = res.read()
         conn.close()
         return res, data
-    token = ed.HTMLEditorHandler.session_token
-    res, _ = get(f"/?token={token}&file=output%2Fdeck%2Fa.html")
+    key = ed.HTMLEditorHandler.session_key
+    res, _ = get(f"/?key={key}&file=output%2Fdeck%2Fa.html")
     # The key moves to the fragment (never sent to a server again); the file asked for is kept.
-    assert res.status == 302 and res.getheader("Location") == f"/__htmldeck/index.html?file=output%2Fdeck%2Fa.html#key={token}"
+    assert res.status == 302 and res.getheader("Location") == f"/__htmldeck/index.html?file=output%2Fdeck%2Fa.html#key={key}"
     assert not res.getheader("Set-Cookie") and res.getheader("Cache-Control") == "no-store"   # it holds the key
-    assert get(f"/__htmldeck/index.html?token={token}")[0].getheader("Location") == f"/__htmldeck/index.html#key={token}"
+    assert get(f"/__htmldeck/index.html?key={key}")[0].getheader("Location") == f"/__htmldeck/index.html#key={key}"
     # A wrong key gets a page saying which link to open.
-    for path in ("/?token=guess", "/?token=", f"/index.html?token={token}x"):
+    for path in ("/?key=guess", "/?key=", f"/index.html?key={key}x"):
         res, data = get(path)
         assert res.status == 403 and b"HTMLDECK_URL" in data and not res.getheader("Location"), path
 
 
 def test_http_log_never_shows_a_session_key(server, capsys):
-    token = ed.HTMLEditorHandler.session_token
+    key = ed.HTMLEditorHandler.session_key
     _request(server, "GET", _watch("/api/watch?path=../x.html"))
-    _request(server, "GET", f"/?token={token}&file=/api/x.html")
-    _request(server, "GET", f"/api/watch?path=../x.html&k%65y={token}")   # the name encoded
+    _request(server, "GET", f"/?key={key}&file=/api/x.html")
+    _request(server, "GET", f"/api/watch?path=../x.html&k%65y={key}")   # the name encoded
     out = capsys.readouterr().out
-    assert "/api/watch?path=..%2Fx.html HTTP" in out and token not in out
+    assert "/api/watch?path=..%2Fx.html HTTP" in out and key not in out
 
 
 def _head(port, path):

@@ -65,7 +65,7 @@ def test_banner_url_line_is_flushed_when_piped(tmp_path):
             if line.startswith("HTMLDECK_URL="):
                 url = line.split("=", 1)[1]
         # The link carries this run's session key: the API answers no one without it.
-        assert url and re.fullmatch(r"http://127\.0\.0\.1:\d+/\?token=[\w-]{40,}", url), url
+        assert url and re.fullmatch(r"http://127\.0\.0\.1:\d+/\?key=[\w-]{40,}", url), url
     finally:
         proc.terminate()
         proc.wait(timeout=10)

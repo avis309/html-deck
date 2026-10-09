@@ -24,12 +24,13 @@ export const FX_ATTRS = ['data-fx', 'data-fx-delay', 'data-fx-dur', 'data-fx-sta
 // The side bar groups effects the way Canva does: basic entrances, then data & charts, then
 // the extra (looping) ones. A preset the runtime knows but no group lists is not offered.
 const FX_GROUPS = [
-  ['basic', ['fade-up', 'fade-in', 'fade-down', 'slide-left', 'slide-right', 'zoom-in', 'zoom-out', 'blur-in', 'pop']],
+  ['basic', ['fade-up', 'fade-in', 'fade-down', 'slide-left', 'slide-right', 'pop', 'wipe', 'blur-in', 'zoom-blur', 'zoom-in', 'zoom-out',
+    'baseline', 'tumble', 'flicker', 'scrapbook', 'stomp']],
   ['data', ['count-up', 'grow-x', 'grow-y', 'draw']],
-  ['extra', ['spin', 'float', 'pulse']],
+  ['extra', ['spin', 'blink', 'pulse', 'wiggle', 'float']],
 ];
 // Runtime refusal → the i18n key that explains it.
-export const FX_WHY = { count: 'fx_count_bad', draw: 'fx_bad_draw', inline: 'fx_bad_inline', filter: 'fx_bad_filter', transform: 'fx_bad_transform', reveal: 'fx_bad_reveal' };
+export const FX_WHY = { count: 'fx_count_bad', draw: 'fx_bad_draw', inline: 'fx_bad_inline', filter: 'fx_bad_filter', clip: 'fx_bad_clip', transform: 'fx_bad_transform', reveal: 'fx_bad_reveal' };
 // Each tile's drawing (Canva-like): `m` is the part that moves on hover (editor.css).
 // The tool's own orange (--accent and lighter tints), so the tiles match the rest of the UI.
 const L = '#ffe0d3', M = '#ffb393', D = '#ff5a1f';
@@ -49,8 +50,17 @@ const FX_ICONS = {
   'slide-right': SQ(8, 10, L) + SQ(14, 10, M) + SQ(22, 10, D, 'm') + arrow('right'),
   'slide-left': SQ(34, 10, L) + SQ(28, 10, M) + SQ(20, 10, D, 'm') + arrow('left'),
   'fade-in': `<g class="m"><rect x="17" y="10" width="7" height="20" rx="2" fill="${L}"/><rect x="23" y="10" width="7" height="20" fill="${M}"/><rect x="29" y="10" width="9" height="20" rx="2" fill="${D}"/></g>`,
-  'zoom-in': `<rect class="m blur" x="19" y="11" width="18" height="18" rx="4" fill="${D}"/>` + corners(true),
-  'zoom-out': `<rect x="15" y="7" width="26" height="26" rx="6" fill="none" stroke="${M}" stroke-width="1.5"/><rect class="m" x="20" y="12" width="16" height="16" rx="4" fill="${D}"/>` + corners(false),
+  'zoom-in': `<g class="m"><rect x="18" y="10" width="20" height="20" rx="4" fill="${D}"/><rect x="22" y="14" width="12" height="12" rx="2.5" fill="${M}"/><rect x="25.5" y="17.5" width="5" height="5" rx="1" fill="${L}"/></g>` + corners(true),
+  'zoom-blur': `<rect class="m blur" x="19" y="11" width="18" height="18" rx="4" fill="${D}"/>` + corners(true),
+  'wipe': `<rect x="18" y="10" width="20" height="20" rx="4" fill="${M}" fill-opacity=".55"/><rect class="m wipe" x="18" y="10" width="20" height="20" rx="4" fill="${D}"/><path d="M28 6v28" stroke="${D}" stroke-width="2" stroke-linecap="round"/>`,
+  'baseline': `<g class="m base"><rect x="20" y="4" width="16" height="16" rx="4" fill="${D}"/><rect x="20" y="13" width="16" height="16" rx="4" fill="${M}" fill-opacity=".7"/></g><path d="M14 31h28" stroke="${D}" stroke-width="2" stroke-linecap="round"/>`,
+  'tumble': SQ(13, 16, L) + SQ(17, 14, M) + `<rect class="m" x="24" y="14" width="16" height="16" rx="4" fill="${D}"/><path d="M22 7q10-5 18 3M37 6l3 4-4 1" stroke="${D}" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+  'flicker': `<rect x="23" y="13" width="15" height="15" rx="3" fill="none" stroke="${M}" stroke-width="1.6"/><rect class="m" x="19" y="9" width="15" height="15" rx="3" fill="${D}"/><path d="M12 13l-2-2M12 20h-3M12 27l-2 2M44 13l2-2M44 20h3M44 27l2 2" stroke="${D}" stroke-width="1.6" stroke-linecap="round"/>`,
+  'scrapbook': `<rect x="13" y="8" width="16" height="16" rx="3" fill="${M}" transform="rotate(-12 21 16)"/><rect x="27" y="16" width="16" height="16" rx="3" fill="${L}" transform="rotate(14 35 24)"/><rect class="m" x="20" y="12" width="16" height="16" rx="3" fill="${D}"/>`,
+  'stomp': `<rect x="15" y="7" width="26" height="26" rx="7" fill="none" stroke="${L}" stroke-width="1.5"/><rect x="18" y="10" width="20" height="20" rx="5" fill="none" stroke="${M}" stroke-width="1.5"/><rect class="m" x="21" y="13" width="14" height="14" rx="3.5" fill="${D}"/>` + corners(false),
+  'wiggle': `<g class="m"><circle cx="28" cy="20" r="9" fill="${D}"/><path d="M38 6q2 1 1 3t1 3M41 3q2 1 1 3t1 3M15 28q2 1 1 3t1 3M12 31q2 1 1 3t1 3" stroke="${D}" stroke-width="1.5" fill="none" stroke-linecap="round"/></g>`,
+  'blink': `<g class="m"><circle cx="28" cy="20" r="11" fill="${L}"/><path d="M28 9a11 11 0 0 1 0 22z" fill="${M}"/><path d="M32 9.8a11 11 0 0 1 0 20.4z" fill="${D}"/></g>`,
+  'zoom-out': `<rect class="m" x="20" y="12" width="16" height="16" rx="4" fill="${D}"/>` + corners(false),
   'blur-in': `<rect class="m blur" x="17" y="9" width="22" height="22" rx="5" fill="${D}"/>`,
   'pop': `<rect x="16" y="8" width="24" height="24" rx="6" fill="${L}"/><rect class="m" x="20" y="12" width="16" height="16" rx="4" fill="${D}"/><path d="M10 14q-3 6 0 12M46 14q3 6 0 12M6 11q-5 9 0 18M50 11q5 9 0 18" stroke="${M}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`,
   'count-up': `<text class="m" x="28" y="26" text-anchor="middle" font-size="15" font-weight="800" fill="${D}" font-family="system-ui, sans-serif">123</text>`,

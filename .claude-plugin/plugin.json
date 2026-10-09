@@ -9,5 +9,6 @@
   "homepage": "https://github.com/avis309/html-deck",
   "repository": "https://github.com/avis309/html-deck",
   "license": "MIT",
+  "icon": "./.claude-plugin/icon.png",
   "keywords": ["html", "slides", "presentation", "editor", "reveal.js", "review"]
 }

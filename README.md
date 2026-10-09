@@ -1,6 +1,6 @@
 <div align="center">
 
-# HTML Deck
+<h1><img src="htmldeck/web/assets/logo.svg" width="48" height="48" align="absmiddle" alt=""> HTML Deck</h1>
 
 **A visual editor for the HTML slides, reports and pages your AI makes.**
 
@@ -97,7 +97,7 @@ Try it in a clone of this repo: `htmldeck --root samples --file marketing-report
 | **Reveal.js** | Hand-written decks: stacks, fragments, speaker notes, backgrounds. Markdown slides are read-only. |
 | **Tailwind CSS** | Classes stay as written; your styles go on top. |
 | **SVG** | Retype a `<text>` / `<tspan>` label in an inline `<svg>`. |
-| **Animations** | The page's own scripts (anime.js, GSAP…) run when presenting a file from the workspace. While editing, CSS and Web Animations are paused, and content a script changes is locked. Add effects from the toolbar without code: entrances, emphasis (pop), data & charts (count-up, grow bars, draw lines) and loops (spin, float, pulse). **Animate this slide** adds them to a whole slide in one undoable step; **Enable FX in the file** keeps them running when the file is opened on its own. |
+| **Animations** | The page's own scripts (anime.js, GSAP…) run when presenting a file from the workspace. While editing, CSS and Web Animations are paused, and content a script changes is locked. Add effects from the toolbar without code: entrances (rise, pan, wipe, blur, zoom, baseline, tumble, flicker, scrapbook), emphasis (pop, stomp), data & charts (count-up, grow bars, draw lines) and loops (spin, blink, pulse, wiggle, float). **Animate this slide** adds them to a whole slide in one undoable step; **Enable FX in the file** keeps them running when the file is opened on its own. |
 | **Safety** | Undo/redo, draft recovery, backups. A workspace's own scripts do not run while editing until you trust the workspace (asked once, remembered; `--trust` for one session), and remote scripts (a CDN) also wait until you trust the file. Presenting runs everything, on a separate origin. Backups and notes never follow symlinks; HTML export embeds web assets only and never fetches from local or private addresses. |
 
 <details>
