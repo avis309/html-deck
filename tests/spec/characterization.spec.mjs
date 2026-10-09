@@ -746,7 +746,8 @@ async function liveSync(browser, url) {
   await s.open(wpath(f));
   // The frame itself (the same object across its reloads), to run code in it.
   const ef = async () => (await s.page.$('#frame')).contentFrame();
-  const frameHas = async (text, ms = 6000) => (await ef()).waitForFunction(t => document.body.textContent.includes(t), text, { timeout: ms }).then(() => true).catch(() => false);
+  // Asked mid-reload the frame may have no body yet: wait on (a throw would end the wait at once).
+  const frameHas = async (text, ms = 6000) => (await ef()).waitForFunction(t => !!document.body?.textContent.includes(t), text, { timeout: ms }).then(() => true).catch(() => false);
   const activeThumb = () => s.page.evaluate(() => [...document.querySelectorAll('#filmstrip .thumb')].findIndex(t => t.classList.contains('active')));
   await s.page.locator('#filmstrip .thumb').nth(1).click();
   await s.page.waitForTimeout(200);
