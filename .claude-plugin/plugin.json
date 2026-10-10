@@ -2,7 +2,7 @@
   "name": "htmldeck",
   "displayName": "HTML Deck",
   "description": "Edit and present the HTML documents of your workspace (slide decks, Reveal.js decks, reports, pages) in a local visual editor that saves in place, and let the agent act on the review notes you pin there.",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "author": {
     "name": "Avis",
     "email": "hunganh.freeze@gmail.com"
