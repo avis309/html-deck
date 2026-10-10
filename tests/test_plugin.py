@@ -130,3 +130,13 @@ def test_plugin_tree_holds_what_the_plugin_runs_and_no_dev_tooling(tmp_path):
     # Everything the skill and the manifests name is in the tree.
     assert (out / _json(".codex-plugin/plugin.json")["skills"] / "open" / "SKILL.md").is_file()
     assert (out / _json(".claude-plugin/plugin.json")["icon"]).is_file()
+
+
+def test_plugin_branch_never_takes_an_older_version():
+    # plugin.yml leaves the branch alone when it holds a newer version: SemVer order, release
+    # candidates included (an rc finishing late must not replace the release).
+    order = ["0.1.9", "0.1.11", "1.2.3-rc.1", "1.2.3-rc.2", "1.2.3-rc.10", "1.2.3", "1.2.4-alpha", "1.2.4"]
+    keys = [build_plugin.version_key(v) for v in order]
+    assert keys == sorted(keys) and len(set(keys)) == len(keys)
+    assert build_plugin.version_key("1.2.3+build.5") == build_plugin.version_key("1.2.3")
+    assert "from build_plugin import version_key" in (REPO / ".github/workflows/plugin.yml").read_text(encoding="utf-8")

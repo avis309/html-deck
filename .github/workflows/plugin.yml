@@ -38,7 +38,7 @@ jobs:
             git -C "$branch" checkout -q --orphan plugin
           fi
           version() { python -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$1/.claude-plugin/plugin.json"; }
-          if [ -f "$branch/.claude-plugin/plugin.json" ] && ! python -c 'import sys; o, n = (tuple(map(int, v.split("."))) for v in sys.argv[1:]); sys.exit(n < o)' "$(version "$branch")" "$(version "$tree")"; then
+          if [ -f "$branch/.claude-plugin/plugin.json" ] && ! python -c 'import sys; sys.path.insert(0, "tools"); from build_plugin import version_key as k; sys.exit(k(sys.argv[2]) < k(sys.argv[1]))' "$(version "$branch")" "$(version "$tree")"; then
             echo "the plugin branch already holds $(version "$branch"), newer than $(version "$tree"): left as it is"
             exit 0
           fi

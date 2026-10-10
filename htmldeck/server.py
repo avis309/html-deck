@@ -815,6 +815,10 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
 
     # --- routing --------------------------------------------------------
     def do_GET(self):
+        # A GET body is never read: on a kept-alive connection its bytes would be taken for the
+        # next request, so a GET that carries one ends its connection.
+        if self.headers.get("Content-Length") or self.headers.get("Transfer-Encoding"):
+            self.close_connection = True
         if not self._host_ok():
             self._send_json({"error": "Invalid Host"}, 403)
             return

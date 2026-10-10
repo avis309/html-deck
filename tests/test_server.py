@@ -2,6 +2,7 @@
 import http.client
 import json
 import os
+import socket
 import threading
 import time
 
@@ -909,3 +910,15 @@ def test_editor_files_share_one_connection(server):
     res.read()
     assert res.will_close
     conn.close()
+
+
+def test_get_with_a_body_ends_its_connection(server):
+    # A GET body is never read: kept alive, its bytes would be parsed as a second request.
+    smuggled = f"GET /__htmldeck/index.html HTTP/1.1\r\nHost: 127.0.0.1:{server}\r\n\r\n".encode()
+    with socket.create_connection(("127.0.0.1", server), timeout=5) as sock:
+        sock.sendall(f"GET /api/config HTTP/1.1\r\nHost: 127.0.0.1:{server}\r\nContent-Length: {len(smuggled)}\r\n\r\n".encode() + smuggled)
+        data = b""
+        while chunk := sock.recv(65536):
+            data += chunk
+    assert data.startswith(b"HTTP/1.1 403")
+    assert data.count(b"HTTP/1.1 ") == 1   # the body was not served as a request of its own

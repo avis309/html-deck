@@ -25,6 +25,13 @@ KEEP = ("htmldeck/", "scripts/", "skills/", ".claude-plugin/plugin.json", ".clau
 FORBIDDEN = ("package.json", "package-lock.json", "npm-shrinkwrap.json", "bun.lock", "node_modules", "tests")
 
 
+def version_key(version: str) -> tuple:
+    """SemVer precedence: 1.2.3-rc.1 < 1.2.3-rc.2 < 1.2.3 (build metadata ignored)."""
+    core, _, pre = version.split("+")[0].partition("-")
+    ids = tuple((0, int(p), "") if p.isdigit() else (1, 0, p) for p in pre.split(".")) if pre else ()
+    return tuple(int(x) for x in core.split(".")), not pre, ids
+
+
 def plugin_files(root: Path = ROOT) -> list[str]:
     # Tracked files, and new ones not ignored yet (the same set once committed, as in CI).
     tracked = subprocess.run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=root, check=True,
