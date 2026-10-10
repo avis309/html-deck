@@ -78,6 +78,8 @@ export function showSlide(i, { keepSel = false } = {}) {
   if (S.notesTimer) { clearTimeout(S.notesTimer); S.notesTimer = 0; saveNotes(); }
   i = clamp(i, 0, S.slides.length - 1);
   if (!keepSel) deselect();
+  // A group stays on its own slide: arrows or Delete must not reach it from another one.
+  if (!keepSel && i !== S.cur) clearMulti();
   S.cur = i;
   S.slides.forEach((s, k) => {
     s.style.setProperty('display', k === i ? s.dataset.edDisplay : 'none', 'important');

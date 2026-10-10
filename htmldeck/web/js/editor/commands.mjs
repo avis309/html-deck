@@ -13,6 +13,7 @@ import { commandBlocked, lockedHint } from './guards.mjs';
 import { afterChange, isDirty, pushOp } from './history.mjs';
 import { loadNotes } from './speaker-notes.mjs';
 import { applyOp } from './ops.mjs';
+import { afterSlideStep } from './slide-actions.mjs';
 
 // Does an inline declaration lose to a stylesheet `!important` rule (Tailwind `important: true`,
 // `!` utilities, hand-written overrides)? Measured, not guessed: read the computed values with
@@ -130,7 +131,9 @@ export function stepHistory(forward) {
     return;
   }
   History.finishStep(S, op, forward);
-  if (target && target.isConnected) {
+  // A slide op changes the slide list itself: it lands on the slide, nothing gets selected.
+  if (op.slide) afterSlideStep(op);
+  else if (target && target.isConnected) {
     const slideIdx = S.slides.indexOf(target.closest('[data-ed-slide]'));
     if (slideIdx >= 0 && slideIdx !== S.cur) showSlide(slideIdx);
     select(target, { edit: wasEditing && op.type === 'html' });

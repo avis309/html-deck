@@ -130,6 +130,39 @@ function keptOrder(oldOrder, newOrder) {
   for (let i = tailIdx[tails.length - 1] ?? -1; i >= 0; i = prev[i]) keep.add(newOrder[i]);
   return keep;
 }
+// The text an element is saved as when it lands somewhere new: an original moved unchanged keeps
+// its exact bytes from the source file, and so does a copy still equal to its original
+// (st.copies: copy id → original id); anything else is serialised.
+function sourceOf(st, b, map) {
+  const id = nodeId(b), t = map.get(id);
+  if (t && t.end > t.start && !coversTouched(b, st.touched)) return st.sourceText.slice(t.start, t.end);
+  const from = st.copies?.get(id), ot = from && map.get(from), o = ot && st.pristine.querySelector(`[data-ed-id="${from}"]`);
+  if (o && ot.end > ot.start && stripIds(o).outerHTML === stripIds(b).outerHTML) return st.sourceText.slice(ot.start, ot.end);
+  return stripIds(b).outerHTML;
+}
+// When the walk below cannot pair the children (blocks moved with their indentation leave the
+// text nodes in another order): keep the unchanged elements at both ends where they are and
+// rewrite only the span between them, each element in it by sourceOf and the text as it is now.
+function spanSplice(st, p, m, map, ptok) {
+  const pc = [...p.childNodes], mc = [...m.childNodes];
+  if (RAWTEXT_PARENTS.has(p.localName) || ![...pc, ...mc].every(n => n.nodeType === 1 || n.nodeType === 3 || n.nodeType === 8)) return null;
+  const pEl = pc.filter(n => n.nodeType === 1), mEl = mc.filter(n => n.nodeType === 1);
+  const same = (a, b) => a && b && nodeId(a) === nodeId(b) && (a.outerHTML === b.outerHTML || coversTouched(b, st.touched));
+  let head = 0;
+  while (head < pEl.length && head < mEl.length && same(pEl[head], mEl[head])) head++;
+  let tail = 0;
+  while (tail < pEl.length - head && tail < mEl.length - head && same(pEl[pEl.length - 1 - tail], mEl[mEl.length - 1 - tail])) tail++;
+  const tok = n => map.get(nodeId(n));
+  const pa = head ? tok(pEl[head - 1]) : null, pb = tail ? tok(pEl[pEl.length - tail]) : null;
+  if ((head && !pa) || (tail && !pb)) return null;
+  const s = pa ? pa.end : ptok.openEnd, e = pb ? pb.start : ptok.closeStart;
+  if (e == null || e < s) return null;
+  const ma = head ? mc.indexOf(mEl[head - 1]) + 1 : 0, mb = tail ? mc.indexOf(mEl[mEl.length - tail]) : mc.length;
+  let text = '';
+  for (const n of mc.slice(ma, mb)) text += n.nodeType === 1 ? sourceOf(st, n, map) : n.nodeType === 3 ? escText(n.nodeValue) : `<!--${n.nodeValue}-->`;
+  // Patches inside the span (an edited element in it) are covered: the span carries them.
+  return [{ s, e, text, inner: true }];
+}
 function childSplices(st, p, m, map, ptok) {
   const pc = [...p.childNodes], mc = [...m.childNodes], patches = [];
   const pEl = pc.map(nodeId).filter(Boolean), mEl = mc.map(nodeId).filter(Boolean);
@@ -150,10 +183,7 @@ function childSplices(st, p, m, map, ptok) {
       if (a.outerHTML !== b.outerHTML && !coversTouched(b, st.touched)) return null;
       pos = t.end; i++; j++;
     } else if (b && b.nodeType === 1 && !pIds.has(nodeId(b))) {
-      // An original moved here unchanged keeps its exact bytes from the source file.
-      const t = map.get(nodeId(b));
-      const text = t && t.end > t.start && !coversTouched(b, st.touched) ? st.sourceText.slice(t.start, t.end) : stripIds(b).outerHTML;
-      patches.push({ s: pos, e: pos, text, order: j });
+      patches.push({ s: pos, e: pos, text: sourceOf(st, b, map), order: j });
       j++;
     } else if (a && a.nodeType === 1 && !mIds.has(nodeId(a))) {
       const t = map.get(nodeId(a));
@@ -182,6 +212,11 @@ export function minimalSerialize(st) {
   if (st.sourceText == null || !st.pristine) return null;
   const map = alignTokens(tokenize(st.sourceText), st.pristine);
   if (!map) return null;
+  // The child walk keeps the finest ranges; when its result does not parse back to the model
+  // (blocks moved, copied and removed in one save), the changed span of each parent is tried.
+  return patchSource(st, map, false) ?? patchSource(st, map, true);
+}
+function patchSource(st, map, spanFirst) {
   let patches = [];
   for (const id of st.touched) {
     const p = st.pristine.querySelector(`[data-ed-id="${id}"]`), m = modelEl(st, id);
@@ -190,7 +225,7 @@ export function minimalSerialize(st) {
     if (!tok) return null;
     if (attrsKey(p) !== attrsKey(m)) patches.push({ s: tok.start, e: tok.openEnd, text: startTag(m) });
     if (p.innerHTML !== m.innerHTML) {
-      const splices = childSplices(st, p, m, map, tok);
+      const splices = spanFirst ? spanSplice(st, p, m, map, tok) || childSplices(st, p, m, map, tok) : childSplices(st, p, m, map, tok) || spanSplice(st, p, m, map, tok);
       if (splices) patches.push(...splices);
       else if (tok.closeStart >= tok.openEnd) patches.push({ s: tok.openEnd, e: tok.closeStart, text: stripIds(m).innerHTML, inner: true });
       else return null;

@@ -18,10 +18,17 @@ const prevTextLen = n => n.previousSibling?.nodeType === 3 ? n.previousSibling.n
 // right before it, so a next sibling that was replaced (an 'html' op rewrites the text nodes,
 // and merges the two around a removed element into one) can still be found by position.
 // The same for a move's from / to position, taken while the node is there.
-export function positionOf(m, l) { return { mI: indexIn(m), mPrev: prevTextLen(m), lI: indexIn(l), lPrev: prevTextLen(l) }; }
-export function nodeRefs(m, l) {
-  return { m, mParent: m.parentNode, mNext: m.nextSibling, mIdx: indexIn(m), mPrev: prevTextLen(m),
-    l, lParent: l.parentNode, lNext: l.nextSibling, lIdx: indexIn(l), lPrev: prevTextLen(l) };
+// With `ws` (the whitespace that goes with the node, see doInsert) the positions are counted
+// without it: it is taken out and put back around the node.
+export function positionOf(m, l, ws) { return withoutWs(ws, () => ({ mI: indexIn(m), mPrev: prevTextLen(m), lI: indexIn(l), lPrev: prevTextLen(l) })); }
+export function nodeRefs(m, l, ws) {
+  return withoutWs(ws, () => ({ m, mParent: m.parentNode, mNext: m.nextSibling, mIdx: indexIn(m), mPrev: prevTextLen(m),
+    l, lParent: l.parentNode, lNext: l.nextSibling, lIdx: indexIn(l), lPrev: prevTextLen(l) }));
+}
+function withoutWs(ws, fn) {
+  const out = ws?.m.isConnected && ws.l.isConnected ? [ws.m, ws.l].map(n => [n, n.nextSibling, n.parentNode]) : null;
+  out?.forEach(([n]) => n.remove());
+  try { return fn(); } finally { out?.forEach(([n, next, parent]) => parent.insertBefore(n, next)); }
 }
 // Ops keep node references, but an 'html' op (a text commit, or its undo) replaces the
 // descendants of the element it edits with equal copies carrying the same data-ed-id. A
@@ -49,13 +56,30 @@ function nextRef(parent, next, idx, prevLen) {
   if (next.nodeType === 3 && prevLen != null && before?.nodeType === 3 && before.nodeValue.length > prevLen) return before.splitText(prevLen);
   return parent.childNodes[idx] ?? null;
 }
+// An insert / remove / move may carry `ws` = { m, l }: the whitespace text right before the node
+// (model and live), which goes with it so the file keeps one line per block (slides).
 export function doInsert(op, live, st) {
   refreshRefs(st, op, live);
   op.mParent.insertBefore(op.m, nextRef(op.mParent, op.mNext, op.mIdx, op.mPrev));
   op.lParent.insertBefore(op.l, nextRef(op.lParent, op.lNext, op.lIdx, op.lPrev));
+  if (op.ws) { op.mParent.insertBefore(op.ws.m, op.m); op.lParent.insertBefore(op.ws.l, op.l); }
   live.adopt(op.l, op.m);
 }
-export function doRemove(op, live, st) { refreshRefs(st, op, live); op.m.remove(); op.l.remove(); }
+export function doRemove(op, live, st) { refreshRefs(st, op, live); takeWs(op); op.m.remove(); op.l.remove(); }
+// Takes the whitespace out with its node. An 'html' op on an ancestor replaces the text nodes with
+// equal copies: the one now right before the node is taken (and kept for putting back) when it
+// holds the same text, or its end when it was merged with the text before; else nothing is.
+function takeWs(op) {
+  if (!op.ws) return;
+  for (const k of ['m', 'l']) {
+    const n = op[k], w = op.ws[k], prev = n.previousSibling, v = w.nodeValue;
+    // Merged with the text before it (the parser joins adjacent text): its own end is split off.
+    const merged = prev?.nodeType === 3 && prev.nodeValue.length > v.length && prev.nodeValue.endsWith(v);
+    const cur = w.isConnected && w.nextSibling === n ? w : prev?.nodeType === 3 && prev.nodeValue === v ? prev
+      : merged ? prev.splitText(prev.nodeValue.length - v.length) : null;
+    if (cur) { op.ws[k] = cur; cur.remove(); }
+  }
+}
 export function applyMove(op, redo, live, st) {
   const t = redo ? op.to : op.from;
   if (st && live?.el) {
@@ -65,9 +89,11 @@ export function applyMove(op, redo, live, st) {
     for (const k of ['lP', 'lN']) t[k] = current(t[k], fl);
   }
   // Taken out first: the recorded positions count the siblings without the node.
+  takeWs(op);
   op.m.remove(); op.l.remove();
   t.mP.insertBefore(op.m, nextRef(t.mP, t.mN, t.mI, t.mPrev));
   t.lP.insertBefore(op.l, nextRef(t.lP, t.lN, t.lI, t.lPrev));
+  if (op.ws) { t.mP.insertBefore(op.ws.m, op.m); t.lP.insertBefore(op.ws.l, op.l); }
   live.refresh(op.l);
   return op.l;
 }
