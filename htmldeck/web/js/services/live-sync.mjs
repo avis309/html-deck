@@ -55,13 +55,14 @@ function refreshNotes() {
   refreshAgentNotes();
 }
 // Not while the editor is in the middle of something: a save (its answer carries the revision it
-// wrote), a presentation, a drag, an IME composition, a block open for typing with nothing typed
+// wrote), a presentation, a drag (a block, or a slide in the filmstrip), an IME composition, a block open for typing with nothing typed
 // yet (a reload would drop the caret: it waits until the block is left), or a dialog about this
 // file. Checked again shortly. Typed text does not wait: it is unsaved, so the dialog asks.
 function busy() {
-  return S.saving || S.presenting || S.present || S.marquee || S.spacingDrag || S.composing
+  return S.saving || S.presenting || S.present || S.marquee || S.spacingDrag || S.slideDrag || S.composing
     || ((S.editing || S.svgEdit) && !isDirty())
     || S.doc?.documentElement.classList.contains('ed-press')
+    || $('#modal-history').classList.contains('show')
     || $('#modal-conflict').classList.contains('show') || $('#modal-reformat').classList.contains('show');
 }
 function settle() {

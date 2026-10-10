@@ -23,6 +23,7 @@ import { flushRemoval, renderNoteList, renderPins } from './feedback-view.mjs';
 import { clearMulti, deselect, select, showSlide } from '../editor/selection.mjs';
 import { download, save } from '../services/save.mjs';
 import { exportPDF, exportSingleFile, openExportMenu } from '../services/export.mjs';
+import { openVersionHistory } from '../services/history.mjs';
 import { fitZoom, layout, setZoom, zoomBy } from './layout.mjs';
 import { layoutPresent, togglePresent } from '../present/controller.mjs';
 import { nextOverflow } from '../features/overflow.mjs';
@@ -105,6 +106,7 @@ export function bindUI() {
     $('#pop-export').classList.remove('show');
     if (btn.dataset.x === 'single') exportSingleFile();
     else if (btn.dataset.x === 'pdf') exportPDF();
+    else if (btn.dataset.x === 'history') openVersionHistory();
   }));
   try { $('#export-remote').checked = localStorage.getItem('htmldeck_export_remote') !== '0'; } catch { /* storage blocked */ }
   $('#export-remote').addEventListener('change', e => { try { localStorage.setItem('htmldeck_export_remote', e.target.checked ? '1' : '0'); } catch { /* storage blocked */ } });

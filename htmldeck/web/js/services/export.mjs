@@ -12,6 +12,7 @@ import { toast } from '../shared/toast.mjs';
 // ---------------------------------------------------------------- export
 export function openExportMenu() {
   const pop = $('#pop-export');
+  $('#export-history').hidden = S.source?.kind !== 'server';
   if (pop.classList.toggle('show')) {
     const r = $('#btn-export').getBoundingClientRect();
     pop.style.left = Math.max(8, r.right - pop.offsetWidth) + 'px';

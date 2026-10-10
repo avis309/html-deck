@@ -16,6 +16,8 @@ machine cannot call it either:
 - ``POST /api/preview``   stage the editor's render of a document next to its source,
   so relative assets and the page's own scripts resolve exactly as they do on disk
 - ``POST /api/save``      atomic write with a timestamped backup
+- ``GET  /api/backups``   the kept backups of a document (newest first)
+- ``POST /api/restore``   write one of them back, as a save (backs up the current version first)
 - ``POST /api/export``    the editor's text as one self-contained file (images, styles, scripts
                           embedded; files on the web only when asked)
 - ``GET/POST /api/notes`` review notes pinned to elements, stored beside the document in
@@ -313,10 +315,88 @@ def _backup(target: Path, stamp: str) -> Path:
                 os.utime(dst.fileno(), ns=(st.st_atime_ns, st.st_mtime_ns))
         if os.utime not in os.supports_fd:
             os.utime(side.path / name, ns=(st.st_atime_ns, st.st_mtime_ns))
-        old = sorted(n for n in side.names() if n.startswith(f"{target.name}.") and n.endswith(".bak"))
+        old = sorted((n for n in side.names() if _backup_key(target, n)), key=lambda n: _backup_key(target, n))
         for stale in old[:-BACKUPS_KEPT]:
             side.unlink(stale)
         return side.path / name
+
+
+_BACKUP_STAMP = re.compile(r"(\d{8}-\d{6})-(\d{1,9})(Z?)")
+
+
+def _backup_key(target: Path, name: str) -> tuple | None:
+    """Order of a backup of `target` by its stamp (None: not one of its backups). Stamps are UTC
+    (marked Z: no hour repeats when the clocks go back). Names before 0.1.12 (local time, 6
+    meaningless digits) were all made before any Z one, so they all count as older."""
+    prefix = f"{target.name}."
+    if not (name.startswith(prefix) and name.endswith(".bak")):
+        return None
+    m = _BACKUP_STAMP.fullmatch(name[len(prefix):-len(".bak")])
+    if not m:
+        return None
+    return bool(m[3]), m[1], len(m[2]) == 9, int(m[2])
+
+
+def _backup_stamp() -> str:
+    # One clock reading for the second and the nanoseconds within it, so names sort in save order.
+    ns = time.time_ns()
+    return time.strftime("%Y%m%d-%H%M%S", time.gmtime(ns // 10**9)) + f"-{ns % 10**9:09d}Z"
+
+
+def list_backups(target: Path, root: Path) -> dict:
+    """The kept backups of a document, newest first: name, local time and size."""
+    if not target.is_file():
+        raise EditorError(404, "Target file does not exist")
+    items = []
+    # With the saves' lock: a save in another tab prunes backups while they are listed.
+    with SAVE_LOCK, _Sidecar(target, BACKUP_DIR_NAME, create=False) as side:
+        if not side.absent:
+            for name in side.names():
+                key = _backup_key(target, name)
+                if key is None:
+                    continue
+                try:
+                    st = os.stat(name, dir_fd=side.fd, follow_symlinks=False) if side.fd is not None else os.lstat(side.path / name)
+                except FileNotFoundError:
+                    continue
+                if not stat.S_ISREG(st.st_mode):
+                    continue
+                # A backup keeps the mtime of the version it holds: when that version was saved
+                # (the name's stamp is when it was replaced, used only for the order).
+                saved = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime))
+                items.append((key, {"name": name, "time": saved, "size": st.st_size}))
+    items.sort(key=lambda kv: kv[0], reverse=True)
+    return {"file": display_path(target, root), "backups": [item for _, item in items]}
+
+
+def restore_backup(target: Path, name: object, expected_rev: str | None, root: Path) -> dict:
+    """Write a kept backup back over the document, as a save: the current version is backed up
+    first, and a tab that is behind the file gets 409."""
+    if not isinstance(name, str) or "/" in name or "\\" in name or _backup_key(target, name) is None:
+        raise EditorError(400, "Not a backup of this document")
+    if not expected_rev:
+        raise EditorError(400, "Missing revision")
+    with SAVE_LOCK:
+        with _Sidecar(target, BACKUP_DIR_NAME, create=False) as side:
+            if side.absent or name not in side.names():
+                raise EditorError(404, "This backup is no longer kept")
+            # Non-blocking, and only a plain file: a FIFO put there would hold the saves' lock.
+            try:
+                fd = side.open(name, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+            except (IsADirectoryError, PermissionError) as exc:   # a folder (Windows refuses to open one)
+                raise EditorError(422, "The backup is not a plain file") from exc
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                os.close(fd)
+                raise EditorError(422, "The backup is not a plain file")
+            with os.fdopen(fd, "rb") as fh:
+                data = fh.read()
+        try:
+            content = data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise EditorError(422, "The backup is not UTF-8 text") from exc
+        if not content.strip():
+            raise EditorError(422, "The backup is empty")
+        return {**_save_locked(target, content, None, False, root, expected_rev), "restored": name}
 
 
 def save_html(target: Path, content: object, expected_mtime_ns: str | None, force: bool, root: Path,
@@ -341,8 +421,7 @@ def _save_locked(target: Path, content: str, expected_mtime_ns: str | None, forc
     elif expected_mtime_ns and not force and str(target.stat().st_mtime_ns) != str(expected_mtime_ns):
         raise EditorError(409, "The file was changed outside the editor since it was opened")
 
-    stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{time.time_ns() % 1_000_000:06d}"
-    backup = _backup(target, stamp)
+    backup = _backup(target, _backup_stamp())
     tmp = target.with_name(f".{target.name}.tmp.{os.getpid()}.{secrets.token_hex(4)}")
     # load_html hands the text over without its BOM: a file that had one keeps it.
     with open(target, "rb") as fh:
@@ -830,6 +909,7 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
             "/api/config": self._api_config,
             "/api/list_html": self._api_list_html,
             "/api/load": self._api_load,
+            "/api/backups": self._api_backups,
             "/api/notes": self._api_notes_get,
             "/api/watch": self._api_watch,
         }.get(parsed.path)
@@ -911,7 +991,8 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"error": SESSION_ERROR, "session": True}, 403)
             return
         route = {"/api/save": self._api_save, "/api/preview": self._api_preview, "/api/notes": self._api_notes_post,
-                 "/api/export": self._api_export, "/api/trust": self._api_trust}.get(parsed.path)
+                 "/api/export": self._api_export, "/api/trust": self._api_trust,
+                 "/api/restore": self._api_restore}.get(parsed.path)
         if route is None:
             self.send_error(404, "Endpoint not found")
             return
@@ -1065,6 +1146,15 @@ class HTMLEditorHandler(http.server.SimpleHTTPRequestHandler):
         target = resolve_html_path(payload.get("path"), self.root, self._allowed_extra())
         return save_html(target, payload.get("content"), payload.get("mtime_ns"), bool(payload.get("force")), self.root,
                          payload.get("rev"))
+
+    def _api_backups(self, parsed):
+        req_path = urllib.parse.parse_qs(parsed.query).get("path", [None])[0]
+        return list_backups(resolve_html_path(req_path, self.root, self._allowed_extra()), self.root)
+
+    def _api_restore(self, parsed):
+        payload = self._read_json()
+        target = resolve_html_path(payload.get("path"), self.root, self._allowed_extra())
+        return restore_backup(target, payload.get("name"), payload.get("rev"), self.root)
 
     def _api_export(self, parsed):
         payload = self._read_json()

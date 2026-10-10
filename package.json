@@ -4,7 +4,7 @@
   "description": "Dev tooling for HtmlDeck: lint of the editor's ES modules and the black-box browser spec.",
   "scripts": {
     "lint": "eslint \"htmldeck/web/js/**/*.mjs\" && node tools/check-architecture.mjs",
-    "spec": "node tests/spec/fx-runtime.spec.mjs && node tests/spec/characterization.spec.mjs && node tests/spec/traditional-chinese.spec.mjs",
+    "spec": "node tests/spec/history.spec.mjs && node tests/spec/fx-runtime.spec.mjs && node tests/spec/characterization.spec.mjs && node tests/spec/traditional-chinese.spec.mjs && node tests/spec/slides.spec.mjs",
     "check": "npm run lint && npm run test:py && npm run spec",
     "align": "node tools/align-report.mjs",
     "test:py": "P=.venv/bin/python; [ -x \"$P\" ] || P=python3; \"$P\" -m ruff check . && \"$P\" -m pytest -q"

@@ -922,3 +922,102 @@ def test_get_with_a_body_ends_its_connection(server):
             data += chunk
     assert data.startswith(b"HTTP/1.1 403")
     assert data.count(b"HTTP/1.1 ") == 1   # the body was not served as a request of its own
+
+
+def test_backups_kept_are_the_newest_even_within_one_second(root, monkeypatch):
+    # The stamp's sub-second part came from another clock reading: saves in the same second
+    # sorted at random, and pruning could drop the newest backup.
+    target = root / "output/deck/a.html"
+    old = target.parent / ed.BACKUP_DIR_NAME
+    old.mkdir()
+    (old / "a.html.20260101-120000-999999.bak").write_text("legacy", encoding="utf-8")   # a 0.1.11 name
+    ns = iter(range(1_767_268_800_000_000_000, 1_767_268_800_000_000_000 + 2_100_000, 300_000))   # wraps the old 6-digit suffix
+    monkeypatch.setattr(ed.time, "time_ns", lambda: next(ns))
+    for i in range(7):
+        ed.save_html(target, f"<p>{i}</p>", None, True, root)
+    listed = ed.list_backups(target, root)["backups"]
+    assert len(listed) == ed.BACKUPS_KEPT
+    # Newest first: the versions before saves 6, 5, 4, 3, 2 (save i backed up "<p>i-1</p>").
+    contents = [(old / b["name"]).read_text(encoding="utf-8") for b in listed]
+    assert contents == ["<p>5</p>", "<p>4</p>", "<p>3</p>", "<p>2</p>", "<p>1</p>"]
+    assert not (old / "a.html.20260101-120000-999999.bak").exists()
+
+
+def test_restore_writes_a_backup_back_as_a_save(root):
+    target = root / "output/deck/a.html"
+    first = ed.load_html(target, root)
+    ed.save_html(target, "<p>b</p>", None, False, root, first["rev"])
+    name = ed.list_backups(target, root)["backups"][0]["name"]
+    with pytest.raises(ed.EditorError) as stale:   # a tab behind the file
+        ed.restore_backup(target, name, first["rev"], root)
+    assert stale.value.status == 409
+    now = ed.load_html(target, root)
+    res = ed.restore_backup(target, name, now["rev"], root)
+    assert target.read_text(encoding="utf-8") == "<p>a</p>" and res["restored"] == name
+    # The version it replaced is a backup in turn.
+    texts = {(target.parent / ed.BACKUP_DIR_NAME / b["name"]).read_text(encoding="utf-8") for b in ed.list_backups(target, root)["backups"]}
+    assert "<p>b</p>" in texts
+
+
+@pytest.mark.parametrize("name", ["../a.html", "a.html", "b.html.20260101-120000-000000001.bak", "x/a.html.20260101-120000-000000001.bak", None])
+def test_restore_takes_only_a_kept_backup_of_this_document(root, name):
+    target = root / "output/deck/a.html"
+    with pytest.raises(ed.EditorError) as err:
+        ed.restore_backup(target, name, ed.load_html(target, root)["rev"], root)
+    assert err.value.status == 400
+
+
+def test_http_backups_and_restore_need_the_session_key(server):
+    conn = http.client.HTTPConnection("127.0.0.1", server, timeout=5)
+    conn.request("GET", "/api/backups?path=output/deck/a.html", headers={"Host": f"127.0.0.1:{server}", "Sec-Fetch-Site": "same-origin"})
+    res = conn.getresponse()
+    res.read()
+    assert res.status == 403
+    conn.request("GET", "/api/backups?path=output/deck/a.html", headers={**_local(server), "Sec-Fetch-Site": "same-origin"})
+    res = conn.getresponse()
+    assert res.status == 200 and json.loads(res.read())["backups"] == []
+    conn.close()
+
+
+def test_history_shows_when_each_version_was_saved_and_refuses_an_empty_one(root):
+    target = root / "output/deck/a.html"
+    os.utime(target, (1_700_000_000, 1_700_000_000))
+    ed.save_html(target, "<p>b</p>", None, True, root)
+    [kept] = ed.list_backups(target, root)["backups"]
+    assert kept["time"] == ed.time.strftime("%Y-%m-%d %H:%M:%S", ed.time.localtime(1_700_000_000))
+    (target.parent / ed.BACKUP_DIR_NAME / kept["name"]).write_text("  \n", encoding="utf-8")
+    with pytest.raises(ed.EditorError) as err:
+        ed.restore_backup(target, kept["name"], ed.load_html(target, root)["rev"], root)
+    assert err.value.status == 422 and target.read_text(encoding="utf-8") == "<p>b</p>"
+
+
+def test_backup_order_does_not_repeat_when_the_clocks_go_back(root, monkeypatch):
+    # Stamps are UTC: a local 01:59:59 then 01:00:00 (fall back) must still prune the oldest.
+    target = root / "output/deck/a.html"
+    start = 1_793_512_799_000_000_000   # 2026-11-01 05:59:59 UTC (01:59:59 EDT)
+    ns = iter([start + i * 1_000_000_000 for i in range(7)])
+    monkeypatch.setattr(ed.time, "time_ns", lambda: next(ns))
+    for i in range(7):
+        ed.save_html(target, f"<p>{i}</p>", None, True, root)
+    names = [b["name"] for b in ed.list_backups(target, root)["backups"]]
+    side = target.parent / ed.BACKUP_DIR_NAME
+    assert [(side / n).read_text(encoding="utf-8") for n in names] == ["<p>5</p>", "<p>4</p>", "<p>3</p>", "<p>2</p>", "<p>1</p>"]
+    assert all(n.endswith("Z.bak") for n in names)
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="no FIFOs here")
+def test_restore_refuses_a_backup_that_is_not_a_plain_file(root):
+    target = root / "output/deck/a.html"
+    ed.save_html(target, "<p>b</p>", None, True, root)
+    [kept] = ed.list_backups(target, root)["backups"]
+    path = target.parent / ed.BACKUP_DIR_NAME / kept["name"]
+    path.unlink()
+    os.mkfifo(path)
+    with pytest.raises(ed.EditorError) as err:   # returns at once, never waits for a writer
+        ed.restore_backup(target, kept["name"], ed.load_html(target, root)["rev"], root)
+    assert err.value.status == 422
+    path.unlink()
+    path.mkdir()   # a folder: refused too, not a 500
+    with pytest.raises(ed.EditorError) as err:
+        ed.restore_backup(target, kept["name"], ed.load_html(target, root)["rev"], root)
+    assert err.value.status == 422

@@ -346,6 +346,18 @@ export const I18N = {
     k_alt_click_kbd: 'Alt + nhấp',
     k_nav_kbd: '← → khi chưa chọn gì',
     k_zoom_kbd: 'Ctrl + / − / 0 · Ctrl + cuộn',
+
+    // Version history
+    version_history_menu: 'Lịch sử phiên bản…',
+    version_history_title: 'Lịch sử phiên bản',
+    version_history_loading: 'Đang tải các phiên bản…',
+    version_history_empty: 'Chưa có phiên bản đã lưu nào. Các bản sao lưu sẽ xuất hiện sau khi bạn lưu tài liệu.',
+    version_history_restore: 'Khôi phục',
+    version_history_confirm: 'Khôi phục phiên bản này sẽ thay các thay đổi chưa lưu (một bản sao của chúng được tải xuống trước). Tiếp tục?',
+    version_history_restored: 'Đã khôi phục phiên bản từ {time}',
+    version_history_error: 'Không tải được lịch sử phiên bản.',
+    // Slide actions (filmstrip)
+    slide_dup: 'Nhân bản slide', slide_left: 'Chuyển sang trái', slide_right: 'Chuyển sang phải', slide_del: 'Xoá slide', slide_deleted: 'Đã xoá slide · Ctrl+Z để hoàn tác', slide_last: 'Bộ slide cần ít nhất một slide',
   },
   
   zh: {
@@ -692,6 +704,18 @@ export const I18N = {
     k_alt_click_kbd: 'Alt + 点击',
     k_nav_kbd: '← → 未选中文本时',
     k_zoom_kbd: 'Ctrl + / − / 0 · Ctrl + 滚轮',
+
+    // Version history
+    version_history_menu: '版本历史…',
+    version_history_title: '版本历史',
+    version_history_loading: '正在加载版本…',
+    version_history_empty: '尚无保存的版本。保存文档后，备份将显示在此处。',
+    version_history_restore: '恢复',
+    version_history_confirm: '恢复此版本将替换未保存的更改（会先下载一份副本）。是否继续？',
+    version_history_restored: '已恢复 {time} 的版本',
+    version_history_error: '无法加载版本历史。',
+    // Slide actions (filmstrip)
+    slide_dup: '复制幻灯片', slide_left: '左移', slide_right: '右移', slide_del: '删除幻灯片', slide_deleted: '已删除幻灯片 · Ctrl+Z 撤销', slide_last: '演示文稿至少需要一张幻灯片',
   },
   'zh-Hant': {
     brand_title: 'HtmlDeck · 由 Avis 建立 (hunganh.freeze@gmail.com)',
@@ -1037,6 +1061,18 @@ export const I18N = {
     k_alt_click_kbd: 'Alt + 點選',
     k_nav_kbd: '← → 未選中文字時',
     k_zoom_kbd: 'Ctrl + / − / 0 · Ctrl + 滾輪',
+
+    // Version history
+    version_history_menu: '版本歷史…',
+    version_history_title: '版本歷史',
+    version_history_loading: '正在載入版本…',
+    version_history_empty: '尚無儲存的版本。儲存文件後，備份將顯示在此處。',
+    version_history_restore: '還原',
+    version_history_confirm: '還原此版本將取代尚未儲存的變更（會先下載一份副本）。是否繼續？',
+    version_history_restored: '已還原 {time} 的版本',
+    version_history_error: '無法載入版本歷史。',
+    // Slide actions (filmstrip)
+    slide_dup: '複製投影片', slide_left: '左移', slide_right: '右移', slide_del: '刪除投影片', slide_deleted: '已刪除投影片 · Ctrl+Z 復原', slide_last: '簡報至少需要一張投影片',
   },
 
   en: {
@@ -1383,6 +1419,18 @@ export const I18N = {
     k_alt_click_kbd: 'Alt + click',
     k_nav_kbd: '← → when unselected',
     k_zoom_kbd: 'Ctrl + / − / 0 · Ctrl + wheel',
+
+    // Version history
+    version_history_menu: 'Version history…',
+    version_history_title: 'Version history',
+    version_history_loading: 'Loading versions…',
+    version_history_empty: 'No saved versions yet. Backups appear here after you save the document.',
+    version_history_restore: 'Restore',
+    version_history_confirm: 'Restoring this version replaces your unsaved edits (a copy of them is downloaded first). Continue?',
+    version_history_restored: 'Restored version from {time}',
+    version_history_error: 'Cannot load version history.',
+    // Slide actions (filmstrip)
+    slide_dup: 'Duplicate slide', slide_left: 'Move left', slide_right: 'Move right', slide_del: 'Delete slide', slide_deleted: 'Slide deleted · Ctrl+Z to undo', slide_last: 'A deck needs at least one slide',
   }
 };
 

@@ -11,6 +11,7 @@ import { selectAllIn } from './caret.mjs';
 import { hooks } from '../shared/hooks.mjs';
 import { commandBlocked, lockedHint } from './guards.mjs';
 import { pushOp } from './history.mjs';
+import { noteCopy } from './slide-actions.mjs';
 
 // ================================================================ element actions
 export function deleteSel() {
@@ -34,6 +35,7 @@ export function duplicateSel() {
   if (!m) return;
   const mc = m.cloneNode(true);
   reId(mc);
+  noteCopy(mc, m);
   const pos = S.win.getComputedStyle(node).position;
   if (pos === 'absolute' || pos === 'fixed') {
     const [tx, ty] = parseTranslate(mc.style.translate);

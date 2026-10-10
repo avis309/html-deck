@@ -95,7 +95,7 @@ export function resetState() {
   if (S.crop) { S.crop.cancelDrag?.(); S.crop = null; el.ctx.classList.remove('crop-mode'); el.box.classList.remove('crop'); }
   clearTimeout(S.notesTimer); S.notesTimer = 0; S.saving = false;
   clearTimeout(S.draftTimer);
-  S.liveById = new Map(); S.slides = []; S.sections = []; S.cur = 0; S.doc = null; S.win = null;
+  S.liveById = new Map(); S.slideDrag = null; S.slides = []; S.sections = []; S.cur = 0; S.doc = null; S.win = null;
   S.layerScope = null; S.linkCtx = null; S.spacingDrag = false;
   S.noteRegion = null; S.hoverRegion = null; S.marquee = null;
   clearMulti();
@@ -115,6 +115,7 @@ export async function openDocument(html, source) {
   $('#sb-mode').value = S.forceMode || 'auto';
   try {
     buildModel(html);
+    S.copies = new Map();   // copy → original, by model id (see duplicateSlide)
     S.format = inspectFormat(S.model);
     S.source = source;
     // Nothing of the previous document's feedback stays usable while this one is mounted:
@@ -241,7 +242,7 @@ export function onFrameReady() {
   const slides = S.format?.format === 'reveal' ? setupReveal(doc, win) : detectSlides(doc, win);
   const fmtStyle = doc.createElement('style');
   fmtStyle.id = 'ed-format';
-  fmtStyle.textContent = `:root { --ed-deck-w: ${S.deckW}px; --ed-deck-h: ${S.deckH}px; }` + (S.format?.format === 'reveal' ? Reveal.editCSS() + Reveal.backgroundCSS(Reveal.leaves(S.model)) : '');
+  fmtStyle.textContent = formatCSS();
   doc.head.appendChild(fmtStyle);
   S.mode = S.forceMode || (slides.length ? 'deck' : 'page');
   if (S.mode === 'deck' && !slides.length) {
@@ -257,6 +258,7 @@ export function onFrameReady() {
     s.setAttribute('data-ed-slide', '');
   }
   S.slides = slides;
+  document.body.dataset.slideCount = String(slides.length);
   // A transformed ancestor (e.g. a deck track with will-change: transform) becomes the containing
   // block of the fixed slide, which the 0-height overflow-hidden body then clips to nothing.
   const ancs = new Set();
@@ -296,6 +298,10 @@ export function onFrameReady() {
   }
   else toast(`Opened ${S.source.name} · ${S.mode === 'deck' ? S.slides.length + ' slides' : 'web page'} · ${n} editable text blocks`);
   if (S.afterReady) { const f = S.afterReady; S.afterReady = null; f(); }
+}
+// The edit view's format rules: the deck size, and for Reveal its layout and slide backgrounds.
+export function formatCSS() {
+  return `:root { --ed-deck-w: ${S.deckW}px; --ed-deck-h: ${S.deckH}px; }` + (S.format?.format === 'reveal' ? Reveal.editCSS() + Reveal.backgroundCSS(Reveal.leaves(S.model)) : '');
 }
 // A deck is a group of ≥2 sibling `.slide` blocks at presentation width; a carousel of small
 // `.slide` cards on a normal page must stay in page mode.
