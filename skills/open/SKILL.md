@@ -30,7 +30,8 @@ it prints.
    named, or the argument of `/htmldeck <file>`. With neither, start without `--file`.
 2. Start it in the background — the server runs until stopped:
    - Claude Code: Bash with `run_in_background: true`: `RUN --root "<workspace>" --file "<doc>"`
-   - Other shells (macOS/Linux): `RUN --root "<workspace>" --file "<doc>" > "${TMPDIR:-/tmp}/htmldeck.log" 2>&1 &`
+   - Other shells (macOS/Linux): `log="$(mktemp -d)/htmldeck.log"; RUN --root "<workspace>" --file "<doc>" > "$log" 2>&1 & echo "$log"`
+     (a private folder: the log holds the session key, and a shared `/tmp` file is readable by other users)
    - PowerShell: `Start-Process -WindowStyle Hidden -FilePath "<plugin root>/scripts/htmldeck-run.cmd" -ArgumentList '--root','"<workspace>"','--file','"<doc>"' -RedirectStandardOutput "$env:TEMP\htmldeck.log" -RedirectStandardError "$env:TEMP\htmldeck.err"` (errors land in `htmldeck.err`)
 3. Read its output until the line `HTMLDECK_URL=http://127.0.0.1:<port>/?key=<key>` and give the user that
    URL whole: the key is what lets the browser in (without it the page says to open the printed link).
